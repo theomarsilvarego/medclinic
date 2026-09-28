@@ -92,12 +92,24 @@ app.put('/api/admin/users/:id', async (req, res) => {
 });
 app.delete('/api/admin/users/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.user.delete({ where: { id } }); res.status(204).send(); });
 
-app.get('/api/admin/clinic', async (_req, res) => res.json(await prisma.clinic.findFirst()));
-app.put('/api/admin/clinic', async (req, res) => {
-  const parsed = clinicSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Preencha todos os campos da clínica.' });
-  const current = await prisma.clinic.findFirst();
-  const clinic = current ? await prisma.clinic.update({ where: { id: current.id }, data: parsed.data }) : await prisma.clinic.create({ data: parsed.data });
-  res.json(clinic);
+app.get('/api/admin/clinic', async (_req, res) => res.json(await prisma.clinic.findMany({ orderBy: { id: 'desc' } })));
+app.post('/api/admin/clinic', async (req, res) => {
+  const parsed = clinicSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha todos os campos da clínica.' });
+  res.status(201).json(await prisma.clinic.create({ data: parsed.data }));
+});
+app.put('/api/admin/clinic/:id', async (req, res) => {
+  const parsed = clinicSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha todos os campos da clínica.' });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.clinic.update({ where: { id }, data: parsed.data }));
+});
+app.delete('/api/admin/clinic/:id', async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.clinic.delete({ where: { id } });
+  res.status(204).send();
 });
 
 async function crud<T extends { id: number }>(res: Response, model: any, method: 'findMany' | 'create' | 'update' | 'delete', args?: any) { return res.json(await model[method](args)); }
