@@ -33,12 +33,12 @@ function adminOnly(req: AuthRequest, res: Response, next: NextFunction) {
   next();
 }
 
-function routeId(req: Request, res: Response, fallback?: unknown) {
+function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
   const paramId = req.params.id;
   const rawId = paramId && paramId !== 'undefined' && paramId !== 'null' && paramId !== 'NaN' ? paramId : fallback;
   const id = Number(rawId);
   if (!Number.isInteger(id) || id <= 0) {
-    res.status(400).json({ message: 'ID do cadastro inválido. Atualize a lista e tente novamente.' });
+    if (respond) res.status(400).json({ message: 'ID do cadastro inválido. Atualize a lista e tente novamente.' });
     return null;
   }
   return id;
@@ -80,8 +80,13 @@ app.post('/api/admin/users', async (req, res) => {
 app.put('/api/admin/users/:id', async (req, res) => {
   const parsed = userSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Dados de usuário inválidos.' });
-  const id = routeId(req, res, req.body?.id); if (id === null) return;
   const data = parsed.data;
+  let id = routeId(req, res, req.body?.id, false);
+  if (id === null) {
+    const existing = await prisma.user.findUnique({ where: { login: data.login }, select: { id: true } });
+    if (!existing) return res.status(400).json({ message: 'ID do cadastro inválido e login não localizado. Atualize a lista e tente novamente.' });
+    id = existing.id;
+  }
   const user = await prisma.user.update({ where: { id }, data: { fullName: data.fullName, login: data.login, profile: data.profile, ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}) }, select: { id: true, fullName: true, login: true, profile: true } });
   res.json(user);
 });
