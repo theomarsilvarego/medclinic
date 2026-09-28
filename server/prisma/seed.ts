@@ -10,7 +10,12 @@ async function main() {
     update: { fullName: 'Administrador MedClinic', passwordHash, profile: Profile.ADMINISTRADOR },
     create: { fullName: 'Administrador MedClinic', login: 'theomar_rego@hotmail', passwordHash, profile: Profile.ADMINISTRADOR }
   });
-  console.log('Administrador padrão criado/atualizado: theomar_rego@hotmail');
+  await prisma.user.upsert({
+    where: { login: 'christiane.calixto@hotmail.com' },
+    update: { fullName: 'Christiane Calixto', profile: Profile.MEDICO },
+    create: { fullName: 'Christiane Calixto', login: 'christiane.calixto@hotmail.com', passwordHash, profile: Profile.MEDICO }
+  });
+  console.log('Usuária Christiane Calixto criada/atualizada como Médica.');
 }
 
 main().finally(() => prisma.$disconnect());
