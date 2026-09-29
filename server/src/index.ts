@@ -51,6 +51,7 @@ const clinicSchema = z.object({ legalName: requiredText, tradeName: requiredText
 const doctorSchema = z.object({ fullName: requiredText, crm: requiredText, rqe: requiredText, specialty: requiredText });
 const financialSchema = z.object({ name: requiredText, value: z.coerce.number().nonnegative(), active: z.boolean().default(true) });
 const insuranceSchema = financialSchema.extend({ ans: requiredText });
+const attendanceSchema = financialSchema.extend({ insuranceId: z.coerce.number().int().positive() });
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'MedClinic API' }));
 app.post('/api/auth/login', async (req, res) => {
@@ -157,6 +158,11 @@ app.get('/api/admin/insurances', async (_req, res) => crud(res, prisma.insurance
 app.post('/api/admin/insurances', async (req, res) => { const p = insuranceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do convênio.' }); res.status(201).json(await prisma.insurance.create({ data: p.data })); });
 app.put('/api/admin/insurances/:id', async (req, res) => { const p = insuranceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do convênio.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.insurance.update({ where: { id }, data: p.data })); });
 app.delete('/api/admin/insurances/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.insurance.delete({ where: { id } }); res.status(204).send(); });
+
+app.get('/api/admin/attendances', async (_req, res) => res.json(await prisma.attendance.findMany({ orderBy: { id: 'desc' }, include: { insurance: { select: { id: true, name: true } } } })));
+app.post('/api/admin/attendances', async (req, res) => { const p = attendanceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha nome, valor e convênio do atendimento.' }); res.status(201).json(await prisma.attendance.create({ data: p.data, include: { insurance: { select: { id: true, name: true } } } })); });
+app.put('/api/admin/attendances/:id', async (req, res) => { const p = attendanceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha nome, valor e convênio do atendimento.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.attendance.update({ where: { id }, data: p.data, include: { insurance: { select: { id: true, name: true } } } })); });
+app.delete('/api/admin/attendances/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.attendance.delete({ where: { id } }); res.status(204).send(); });
 
 app.get('/api/admin/procedures', async (_req, res) => crud(res, prisma.procedure, 'findMany', { orderBy: { id: 'desc' } }));
 app.post('/api/admin/procedures', async (req, res) => { const p = financialSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do procedimento.' }); res.status(201).json(await prisma.procedure.create({ data: p.data })); });

@@ -59,6 +59,8 @@ model Insurance {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  attendances Attendance[]
+
   @@map("insurances")
 }
 
@@ -92,4 +94,18 @@ model Patient {
   @@index([fullName])
   @@index([cpf])
   @@map("patients")
+}
+
+model Attendance {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(160)
+  value       Decimal   @db.Decimal(10, 2)
+  insuranceId Int       @map("insurance_id")
+  active      Boolean   @default(true)
+  insurance   Insurance @relation(fields: [insuranceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([insuranceId])
+  @@map("attendances")
 }
