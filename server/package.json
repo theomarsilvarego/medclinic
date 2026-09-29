@@ -9,7 +9,10 @@
     "build": "tsc",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "postinstall": "prisma generate",
+    "predev": "prisma generate",
+    "prestart": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

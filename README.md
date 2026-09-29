@@ -52,6 +52,9 @@ cd ../client
 npm install
 ```
 
+
+> Se o projeto já estava instalado antes de uma alteração no `schema.prisma`, execute `cd server && npm run prisma:generate` ou reinstale as dependências para regenerar o cliente Prisma.
+
 5. Inicie em dois terminais:
 
 ```bash
