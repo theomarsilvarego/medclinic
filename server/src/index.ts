@@ -66,6 +66,41 @@ app.get('/api/auth/me', auth, async (req: AuthRequest, res) => {
   res.json(user);
 });
 
+const patientSchema = z.object({
+  sourceCode: z.coerce.number().int().positive(),
+  recordNumber: z.string().trim().optional().nullable(),
+  fullName: requiredText,
+  sex: z.coerce.number().int().optional().nullable(),
+  maritalStatus: z.coerce.number().int().optional().nullable(),
+  cpf: z.string().trim().optional().nullable(),
+  email: z.string().trim().email().optional().nullable().or(z.literal('')),
+  phone: z.string().trim().optional().nullable(),
+  birthDate: z.coerce.date().optional().nullable(),
+  insuranceCode: z.coerce.number().int().optional().nullable(),
+  notes: z.string().optional().nullable()
+});
+
+// Pacientes são acessíveis a qualquer perfil autenticado.
+app.get('/api/patients', auth, async (_req, res) => res.json(await prisma.patient.findMany({ orderBy: { fullName: 'asc' } })));
+app.post('/api/patients', auth, async (req, res) => {
+  const parsed = patientSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha nome e código do paciente corretamente.' });
+  res.status(201).json(await prisma.patient.create({ data: parsed.data }));
+});
+app.put('/api/patients/:id', auth, async (req, res) => {
+  const parsed = patientSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Dados do paciente inválidos.' });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.patient.update({ where: { id }, data: parsed.data }));
+});
+app.delete('/api/patients/:id', auth, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.patient.delete({ where: { id } });
+  res.status(204).send();
+});
+
 app.use('/api/admin', auth, adminOnly);
 
 app.get('/api/admin/users', async (_req, res) => res.json(await prisma.user.findMany({ orderBy: { id: 'desc' }, select: { id: true, fullName: true, login: true, profile: true, createdAt: true } })));

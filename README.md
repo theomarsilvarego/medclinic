@@ -81,6 +81,7 @@ O Administrador possui CRUD completo para:
 - Médicos: nome completo, CRM, RQE e especialidade.
 - Convênios: nome, ANS, valor e ativo.
 - Procedimentos: nome, valor e ativo.
+- Pacientes: dados importados da planilha, prontuário, contatos, nascimento, convênio e observações clínicas; disponível para todos os perfis autenticados.
 
 As rotas da API exigem token JWT, e as rotas administrativas exigem perfil `ADMINISTRADOR`.
 
