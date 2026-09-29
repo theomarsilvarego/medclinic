@@ -14,13 +14,14 @@ enum Profile {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  fullName     String   @map("full_name") @db.VarChar(160)
-  login        String   @unique @db.VarChar(160)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  profile      Profile
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id             Int             @id @default(autoincrement())
+  fullName       String          @map("full_name") @db.VarChar(160)
+  login          String          @unique @db.VarChar(160)
+  passwordHash   String          @map("password_hash") @db.VarChar(255)
+  profile        Profile
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  medicalRecords MedicalRecord[] @relation("MedicalRecordAuthor")
 
   @@map("users")
 }
@@ -81,21 +82,22 @@ model Procedure {
 }
 
 model Patient {
-  id            Int           @id @default(autoincrement())
-  sourceCode    Int           @unique @map("source_code")
-  recordNumber  String?       @map("record_number") @db.VarChar(40)
-  fullName      String        @map("full_name") @db.VarChar(180)
-  sex           Int?
-  maritalStatus Int?          @map("marital_status")
-  cpf           String?       @db.VarChar(14)
-  email         String?       @db.VarChar(180)
-  phone         String?       @db.VarChar(40)
-  birthDate     DateTime?     @map("birth_date") @db.Date
-  insuranceCode Int?          @map("insurance_code")
-  notes         String?       @db.Text
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  appointments  Appointment[]
+  id             Int             @id @default(autoincrement())
+  sourceCode     Int             @unique @map("source_code")
+  recordNumber   String?         @map("record_number") @db.VarChar(40)
+  fullName       String          @map("full_name") @db.VarChar(180)
+  sex            Int?
+  maritalStatus  Int?            @map("marital_status")
+  cpf            String?         @db.VarChar(14)
+  email          String?         @db.VarChar(180)
+  phone          String?         @db.VarChar(40)
+  birthDate      DateTime?       @map("birth_date") @db.Date
+  insuranceCode  Int?            @map("insurance_code")
+  notes          String?         @db.Text
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
 
   @@index([fullName])
   @@index([cpf])
@@ -148,9 +150,36 @@ model Appointment {
   procedure       Procedure?          @relation(fields: [procedureId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
+  medicalRecords  MedicalRecord[]
 
   @@unique([doctorId, appointmentDate, scheduledTime])
   @@index([appointmentDate, scheduledTime])
   @@index([patientId, appointmentDate])
   @@map("appointments")
+}
+
+model MedicalRecord {
+  id             Int          @id @default(autoincrement())
+  patientId      Int          @map("patient_id")
+  authorId       Int          @map("author_id")
+  appointmentId  Int?         @map("appointment_id")
+  recordDate     DateTime     @map("record_date") @db.Date
+  title          String       @db.VarChar(160)
+  chiefComplaint String?      @map("chief_complaint") @db.Text
+  medicalHistory String?      @map("medical_history") @db.Text
+  physicalExam   String?      @map("physical_exam") @db.Text
+  diagnosis      String?      @db.Text
+  conduct        String?      @db.Text
+  prescription   String?      @db.Text
+  notes          String?      @db.Text
+  patient        Patient      @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  author         User         @relation("MedicalRecordAuthor", fields: [authorId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([patientId, recordDate])
+  @@index([authorId, recordDate])
+  @@index([appointmentId])
+  @@map("medical_records")
 }

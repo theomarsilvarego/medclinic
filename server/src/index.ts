@@ -43,6 +43,11 @@ function appointmentManage(req: AuthRequest, res: Response, next: NextFunction) 
   next();
 }
 
+function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.profile !== Profile.MEDICO) return res.status(403).json({ message: 'Acesso restrito ao perfil Médico.' });
+  next();
+}
+
 function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
   const paramId = req.params.id;
   const rawId = paramId && paramId !== 'undefined' && paramId !== 'null' && paramId !== 'NaN' ? paramId : fallback;
@@ -82,6 +87,26 @@ const appointmentInclude = {
   insurance: { select: { id: true, name: true } },
   attendance: { select: { id: true, name: true } },
   procedure: { select: { id: true, name: true } }
+};
+
+const medicalRecordSchema = z.object({
+  patientId: z.coerce.number().int().positive(),
+  appointmentId: z.coerce.number().int().positive().nullable().optional(),
+  recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
+  title: requiredText,
+  chiefComplaint: z.string().optional().nullable(),
+  medicalHistory: z.string().optional().nullable(),
+  physicalExam: z.string().optional().nullable(),
+  diagnosis: z.string().optional().nullable(),
+  conduct: z.string().optional().nullable(),
+  prescription: z.string().optional().nullable(),
+  notes: z.string().optional().nullable()
+});
+
+const medicalRecordInclude = {
+  patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
+  author: { select: { id: true, fullName: true } },
+  appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } }
 };
 
 async function validateAppointmentInsurance(data: z.infer<typeof appointmentSchema>) {
@@ -144,6 +169,31 @@ app.delete('/api/patients/:id', auth, async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;
   await prisma.patient.delete({ where: { id } });
+  res.status(204).send();
+});
+
+app.get('/api/medical-records', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const rawPatientId = req.query.patientId;
+  const patientId = rawPatientId ? Number(rawPatientId) : undefined;
+  if (patientId !== undefined && (!Number.isInteger(patientId) || patientId <= 0)) return res.status(400).json({ message: 'Paciente inválido.' });
+  res.json(await prisma.medicalRecord.findMany({ where: patientId ? { patientId } : undefined, orderBy: [{ recordDate: 'desc' }, { createdAt: 'desc' }], include: medicalRecordInclude }));
+});
+app.post('/api/medical-records', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = medicalRecordSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha a data, o título e o paciente do prontuário.' });
+  const data = { ...parsed.data, recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`), authorId: req.user!.id };
+  res.status(201).json(await prisma.medicalRecord.create({ data, include: medicalRecordInclude }));
+});
+app.put('/api/medical-records/:id', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = medicalRecordSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha a data, o título e o paciente do prontuário.' });
+  const id = routeId(req, res, req.body?.id); if (id === null) return;
+  const data = { ...parsed.data, recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`) };
+  res.json(await prisma.medicalRecord.update({ where: { id }, data, include: medicalRecordInclude }));
+});
+app.delete('/api/medical-records/:id', auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res); if (id === null) return;
+  await prisma.medicalRecord.delete({ where: { id } });
   res.status(204).send();
 });
 
