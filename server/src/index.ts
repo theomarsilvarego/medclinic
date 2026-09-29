@@ -99,8 +99,7 @@ const medicalRecordSchema = z.object({
   physicalExam: z.string().optional().nullable(),
   diagnosis: z.string().optional().nullable(),
   conduct: z.string().optional().nullable(),
-  prescription: z.string().optional().nullable(),
-  notes: z.string().optional().nullable()
+  prescription: z.string().optional().nullable()
 });
 
 const medicalRecordInclude = {
