@@ -20,7 +20,7 @@ function formatDateInput(value: string) { return value ? value.slice(0, 10) : to
 function ageToday(value?: string | null) { if (!value) return 'Não informado'; const birth = new Date(`${value.slice(0, 10)}T12:00:00`); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); const beforeBirthday = now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate()); if (beforeBirthday) age -= 1; return `${age} anos`; }
 function display(value: unknown) { return value === null || value === undefined || value === '' ? 'Não informado' : String(value); }
 
-export function MedicalRecordsPage({ patientId }: MedicalRecordsPageProps) {
+export function MedicalRecordsPage({ patientId, allowNewRecord = false }: MedicalRecordsPageProps & { allowNewRecord?: boolean }) {
   const [patients, setPatients] = useState<Row[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(patientId);
   const [records, setRecords] = useState<Row[]>([]);
@@ -54,7 +54,7 @@ export function MedicalRecordsPage({ patientId }: MedicalRecordsPageProps) {
   async function remove(id: number) { if (!confirm('Excluir este registro do prontuário?')) return; try { await request(`/medical-records/${id}`, { method: 'DELETE' }); await reload(); } catch (e: any) { setError(e.message); } }
 
   return <>
-    <div className="page-heading medical-records-heading"><div><p className="eyebrow">ÁREA MÉDICA</p><h1>Prontuários</h1><p className="muted">Histórico clínico organizado por paciente.</p></div></div>
+    <div className="page-heading medical-records-heading"><div><p className="eyebrow">ÁREA MÉDICA</p><h1>Prontuários</h1><p className="muted">Histórico clínico organizado por paciente.</p></div>{allowNewRecord && <button className="primary" disabled={!selectedPatientId} onClick={() => setEditing(emptyRecord(selectedPatientId))}><Plus size={17}/> Novo registro</button>}</div>
     {error && <div className="error page-error">{error}</div>}
     <div className="records-patient-bar"><UserRound size={18}/><label>Paciente<select value={selectedPatientId || ''} onChange={event => setSelectedPatientId(event.target.value ? Number(event.target.value) : null)}><option value="">Selecione um paciente</option>{patients.map(patient => <option key={patient.id} value={patient.id}>{patient.fullName}</option>)}</select></label></div>
     {selectedPatient && <section className="clinical-patient-card"><div className="clinical-patient-heading"><div><span>FICHA CLÍNICA</span><h2>{selectedPatient.fullName}</h2></div><UserRound size={25}/></div><div className="clinical-patient-grid"><div><span>NOME DA PACIENTE</span><strong>{selectedPatient.fullName}</strong></div><div><span>CPF</span><strong>{display(selectedPatient.cpf)}</strong></div><div><span>TELEFONE</span><strong>{display(selectedPatient.phone)}</strong></div><div><span>CONVÊNIO</span><strong>{selectedPatient.insuranceCode ? `Código ${selectedPatient.insuranceCode}` : 'Não informado'}</strong></div><div><span>DATA DE NASCIMENTO</span><strong>{selectedPatient.birthDate ? new Date(`${String(selectedPatient.birthDate).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informado'}</strong></div><div><span>IDADE HOJE</span><strong>{ageToday(selectedPatient.birthDate)}</strong></div></div></section>}
