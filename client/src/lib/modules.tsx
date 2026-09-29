@@ -12,4 +12,4 @@ export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; si
   { key: 'procedures', label: 'Procedimentos', singular: 'procedimento', icon: <ClipboardList size={18}/> }
 ];
 
-export function canAccessModule(profile: string, key: ModuleKey) { return profile === 'ADMINISTRADOR' || key === 'patients' || key === 'appointments'; }
+export function canAccessModule(profile: string, key: ModuleKey) { return profile === 'ADMINISTRADOR' || key === 'patients' || (key === 'appointments' && profile !== 'MEDICO'); }
