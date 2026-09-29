@@ -85,6 +85,7 @@ O Administrador possui CRUD completo para:
 - Convênios: nome, ANS, valor e ativo.
 - Procedimentos: nome, valor e ativo.
 - Atendimentos: nome, valor, convênio relacionado e ativo; disponível para o perfil Administrador.
+- Agendamentos: grade diária de 08:00 a 20:00 em intervalos de 30 minutos; gestão por Administrador/Secretária e consulta diária pelo Médico.
 - Pacientes: dados importados da planilha, prontuário, contatos, nascimento, convênio e observações clínicas; disponível para todos os perfis autenticados.
 
 As rotas da API exigem token JWT, e as rotas administrativas exigem perfil `ADMINISTRADOR`.

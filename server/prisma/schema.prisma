@@ -47,6 +47,8 @@ model Doctor {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  appointments Appointment[]
+
   @@map("doctors")
 }
 
@@ -59,7 +61,8 @@ model Insurance {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  attendances Attendance[]
+  attendances  Attendance[]
+  appointments Appointment[]
 
   @@map("insurances")
 }
@@ -72,24 +75,27 @@ model Procedure {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  appointments Appointment[]
+
   @@map("procedures")
 }
 
 model Patient {
-  id            Int       @id @default(autoincrement())
-  sourceCode    Int       @unique @map("source_code")
-  recordNumber  String?   @map("record_number") @db.VarChar(40)
-  fullName      String    @map("full_name") @db.VarChar(180)
+  id            Int           @id @default(autoincrement())
+  sourceCode    Int           @unique @map("source_code")
+  recordNumber  String?       @map("record_number") @db.VarChar(40)
+  fullName      String        @map("full_name") @db.VarChar(180)
   sex           Int?
-  maritalStatus Int?      @map("marital_status")
-  cpf           String?   @db.VarChar(14)
-  email         String?   @db.VarChar(180)
-  phone         String?   @db.VarChar(40)
-  birthDate     DateTime? @map("birth_date") @db.Date
-  insuranceCode Int?      @map("insurance_code")
-  notes         String?   @db.Text
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  maritalStatus Int?          @map("marital_status")
+  cpf           String?       @db.VarChar(14)
+  email         String?       @db.VarChar(180)
+  phone         String?       @db.VarChar(40)
+  birthDate     DateTime?     @map("birth_date") @db.Date
+  insuranceCode Int?          @map("insurance_code")
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  appointments  Appointment[]
 
   @@index([fullName])
   @@index([cpf])
@@ -97,15 +103,54 @@ model Patient {
 }
 
 model Attendance {
-  id          Int       @id @default(autoincrement())
-  name        String    @db.VarChar(160)
-  value       Decimal   @db.Decimal(10, 2)
-  insuranceId Int       @map("insurance_id")
-  active      Boolean   @default(true)
-  insurance   Insurance @relation(fields: [insuranceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id           Int           @id @default(autoincrement())
+  name         String        @db.VarChar(160)
+  value        Decimal       @db.Decimal(10, 2)
+  insuranceId  Int           @map("insurance_id")
+  active       Boolean       @default(true)
+  insurance    Insurance     @relation(fields: [insuranceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  appointments Appointment[]
 
   @@index([insuranceId])
   @@map("attendances")
+}
+
+enum AppointmentStatus {
+  AGENDADO
+  CONFIRMADO
+  ATENDIDO
+  FALTOU
+}
+
+enum AppointmentItemType {
+  ATENDIMENTO
+  PROCEDIMENTO
+}
+
+model Appointment {
+  id              Int                 @id @default(autoincrement())
+  appointmentDate DateTime            @map("appointment_date") @db.Date
+  scheduledTime   String              @map("scheduled_time") @db.VarChar(5)
+  patientId       Int                 @map("patient_id")
+  doctorId        Int                 @map("doctor_id")
+  insuranceId     Int                 @map("insurance_id")
+  itemType        AppointmentItemType @map("item_type")
+  attendanceId    Int?                @map("attendance_id")
+  procedureId     Int?                @map("procedure_id")
+  status          AppointmentStatus   @default(AGENDADO)
+  notes           String?             @db.Text
+  patient         Patient             @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  doctor          Doctor              @relation(fields: [doctorId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  insurance       Insurance           @relation(fields: [insuranceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  attendance      Attendance?         @relation(fields: [attendanceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  procedure       Procedure?          @relation(fields: [procedureId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@unique([doctorId, appointmentDate, scheduledTime])
+  @@index([appointmentDate, scheduledTime])
+  @@index([patientId, appointmentDate])
+  @@map("appointments")
 }

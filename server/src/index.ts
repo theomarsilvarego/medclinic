@@ -3,7 +3,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient, Profile } from '@prisma/client';
+import { AppointmentItemType, AppointmentStatus, PrismaClient, Profile } from '@prisma/client';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -33,6 +33,16 @@ function adminOnly(req: AuthRequest, res: Response, next: NextFunction) {
   next();
 }
 
+function appointmentAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  if (![Profile.ADMINISTRADOR, Profile.SECRETARIA, Profile.MEDICO].includes(req.user?.profile as Profile)) return res.status(403).json({ message: 'Perfil sem acesso à agenda.' });
+  next();
+}
+
+function appointmentManage(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.profile !== Profile.ADMINISTRADOR && req.user?.profile !== Profile.SECRETARIA) return res.status(403).json({ message: 'Apenas administrador e secretária podem gerenciar agendamentos.' });
+  next();
+}
+
 function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
   const paramId = req.params.id;
   const rawId = paramId && paramId !== 'undefined' && paramId !== 'null' && paramId !== 'NaN' ? paramId : fallback;
@@ -52,6 +62,41 @@ const doctorSchema = z.object({ fullName: requiredText, crm: requiredText, rqe: 
 const financialSchema = z.object({ name: requiredText, value: z.coerce.number().nonnegative(), active: z.boolean().default(true) });
 const insuranceSchema = financialSchema.extend({ ans: requiredText });
 const attendanceSchema = financialSchema.extend({ insuranceId: z.coerce.number().int().positive() });
+
+const appointmentSchema = z.object({
+  appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
+  scheduledTime: z.string().regex(/^(20:00|(?:08|09|10|11|12|13|14|15|16|17|18|19):(00|30))$/, 'Horário inválido.'),
+  patientId: z.coerce.number().int().positive(),
+  doctorId: z.coerce.number().int().positive(),
+  insuranceId: z.coerce.number().int().positive(),
+  itemType: z.nativeEnum(AppointmentItemType),
+  attendanceId: z.coerce.number().int().positive().nullable().optional(),
+  procedureId: z.coerce.number().int().positive().nullable().optional(),
+  status: z.nativeEnum(AppointmentStatus).default(AppointmentStatus.AGENDADO),
+  notes: z.string().optional().nullable()
+});
+
+const appointmentInclude = {
+  patient: { select: { id: true, fullName: true, phone: true } },
+  doctor: { select: { id: true, fullName: true, specialty: true } },
+  insurance: { select: { id: true, name: true } },
+  attendance: { select: { id: true, name: true } },
+  procedure: { select: { id: true, name: true } }
+};
+
+async function validateAppointmentInsurance(data: z.infer<typeof appointmentSchema>) {
+  if (data.itemType === AppointmentItemType.ATENDIMENTO && data.attendanceId) {
+    const attendance = await prisma.attendance.findUnique({ where: { id: data.attendanceId }, select: { insuranceId: true } });
+    if (!attendance || attendance.insuranceId !== data.insuranceId) throw new Error('O atendimento selecionado não pertence ao convênio informado.');
+  }
+}
+
+function appointmentData(data: z.infer<typeof appointmentSchema>) {
+  const isAttendance = data.itemType === AppointmentItemType.ATENDIMENTO;
+  if (isAttendance && !data.attendanceId) throw new Error('Selecione um atendimento.');
+  if (!isAttendance && !data.procedureId) throw new Error('Selecione um procedimento.');
+  return { ...data, appointmentDate: new Date(`${data.appointmentDate}T00:00:00.000Z`), attendanceId: isAttendance ? data.attendanceId : null, procedureId: isAttendance ? null : data.procedureId };
+}
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'MedClinic API' }));
 app.post('/api/auth/login', async (req, res) => {
@@ -101,6 +146,36 @@ app.delete('/api/patients/:id', auth, async (req, res) => {
   await prisma.patient.delete({ where: { id } });
   res.status(204).send();
 });
+
+app.get('/api/appointments/meta', auth, appointmentAccess, async (_req, res) => {
+  const [patients, doctors, insurances, attendances, procedures] = await Promise.all([
+    prisma.patient.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, phone: true } }),
+    prisma.doctor.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, specialty: true } }),
+    prisma.insurance.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.attendance.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, insuranceId: true, insurance: { select: { name: true } } } }),
+    prisma.procedure.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, value: true } })
+  ]);
+  res.json({ patients, doctors, insurances, attendances, procedures });
+});
+app.get('/api/appointments', auth, appointmentAccess, async (req, res) => {
+  const date = String(req.query.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Informe a data no formato AAAA-MM-DD.' });
+  res.json(await prisma.appointment.findMany({ where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) }, orderBy: [{ scheduledTime: 'asc' }, { doctor: { fullName: 'asc' } }], include: appointmentInclude }));
+});
+app.post('/api/appointments', auth, appointmentManage, async (req, res) => {
+  const parsed = appointmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha corretamente os dados do agendamento.' });
+  try { await validateAppointmentInsurance(parsed.data); const data = appointmentData(parsed.data); res.status(201).json(await prisma.appointment.create({ data, include: appointmentInclude })); }
+  catch (err: any) { if (err?.code === 'P2002') return res.status(409).json({ message: 'Este médico já possui agendamento nesse horário.' }); if (err?.message) return res.status(400).json({ message: err.message }); throw err; }
+});
+app.put('/api/appointments/:id', auth, appointmentManage, async (req, res) => {
+  const parsed = appointmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Preencha corretamente os dados do agendamento.' });
+  const id = routeId(req, res, req.body?.id); if (id === null) return;
+  try { await validateAppointmentInsurance(parsed.data); const data = appointmentData(parsed.data); res.json(await prisma.appointment.update({ where: { id }, data, include: appointmentInclude })); }
+  catch (err: any) { if (err?.code === 'P2002') return res.status(409).json({ message: 'Este médico já possui agendamento nesse horário.' }); if (err?.message) return res.status(400).json({ message: err.message }); throw err; }
+});
+app.delete('/api/appointments/:id', auth, appointmentManage, async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.appointment.delete({ where: { id } }); res.status(204).send(); });
 
 app.use('/api/admin', auth, adminOnly);
 
