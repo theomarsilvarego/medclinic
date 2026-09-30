@@ -84,6 +84,13 @@ const supplierSchema = z.object({
   contact: requiredText,
   address: requiredText
 });
+const examTypeSchema = z.object({
+  code: requiredText,
+  name: requiredText,
+  invoiceValue: z.coerce.number().nonnegative(),
+  value: z.coerce.number().nonnegative(),
+  active: z.boolean().default(true)
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
@@ -326,6 +333,11 @@ app.get('/api/admin/suppliers', async (_req, res) => crud(res, prisma.supplier, 
 app.post('/api/admin/suppliers', async (req, res) => { const p = supplierSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do fornecedor.' }); res.status(201).json(await prisma.supplier.create({ data: p.data })); });
 app.put('/api/admin/suppliers/:id', async (req, res) => { const p = supplierSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do fornecedor.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.supplier.update({ where: { id }, data: p.data })); });
 app.delete('/api/admin/suppliers/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.supplier.delete({ where: { id } }); res.status(204).send(); });
+
+app.get('/api/admin/exam-types', async (_req, res) => crud(res, prisma.examType, 'findMany', { orderBy: { id: 'desc' } }));
+app.post('/api/admin/exam-types', async (req, res) => { const p = examTypeSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do tipo de exame.' }); res.status(201).json(await prisma.examType.create({ data: p.data })); });
+app.put('/api/admin/exam-types/:id', async (req, res) => { const p = examTypeSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do tipo de exame.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.examType.update({ where: { id }, data: p.data })); });
+app.delete('/api/admin/exam-types/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.examType.delete({ where: { id } }); res.status(204).send(); });
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); res.status(500).json({ message: 'Erro interno do servidor.' }); });
 app.listen(port, '0.0.0.0', () => console.log(`MedClinic API em http://localhost:${port}`));

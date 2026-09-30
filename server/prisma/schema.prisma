@@ -120,6 +120,21 @@ model Supplier {
   @@map("suppliers")
 }
 
+model ExamType {
+  id           Int      @id @default(autoincrement())
+  code         String   @db.VarChar(40)
+  name         String   @db.VarChar(160)
+  invoiceValue Decimal  @map("invoice_value") @db.Decimal(10, 2)
+  value        Decimal  @db.Decimal(10, 2)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([code])
+  @@index([name])
+  @@map("exam_types")
+}
+
 model Patient {
   id             Int             @id @default(autoincrement())
   sourceCode     Int             @unique @map("source_code")
