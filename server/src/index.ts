@@ -260,7 +260,7 @@ app.post('/api/medical-records/:id/attachments', auth, doctorOnly, attachmentUpl
       mimeType: req.file.mimetype,
       sizeBytes: req.file.size,
       storageKey: req.file.filename,
-      url: `/api/medical-record-attachments/${req.file.filename}/file`,
+      url: `/medical-record-attachments/${req.file.filename}/file`,
       uploadedById: req.user!.id
     },
     include: { uploadedBy: { select: { id: true, fullName: true } } }

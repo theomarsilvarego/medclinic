@@ -45,7 +45,8 @@ function AttachmentsArea({ recordId, attachments = [], onChanged }: { recordId: 
   async function view(attachment: Row) {
     try {
       const token = localStorage.getItem('medclinic_token');
-      const response = await fetch(`${API}${attachment.url}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const attachmentPath = String(attachment.url || '').replace(/^\/api(?=\/)/, '');
+      const response = await fetch(`${API}${attachmentPath}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!response.ok) throw new Error('Não foi possível abrir o anexo.');
       const blobUrl = URL.createObjectURL(await response.blob()); window.open(blobUrl, '_blank', 'noopener,noreferrer');
     } catch (error: any) { setMessage(error.message); }
