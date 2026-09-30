@@ -3,7 +3,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { AppointmentItemType, AppointmentStatus, PrismaClient, Profile } from '@prisma/client';
+import { AppointmentItemType, AppointmentStatus, InjectableType, PrismaClient, Profile } from '@prisma/client';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -67,6 +67,15 @@ const doctorSchema = z.object({ fullName: requiredText, crm: requiredText, rqe: 
 const financialSchema = z.object({ name: requiredText, value: z.coerce.number().nonnegative(), active: z.boolean().default(true) });
 const insuranceSchema = financialSchema.extend({ ans: requiredText });
 const attendanceSchema = financialSchema.extend({ insuranceId: z.coerce.number().int().positive() });
+const injectableSchema = z.object({
+  name: requiredText,
+  type: z.nativeEnum(InjectableType),
+  supplier: requiredText,
+  invoiceValue: z.coerce.number().nonnegative(),
+  value: z.coerce.number().nonnegative(),
+  quantity: z.coerce.number().int().nonnegative(),
+  minimum: z.coerce.number().int().nonnegative()
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
@@ -299,6 +308,11 @@ app.get('/api/admin/procedures', async (_req, res) => crud(res, prisma.procedure
 app.post('/api/admin/procedures', async (req, res) => { const p = financialSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do procedimento.' }); res.status(201).json(await prisma.procedure.create({ data: p.data })); });
 app.put('/api/admin/procedures/:id', async (req, res) => { const p = financialSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do procedimento.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.procedure.update({ where: { id }, data: p.data })); });
 app.delete('/api/admin/procedures/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.procedure.delete({ where: { id } }); res.status(204).send(); });
+
+app.get('/api/admin/injectables', async (_req, res) => crud(res, prisma.injectable, 'findMany', { orderBy: { id: 'desc' } }));
+app.post('/api/admin/injectables', async (req, res) => { const p = injectableSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do injetável.' }); res.status(201).json(await prisma.injectable.create({ data: p.data })); });
+app.put('/api/admin/injectables/:id', async (req, res) => { const p = injectableSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do injetável.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.injectable.update({ where: { id }, data: p.data })); });
+app.delete('/api/admin/injectables/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.injectable.delete({ where: { id } }); res.status(204).send(); });
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); res.status(500).json({ message: 'Erro interno do servidor.' }); });
 app.listen(port, '0.0.0.0', () => console.log(`MedClinic API em http://localhost:${port}`));

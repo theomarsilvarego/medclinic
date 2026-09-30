@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarCheck, ClipboardList, ClipboardPlus, Building2, FileText, ShieldCheck, Stethoscope, Users } from 'lucide-react';
+import { CalendarCheck, ClipboardList, ClipboardPlus, Building2, FileText, ShieldCheck, Syringe, Stethoscope, Users } from 'lucide-react';
 import type { ModuleKey } from './app';
 export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; singular: string }[] = [
   { key: 'patients', label: 'Pacientes', singular: 'paciente', icon: <ClipboardPlus size={18}/> },
@@ -11,6 +11,7 @@ export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; si
   { key: 'doctors', label: 'Médicos', singular: 'médico', icon: <Stethoscope size={18}/> },
   { key: 'insurances', label: 'Convênios', singular: 'convênio', icon: <ShieldCheck size={18}/> },
   { key: 'procedures', label: 'Procedimentos', singular: 'procedimento', icon: <ClipboardList size={18}/> }
+  ,{ key: 'injectables', label: 'Injetáveis', singular: 'injetável', icon: <Syringe size={18}/> }
 ];
 
 export function canAccessModule(profile: string, key: ModuleKey) { if (key === 'medical-records') return profile === 'MEDICO'; return profile === 'ADMINISTRADOR' || key === 'patients' || (key === 'appointments' && profile !== 'MEDICO'); }

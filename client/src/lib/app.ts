@@ -1,5 +1,5 @@
 export type Profile = 'ADMINISTRADOR' | 'MEDICO' | 'SECRETARIA';
-export type ModuleKey = 'overview' | 'doctor-day' | 'medical-records' | 'patients' | 'users' | 'clinic' | 'doctors' | 'insurances' | 'procedures' | 'attendances' | 'appointments';
+export type ModuleKey = 'overview' | 'doctor-day' | 'medical-records' | 'patients' | 'users' | 'clinic' | 'doctors' | 'insurances' | 'procedures' | 'attendances' | 'injectables' | 'appointments';
 export type Row = Record<string, any>;
 
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';

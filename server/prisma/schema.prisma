@@ -81,6 +81,29 @@ model Procedure {
   @@map("procedures")
 }
 
+enum InjectableType {
+  VITAMINAS
+  PROTOCOLOS
+  IMUNIDADES
+}
+
+model Injectable {
+  id            Int            @id @default(autoincrement())
+  name          String         @db.VarChar(160)
+  type          InjectableType
+  supplier      String         @db.VarChar(160)
+  invoiceValue  Decimal        @map("invoice_value") @db.Decimal(10, 2)
+  value         Decimal        @db.Decimal(10, 2)
+  quantity      Int            @default(0)
+  minimum       Int            @default(0)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([name])
+  @@map("injectables")
+}
+
 model Patient {
   id             Int             @id @default(autoincrement())
   sourceCode     Int             @unique @map("source_code")
