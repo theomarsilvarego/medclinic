@@ -151,7 +151,14 @@ const patientSchema = z.object({
 });
 
 // Pacientes são acessíveis a qualquer perfil autenticado.
-app.get('/api/patients', auth, async (_req, res) => res.json(await prisma.patient.findMany({ orderBy: { fullName: 'asc' } })));
+app.get('/api/patients', auth, async (_req, res) => {
+  const [patients, insurances] = await Promise.all([
+    prisma.patient.findMany({ orderBy: { fullName: 'asc' } }),
+    prisma.insurance.findMany({ select: { id: true, name: true } })
+  ]);
+  const insuranceNames = new Map(insurances.map(insurance => [insurance.id, insurance.name]));
+  res.json(patients.map(patient => ({ ...patient, insuranceName: patient.insuranceCode ? insuranceNames.get(patient.insuranceCode) || null : null })));
+});
 app.post('/api/patients', auth, async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Preencha nome e código do paciente corretamente.' });
