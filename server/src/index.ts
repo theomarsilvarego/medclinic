@@ -106,6 +106,10 @@ const examTypeSchema = z.object({
   value: z.coerce.number().nonnegative(),
   active: z.boolean().default(true)
 });
+const examGroupSchema = z.object({
+  name: requiredText,
+  examTypeIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um exame.').transform(ids => [...new Set(ids)])
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
@@ -147,6 +151,7 @@ const medicalRecordInclude = {
   appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } },
   attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } }
 };
+const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
 
 async function validateAppointmentInsurance(data: z.infer<typeof appointmentSchema>) {
   if (data.itemType === AppointmentItemType.ATENDIMENTO && data.attendanceId) {
@@ -283,6 +288,39 @@ app.delete('/api/medical-record-attachments/:id', auth, doctorOnly, async (req, 
   if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
   await prisma.medicalRecordAttachment.delete({ where: { id } });
   await fs.promises.unlink(path.resolve(attachmentRoot, attachment.storageKey)).catch(() => undefined);
+  res.status(204).send();
+});
+
+app.get('/api/exam-types/catalog', auth, doctorOnly, async (_req, res) => {
+  res.json(await prisma.examType.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { code: 'asc' }], select: { id: true, code: true, name: true, value: true } }));
+});
+app.get('/api/exam-groups', auth, doctorOnly, async (req: AuthRequest, res) => {
+  res.json(await prisma.examGroup.findMany({ where: { createdById: req.user!.id }, orderBy: { name: 'asc' }, include: examGroupInclude }));
+});
+app.post('/api/exam-groups', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = examGroupSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Informe o nome e selecione pelo menos um exame.' });
+  const exams = await prisma.examType.findMany({ where: { id: { in: parsed.data.examTypeIds }, active: true }, select: { id: true } });
+  if (exams.length !== parsed.data.examTypeIds.length) return res.status(400).json({ message: 'Um ou mais exames selecionados não estão disponíveis.' });
+  const group = await prisma.examGroup.create({ data: { name: parsed.data.name, createdById: req.user!.id, items: { create: parsed.data.examTypeIds.map(examTypeId => ({ examTypeId })) } }, include: examGroupInclude });
+  res.status(201).json(group);
+});
+app.put('/api/exam-groups/:id', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = examGroupSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Informe o nome e selecione pelo menos um exame.' });
+  const id = routeId(req, res); if (id === null) return;
+  const existing = await prisma.examGroup.findFirst({ where: { id, createdById: req.user!.id } });
+  if (!existing) return res.status(404).json({ message: 'Grupo de exames não encontrado.' });
+  const exams = await prisma.examType.findMany({ where: { id: { in: parsed.data.examTypeIds }, active: true }, select: { id: true } });
+  if (exams.length !== parsed.data.examTypeIds.length) return res.status(400).json({ message: 'Um ou mais exames selecionados não estão disponíveis.' });
+  const group = await prisma.$transaction(async tx => { await tx.examGroupItem.deleteMany({ where: { groupId: id } }); return tx.examGroup.update({ where: { id }, data: { name: parsed.data.name, items: { create: parsed.data.examTypeIds.map(examTypeId => ({ examTypeId })) } }, include: examGroupInclude }); });
+  res.json(group);
+});
+app.delete('/api/exam-groups/:id', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const id = routeId(req, res); if (id === null) return;
+  const existing = await prisma.examGroup.findFirst({ where: { id, createdById: req.user!.id }, select: { id: true } });
+  if (!existing) return res.status(404).json({ message: 'Grupo de exames não encontrado.' });
+  await prisma.examGroup.delete({ where: { id } });
   res.status(204).send();
 });
 

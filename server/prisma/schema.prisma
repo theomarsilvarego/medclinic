@@ -23,6 +23,7 @@ model User {
   updatedAt      DateTime        @updatedAt @map("updated_at")
   medicalRecords      MedicalRecord[]           @relation("MedicalRecordAuthor")
   uploadedAttachments MedicalRecordAttachment[] @relation("MedicalRecordAttachmentUploader")
+  examGroups          ExamGroup[]               @relation("ExamGroupAuthor")
 
   @@map("users")
 }
@@ -130,10 +131,37 @@ model ExamType {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  groupItems   ExamGroupItem[]
 
   @@index([code])
   @@index([name])
   @@map("exam_types")
+}
+
+model ExamGroup {
+  id          Int             @id @default(autoincrement())
+  name        String          @db.VarChar(160)
+  createdById Int             @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  createdBy   User            @relation("ExamGroupAuthor", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  items       ExamGroupItem[]
+
+  @@index([createdById])
+  @@index([name])
+  @@map("exam_groups")
+}
+
+model ExamGroupItem {
+  id          Int       @id @default(autoincrement())
+  groupId     Int       @map("group_id")
+  examTypeId  Int       @map("exam_type_id")
+  group       ExamGroup @relation(fields: [groupId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  examType    ExamType  @relation(fields: [examTypeId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([groupId, examTypeId])
+  @@index([examTypeId])
+  @@map("exam_group_items")
 }
 
 model Patient {
