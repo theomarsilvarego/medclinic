@@ -104,6 +104,22 @@ model Injectable {
   @@map("injectables")
 }
 
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(160)
+  cnpj      String   @db.VarChar(18)
+  legalName String   @map("legal_name") @db.VarChar(180)
+  email     String   @db.VarChar(180)
+  contact   String   @db.VarChar(80)
+  address   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@index([cnpj])
+  @@map("suppliers")
+}
+
 model Patient {
   id             Int             @id @default(autoincrement())
   sourceCode     Int             @unique @map("source_code")

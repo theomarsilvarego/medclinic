@@ -76,6 +76,14 @@ const injectableSchema = z.object({
   quantity: z.coerce.number().int().nonnegative(),
   minimum: z.coerce.number().int().nonnegative()
 });
+const supplierSchema = z.object({
+  name: requiredText,
+  cnpj: requiredText,
+  legalName: requiredText,
+  email: z.string().trim().email('E-mail inválido.'),
+  contact: requiredText,
+  address: requiredText
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
@@ -313,6 +321,11 @@ app.get('/api/admin/injectables', async (_req, res) => crud(res, prisma.injectab
 app.post('/api/admin/injectables', async (req, res) => { const p = injectableSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do injetável.' }); res.status(201).json(await prisma.injectable.create({ data: p.data })); });
 app.put('/api/admin/injectables/:id', async (req, res) => { const p = injectableSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do injetável.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.injectable.update({ where: { id }, data: p.data })); });
 app.delete('/api/admin/injectables/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.injectable.delete({ where: { id } }); res.status(204).send(); });
+
+app.get('/api/admin/suppliers', async (_req, res) => crud(res, prisma.supplier, 'findMany', { orderBy: { name: 'asc' } }));
+app.post('/api/admin/suppliers', async (req, res) => { const p = supplierSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do fornecedor.' }); res.status(201).json(await prisma.supplier.create({ data: p.data })); });
+app.put('/api/admin/suppliers/:id', async (req, res) => { const p = supplierSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do fornecedor.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.supplier.update({ where: { id }, data: p.data })); });
+app.delete('/api/admin/suppliers/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.supplier.delete({ where: { id } }); res.status(204).send(); });
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); res.status(500).json({ message: 'Erro interno do servidor.' }); });
 app.listen(port, '0.0.0.0', () => console.log(`MedClinic API em http://localhost:${port}`));
