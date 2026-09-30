@@ -21,7 +21,8 @@ model User {
   profile        Profile
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
-  medicalRecords MedicalRecord[] @relation("MedicalRecordAuthor")
+  medicalRecords      MedicalRecord[]           @relation("MedicalRecordAuthor")
+  uploadedAttachments MedicalRecordAttachment[] @relation("MedicalRecordAttachmentUploader")
 
   @@map("users")
 }
@@ -150,8 +151,9 @@ model Patient {
   notes          String?         @db.Text
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
-  appointments   Appointment[]
-  medicalRecords MedicalRecord[]
+  appointments           Appointment[]
+  medicalRecords         MedicalRecord[]
+  recordAttachments     MedicalRecordAttachment[]
 
   @@index([fullName])
   @@index([cpf])
@@ -230,9 +232,31 @@ model MedicalRecord {
   appointment    Appointment? @relation(fields: [appointmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
+  attachments    MedicalRecordAttachment[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
   @@index([appointmentId])
   @@map("medical_records")
+}
+
+model MedicalRecordAttachment {
+  id              Int          @id @default(autoincrement())
+  medicalRecordId Int          @map("medical_record_id")
+  patientId       Int          @map("patient_id")
+  fileName        String       @map("file_name") @db.VarChar(255)
+  mimeType        String       @map("mime_type") @db.VarChar(100)
+  sizeBytes       Int          @map("size_bytes")
+  storageKey      String       @unique @map("storage_key") @db.VarChar(255)
+  url             String       @db.VarChar(255)
+  uploadedById    Int          @map("uploaded_by_id")
+  uploadedAt      DateTime     @default(now()) @map("uploaded_at")
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  patient         Patient      @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  uploadedBy      User         @relation("MedicalRecordAttachmentUploader", fields: [uploadedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([medicalRecordId])
+  @@index([patientId])
+  @@index([uploadedById])
+  @@map("medical_record_attachments")
 }

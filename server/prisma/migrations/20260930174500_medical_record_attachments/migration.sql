@@ -1,0 +1,20 @@
+CREATE TABLE `medical_record_attachments` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `medical_record_id` INTEGER NOT NULL,
+    `patient_id` INTEGER NOT NULL,
+    `file_name` VARCHAR(255) NOT NULL,
+    `mime_type` VARCHAR(100) NOT NULL,
+    `size_bytes` INTEGER NOT NULL,
+    `storage_key` VARCHAR(255) NOT NULL,
+    `url` VARCHAR(255) NOT NULL,
+    `uploaded_by_id` INTEGER NOT NULL,
+    `uploaded_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX `medical_record_attachments_medical_record_id_idx`(`medical_record_id`),
+    INDEX `medical_record_attachments_patient_id_idx`(`patient_id`),
+    INDEX `medical_record_attachments_uploaded_by_id_idx`(`uploaded_by_id`),
+    UNIQUE INDEX `medical_record_attachments_storage_key_key`(`storage_key`),
+    PRIMARY KEY (`id`),
+    CONSTRAINT `medical_record_attachments_medical_record_id_fkey` FOREIGN KEY (`medical_record_id`) REFERENCES `medical_records` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `medical_record_attachments_patient_id_fkey` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `medical_record_attachments_uploaded_by_id_fkey` FOREIGN KEY (`uploaded_by_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

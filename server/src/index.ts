@@ -3,13 +3,28 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { AppointmentItemType, AppointmentStatus, InjectableType, PrismaClient, Profile } from '@prisma/client';
+import multer from 'multer';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+const attachmentRoot = path.resolve(process.env.MEDICAL_RECORD_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'medical-records'));
+fs.mkdirSync(attachmentRoot, { recursive: true });
+const allowedAttachments: Record<string, string> = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png' };
+const attachmentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, attachmentRoot),
+    filename: (_req, file, callback) => callback(null, `${crypto.randomUUID()}${allowedAttachments[file.mimetype] || ''}`)
+  }),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => { if (!allowedAttachments[file.mimetype]) return callback(new Error('Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG.')); callback(null, true); }
+});
 
 type AuthRequest = Request & { user?: { id: number; profile: Profile; login: string } };
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || true }));
@@ -129,7 +144,8 @@ const medicalRecordSchema = z.object({
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
-  appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } }
+  appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } },
+  attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } }
 };
 
 async function validateAppointmentInsurance(data: z.infer<typeof appointmentSchema>) {
@@ -224,6 +240,49 @@ app.put('/api/medical-records/:id', auth, doctorOnly, async (req: AuthRequest, r
 app.delete('/api/medical-records/:id', auth, doctorOnly, async (req, res) => {
   const id = routeId(req, res); if (id === null) return;
   await prisma.medicalRecord.delete({ where: { id } });
+  res.status(204).send();
+});
+
+app.post('/api/medical-records/:id/attachments', auth, doctorOnly, attachmentUpload.single('file'), async (req: AuthRequest, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  if (!req.file) return res.status(400).json({ message: 'Selecione um arquivo PDF, JPG ou PNG.' });
+  const record = await prisma.medicalRecord.findUnique({ where: { id }, select: { id: true, patientId: true } });
+  if (!record) {
+    await fs.promises.unlink(req.file.path).catch(() => undefined);
+    return res.status(404).json({ message: 'Prontuário não encontrado.' });
+  }
+  const attachment = await prisma.medicalRecordAttachment.create({
+    data: {
+      medicalRecordId: record.id,
+      patientId: record.patientId,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      sizeBytes: req.file.size,
+      storageKey: req.file.filename,
+      url: `/api/medical-record-attachments/${req.file.filename}/file`,
+      uploadedById: req.user!.id
+    },
+    include: { uploadedBy: { select: { id: true, fullName: true } } }
+  });
+  res.status(201).json(attachment);
+});
+
+app.get('/api/medical-record-attachments/:storageKey/file', auth, doctorOnly, async (req, res) => {
+  const attachment = await prisma.medicalRecordAttachment.findFirst({ where: { storageKey: String(req.params.storageKey) }, select: { storageKey: true, fileName: true, mimeType: true } });
+  if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
+  const filePath = path.resolve(attachmentRoot, attachment.storageKey);
+  if (!filePath.startsWith(`${attachmentRoot}${path.sep}`)) return res.status(400).json({ message: 'Arquivo inválido.' });
+  res.type(attachment.mimeType).download(filePath, attachment.fileName);
+});
+
+app.delete('/api/medical-record-attachments/:id', auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const attachment = await prisma.medicalRecordAttachment.findUnique({ where: { id }, select: { storageKey: true } });
+  if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
+  await prisma.medicalRecordAttachment.delete({ where: { id } });
+  await fs.promises.unlink(path.resolve(attachmentRoot, attachment.storageKey)).catch(() => undefined);
   res.status(204).send();
 });
 
@@ -339,5 +398,5 @@ app.post('/api/admin/exam-types', async (req, res) => { const p = examTypeSchema
 app.put('/api/admin/exam-types/:id', async (req, res) => { const p = examTypeSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do tipo de exame.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.examType.update({ where: { id }, data: p.data })); });
 app.delete('/api/admin/exam-types/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.examType.delete({ where: { id } }); res.status(204).send(); });
 
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); res.status(500).json({ message: 'Erro interno do servidor.' }); });
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); const message = err?.code === 'LIMIT_FILE_SIZE' ? 'O arquivo excede o limite de 10 MB.' : err?.message || 'Erro interno do servidor.'; res.status(err?.code === 'LIMIT_FILE_SIZE' || err?.status === 400 || message.startsWith('Tipo de arquivo') ? 400 : 500).json({ message }); });
 app.listen(port, '0.0.0.0', () => console.log(`MedClinic API em http://localhost:${port}`));
