@@ -24,6 +24,7 @@ model User {
   medicalRecords      MedicalRecord[]           @relation("MedicalRecordAuthor")
   uploadedAttachments MedicalRecordAttachment[] @relation("MedicalRecordAttachmentUploader")
   examGroups          ExamGroup[]               @relation("ExamGroupAuthor")
+  examRequests        ExamRequest[]             @relation("ExamRequestAuthor")
 
   @@map("users")
 }
@@ -146,6 +147,7 @@ model ExamGroup {
   updatedAt   DateTime        @updatedAt @map("updated_at")
   createdBy   User            @relation("ExamGroupAuthor", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
   items       ExamGroupItem[]
+  requests    ExamRequest[]
 
   @@index([createdById])
   @@index([name])
@@ -182,6 +184,7 @@ model Patient {
   appointments           Appointment[]
   medicalRecords         MedicalRecord[]
   recordAttachments     MedicalRecordAttachment[]
+  examRequests          ExamRequest[]
 
   @@index([fullName])
   @@index([cpf])
@@ -261,11 +264,36 @@ model MedicalRecord {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   attachments    MedicalRecordAttachment[]
+  examRequests   ExamRequest[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
   @@index([appointmentId])
   @@map("medical_records")
+}
+
+enum ExamRequestStatus {
+  AGUARDANDO_RESULTADO
+}
+
+model ExamRequest {
+  id             Int               @id @default(autoincrement())
+  medicalRecordId Int              @map("medical_record_id")
+  patientId      Int               @map("patient_id")
+  examGroupId    Int               @map("exam_group_id")
+  groupName      String            @map("group_name") @db.VarChar(160)
+  status         ExamRequestStatus @default(AGUARDANDO_RESULTADO)
+  requestedById  Int               @map("requested_by_id")
+  requestedAt    DateTime          @default(now()) @map("requested_at")
+  medicalRecord  MedicalRecord     @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  patient        Patient           @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  examGroup      ExamGroup         @relation(fields: [examGroupId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  requestedBy    User              @relation("ExamRequestAuthor", fields: [requestedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([medicalRecordId, examGroupId])
+  @@index([patientId])
+  @@index([requestedById])
+  @@map("exam_requests")
 }
 
 model MedicalRecordAttachment {

@@ -110,6 +110,9 @@ const examGroupSchema = z.object({
   name: requiredText,
   examTypeIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um exame.').transform(ids => [...new Set(ids)])
 });
+const examRequestSchema = z.object({
+  examGroupIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um grupo.')
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
@@ -145,11 +148,13 @@ const medicalRecordSchema = z.object({
   prescription: z.string().optional().nullable()
 });
 
+const examRequestInclude = { examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
   appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } },
-  attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } }
+  attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } },
+  examRequests: { orderBy: { requestedAt: 'asc' as const }, include: examRequestInclude }
 };
 const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
 
@@ -322,6 +327,22 @@ app.delete('/api/exam-groups/:id', auth, doctorOnly, async (req: AuthRequest, re
   if (!existing) return res.status(404).json({ message: 'Grupo de exames não encontrado.' });
   await prisma.examGroup.delete({ where: { id } });
   res.status(204).send();
+});
+
+app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = examRequestSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um grupo de exames.' });
+  const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
+  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
+  if (!record) return res.status(404).json({ message: 'Prontuário não encontrado.' });
+  const groupIds = [...new Set(parsed.data.examGroupIds)];
+  const groups = await prisma.examGroup.findMany({ where: { id: { in: groupIds }, createdById: req.user!.id }, select: { id: true, name: true } });
+  if (groups.length !== groupIds.length) return res.status(400).json({ message: 'Um ou mais grupos não estão disponíveis para este médico.' });
+  const existing = await prisma.examRequest.findMany({ where: { medicalRecordId, examGroupId: { in: groupIds } }, select: { examGroupId: true } });
+  const existingIds = new Set(existing.map(item => item.examGroupId));
+  const pending = groups.filter(group => !existingIds.has(group.id));
+  if (pending.length > 0) await prisma.examRequest.createMany({ data: pending.map(group => ({ medicalRecordId, patientId: record.patientId, examGroupId: group.id, groupName: group.name, requestedById: req.user!.id })) });
+  res.status(201).json(await prisma.examRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: examRequestInclude }));
 });
 
 app.get('/api/appointments/meta', auth, appointmentAccess, async (_req, res) => {
