@@ -417,9 +417,10 @@ app.post('/api/medical-records/:id/injectable-requests', auth, doctorOnly, async
   const parsed = injectableRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um injetável e informe via e sessões.' });
   const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true, appointment: { select: { appointmentDate: true } } } });
-  const todayDate = new Date().toISOString().slice(0, 10);
-  if (!record || !record.appointment || record.appointment.appointmentDate.toISOString().slice(0, 10) !== todayDate) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente para atendimentos do dia.' });
+  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
+  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0); const tomorrowDate = new Date(todayDate); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const todayAppointment = record ? await prisma.appointment.findFirst({ where: { patientId: record.patientId, appointmentDate: { gte: todayDate, lt: tomorrowDate } }, select: { id: true } }) : null;
+  if (!record || !todayAppointment) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente para atendimentos do dia.' });
   const items = parsed.data.items.filter((item, index, all) => all.findIndex(other => other.injectableId === item.injectableId) === index);
   const ids = items.map(item => item.injectableId);
   const injectables = await prisma.injectable.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, type: true } });
