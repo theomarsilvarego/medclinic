@@ -116,6 +116,9 @@ const examGroupSchema = z.object({
 const examRequestSchema = z.object({
   examGroupIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um grupo.')
 });
+const injectableRequestSchema = z.object({
+  items: z.array(z.object({ injectableId: z.coerce.number().int().positive(), route: z.enum(['IM', 'EV', 'SC']), sessions: z.coerce.number().int().min(1).max(99) })).min(1, 'Selecione pelo menos um injetável.')
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
@@ -151,13 +154,15 @@ const medicalRecordSchema = z.object({
   prescription: z.string().optional().nullable()
 });
 
+const injectableRequestInclude = { injectable: { select: { id: true, name: true, type: true } }, requestedBy: { select: { id: true, fullName: true } } };
 const examRequestInclude = { examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
   appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } },
   attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } },
-  examRequests: { orderBy: { requestedAt: 'asc' as const }, include: examRequestInclude }
+  examRequests: { orderBy: { requestedAt: 'asc' as const }, include: examRequestInclude },
+  injectableRequests: { orderBy: { requestedAt: 'asc' as const }, include: injectableRequestInclude }
 };
 const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
 
@@ -336,6 +341,9 @@ app.delete('/api/medical-record-attachments/:id', auth, doctorOnly, async (req, 
 app.get('/api/exam-types/catalog', auth, doctorOnly, async (_req, res) => {
   res.json(await prisma.examType.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { code: 'asc' }], select: { id: true, code: true, name: true, value: true } }));
 });
+app.get('/api/injectables/catalog', auth, doctorOnly, async (_req, res) => {
+  res.json(await prisma.injectable.findMany({ orderBy: [{ type: 'asc' }, { name: 'asc' }], select: { id: true, name: true, type: true } }));
+});
 app.get('/api/exam-groups', auth, doctorOnly, async (req: AuthRequest, res) => {
   res.json(await prisma.examGroup.findMany({ where: { createdById: req.user!.id }, orderBy: { name: 'asc' }, include: examGroupInclude }));
 });
@@ -403,6 +411,24 @@ app.get('/api/medical-record-exam-requests/:id/pdf', auth, doctorOnly, async (re
   const pdfPath = path.join(examRequestPdfRoot, `${examRequest.id}.pdf`);
   if (!fs.existsSync(pdfPath)) await generateExamRequestPdf(examRequest);
   res.type('application/pdf').sendFile(pdfPath, { headers: { 'Content-Disposition': `inline; filename="${examRequest.code || `RX-${String(examRequest.id).padStart(6, '0')}`}.pdf"` } });
+});
+
+app.post('/api/medical-records/:id/injectable-requests', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = injectableRequestSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um injetável e informe via e sessões.' });
+  const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
+  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true, appointment: { select: { appointmentDate: true } } } });
+  const todayDate = new Date().toISOString().slice(0, 10);
+  if (!record || !record.appointment || record.appointment.appointmentDate.toISOString().slice(0, 10) !== todayDate) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente para atendimentos do dia.' });
+  const items = parsed.data.items.filter((item, index, all) => all.findIndex(other => other.injectableId === item.injectableId) === index);
+  const ids = items.map(item => item.injectableId);
+  const injectables = await prisma.injectable.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, type: true } });
+  if (injectables.length !== ids.length) return res.status(400).json({ message: 'Um ou mais injetáveis não estão cadastrados.' });
+  const existing = await prisma.injectableRequest.findMany({ where: { medicalRecordId, injectableId: { in: ids } }, select: { injectableId: true } });
+  const existingIds = new Set(existing.map(item => item.injectableId));
+  const data = items.filter(item => !existingIds.has(item.injectableId)).map(item => { const injectable = injectables.find(row => row.id === item.injectableId)!; return { medicalRecordId, patientId: record.patientId, injectableId: item.injectableId, name: injectable.name, category: injectable.type, route: item.route as any, sessions: item.sessions, requestedById: req.user!.id }; });
+  if (data.length) await prisma.injectableRequest.createMany({ data });
+  res.status(201).json(await prisma.injectableRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: injectableRequestInclude }));
 });
 
 app.get('/api/appointments/meta', auth, appointmentAccess, async (_req, res) => {

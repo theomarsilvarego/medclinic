@@ -25,6 +25,7 @@ model User {
   uploadedAttachments MedicalRecordAttachment[] @relation("MedicalRecordAttachmentUploader")
   examGroups          ExamGroup[]               @relation("ExamGroupAuthor")
   examRequests        ExamRequest[]             @relation("ExamRequestAuthor")
+  injectableRequests  InjectableRequest[]      @relation("InjectableRequestAuthor")
 
   @@map("users")
 }
@@ -101,6 +102,7 @@ model Injectable {
   minimum       Int            @default(0)
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
+  requests      InjectableRequest[]
 
   @@index([type])
   @@index([name])
@@ -185,6 +187,7 @@ model Patient {
   medicalRecords         MedicalRecord[]
   recordAttachments     MedicalRecordAttachment[]
   examRequests          ExamRequest[]
+  injectableRequests    InjectableRequest[]
 
   @@index([fullName])
   @@index([cpf])
@@ -265,6 +268,7 @@ model MedicalRecord {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   attachments    MedicalRecordAttachment[]
   examRequests   ExamRequest[]
+  injectableRequests InjectableRequest[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
@@ -296,6 +300,39 @@ model ExamRequest {
   @@index([patientId])
   @@index([requestedById])
   @@map("exam_requests")
+}
+
+enum InjectableRequestRoute {
+  IM
+  EV
+  SC
+}
+
+enum InjectableRequestStatus {
+  AGUARDANDO_APLICACAO
+}
+
+model InjectableRequest {
+  id              Int                     @id @default(autoincrement())
+  medicalRecordId Int                     @map("medical_record_id")
+  patientId       Int                     @map("patient_id")
+  injectableId    Int                     @map("injectable_id")
+  name            String                  @db.VarChar(160)
+  category        InjectableType
+  route           InjectableRequestRoute
+  sessions        Int                     @default(1)
+  status          InjectableRequestStatus @default(AGUARDANDO_APLICACAO)
+  requestedById   Int                     @map("requested_by_id")
+  requestedAt     DateTime                @default(now()) @map("requested_at")
+  medicalRecord   MedicalRecord           @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  patient         Patient                 @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  injectable      Injectable              @relation(fields: [injectableId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  requestedBy     User                    @relation("InjectableRequestAuthor", fields: [requestedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([medicalRecordId, injectableId])
+  @@index([patientId])
+  @@index([requestedById])
+  @@map("injectable_requests")
 }
 
 model MedicalRecordAttachment {
