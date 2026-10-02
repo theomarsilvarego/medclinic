@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { AppointmentItemType, AppointmentStatus, InjectableType, PrismaClient, Profile } from '@prisma/client';
 import multer from 'multer';
+import PDFDocument from 'pdfkit';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -16,6 +17,8 @@ const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
 const attachmentRoot = path.resolve(process.env.MEDICAL_RECORD_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'medical-records'));
 fs.mkdirSync(attachmentRoot, { recursive: true });
+const examRequestPdfRoot = path.resolve(process.env.EXAM_REQUEST_PDF_DIR || path.join(process.cwd(), 'uploads', 'exam-requests'));
+fs.mkdirSync(examRequestPdfRoot, { recursive: true });
 const allowedAttachments: Record<string, string> = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png' };
 const attachmentUpload = multer({
   storage: multer.diskStorage({
@@ -157,6 +160,40 @@ const medicalRecordInclude = {
   examRequests: { orderBy: { requestedAt: 'asc' as const }, include: examRequestInclude }
 };
 const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
+
+function pdfDate(value: Date | string) { return new Date(value).toLocaleDateString('pt-BR'); }
+function pdfMoney(value: unknown) { return `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`; }
+async function generateExamRequestPdf(data: any) {
+  const pdfPath = path.join(examRequestPdfRoot, `${data.id}.pdf`);
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 48 });
+    const stream = fs.createWriteStream(pdfPath);
+    stream.on('finish', resolve); stream.on('error', reject); doc.on('error', reject); doc.pipe(stream);
+    const wine = '#741447'; const pale = '#f8edf3'; const ink = '#29242a'; const gray = '#706970';
+    doc.rect(0, 0, 595, 128).fill(pale); doc.rect(0, 0, 595, 5).fill(wine);
+    doc.fillColor(wine).font('Helvetica-Bold').fontSize(26).text('intimavie', 48, 38);
+    doc.fillColor('#76566b').font('Helvetica').fontSize(10).text('MEDICINA ÍNTIMA', 51, 73);
+    doc.fillColor(wine).font('Helvetica-Bold').fontSize(11).text('EXAMES & RECEITAS', 418, 51, { width: 128, align: 'right' });
+    doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('PEDIDO DE EXAMES', 48, 153);
+    doc.fillColor(gray).font('Helvetica').fontSize(10).text(`Código: ${data.code || `RX-${String(data.id).padStart(6, '0')}`}`, 410, 153, { width: 137, align: 'right' });
+    doc.roundedRect(48, 181, 499, 90, 8).fillAndStroke('#fff9fc', '#e5d3df');
+    doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('PACIENTE', 65, 201);
+    doc.fillColor(ink).font('Helvetica-Bold').fontSize(17).text(String(data.patient?.fullName || '').toUpperCase(), 65, 219, { width: 465 });
+    doc.fillColor(gray).font('Helvetica').fontSize(9).text(`CPF: ${data.patient?.cpf || 'Não informado'}`, 65, 251);
+    doc.text(`Nascimento: ${data.patient?.birthDate ? pdfDate(data.patient.birthDate) : 'Não informado'}`, 235, 251);
+    doc.text(`Telefone: ${data.patient?.phone || 'Não informado'}`, 410, 251, { width: 120, align: 'right' });
+    const tableTop = 307; doc.rect(48, tableTop, 499, 27).fill(wine);
+    doc.fillColor('#fff').font('Helvetica-Bold').fontSize(9).text('CÓDIGO', 65, tableTop + 9).text('EXAME', 142, tableTop + 9).text('VALOR', 480, tableTop + 9, { width: 50, align: 'right' });
+    let y = tableTop + 27; let total = 0;
+    const items = data.examGroup?.items || [];
+    items.forEach((item: any, index: number) => { const exam = item.examType || {}; const value = Number(exam.value || 0); total += value; if (index % 2 === 0) doc.rect(48, y, 499, 32).fill('#fff8fc'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text(String(exam.code || '—'), 65, y + 11, { width: 68 }); doc.fillColor(ink).font('Helvetica').text(String(exam.name || 'Exame'), 142, y + 11, { width: 315 }); doc.text(pdfMoney(value), 480, y + 11, { width: 50, align: 'right' }); y += 32; });
+    doc.strokeColor('#e5d3df').moveTo(48, y).lineTo(547, y).stroke();
+    doc.roundedRect(336, y + 24, 211, 62, 8).fillAndStroke(pale, '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('VALOR TOTAL', 355, y + 43); doc.fontSize(20).text(pdfMoney(total), 355, y + 60, { width: 172, align: 'right' });
+    const footerY = 735; doc.strokeColor('#d9c8d1').moveTo(65, footerY).lineTo(240, footerY).stroke(); doc.fillColor(gray).font('Helvetica').fontSize(9).text('Responsável pela emissão', 65, footerY + 12); doc.text(`Emitido por: ${data.requestedBy?.fullName || 'Médico'}`, 65, footerY + 31); doc.fillColor('#8d8189').fontSize(8).text('Documento gerado pelo sistema Clínica Intimavie.', 195, footerY + 63, { width: 250, align: 'center' });
+    doc.end();
+  });
+  return pdfPath;
+}
 
 async function validateAppointmentInsurance(data: z.infer<typeof appointmentSchema>) {
   if (data.itemType === AppointmentItemType.ATENDIMENTO && data.attendanceId) {
@@ -341,8 +378,31 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
   const existing = await prisma.examRequest.findMany({ where: { medicalRecordId, examGroupId: { in: groupIds } }, select: { examGroupId: true } });
   const existingIds = new Set(existing.map(item => item.examGroupId));
   const pending = groups.filter(group => !existingIds.has(group.id));
-  if (pending.length > 0) await prisma.examRequest.createMany({ data: pending.map(group => ({ medicalRecordId, patientId: record.patientId, examGroupId: group.id, groupName: group.name, requestedById: req.user!.id })) });
+  const createdIds: number[] = [];
+  if (pending.length > 0) {
+    await prisma.$transaction(async tx => {
+      for (const group of pending) {
+        const created = await tx.examRequest.create({ data: { medicalRecordId, patientId: record.patientId, examGroupId: group.id, groupName: group.name, code: `TMP-${crypto.randomUUID()}`, requestedById: req.user!.id } });
+        const code = `RX-${String(created.id).padStart(6, '0')}`;
+        await tx.examRequest.update({ where: { id: created.id }, data: { code, pdfUrl: `/medical-record-exam-requests/${created.id}/pdf` } });
+        createdIds.push(created.id);
+      }
+    });
+    for (const id of createdIds) {
+      const created = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } } } });
+      if (created) await generateExamRequestPdf(created);
+    }
+  }
   res.status(201).json(await prisma.examRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: examRequestInclude }));
+});
+
+app.get('/api/medical-record-exam-requests/:id/pdf', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const id = routeId(req, res); if (id === null) return;
+  const examRequest = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } } } });
+  if (!examRequest) return res.status(404).json({ message: 'Pedido de exames não encontrado.' });
+  const pdfPath = path.join(examRequestPdfRoot, `${examRequest.id}.pdf`);
+  if (!fs.existsSync(pdfPath)) await generateExamRequestPdf(examRequest);
+  res.type('application/pdf').sendFile(pdfPath, { headers: { 'Content-Disposition': `inline; filename="${examRequest.code || `RX-${String(examRequest.id).padStart(6, '0')}`}.pdf"` } });
 });
 
 app.get('/api/appointments/meta', auth, appointmentAccess, async (_req, res) => {
