@@ -212,6 +212,7 @@ model Attendance {
 enum AppointmentStatus {
   AGENDADO
   CONFIRMADO
+  EM_ATENDIMENTO
   ATENDIDO
   FALTOU
 }

@@ -15,6 +15,7 @@ const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'America/Sao_Paulo';
 const attachmentRoot = path.resolve(process.env.MEDICAL_RECORD_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'medical-records'));
 fs.mkdirSync(attachmentRoot, { recursive: true });
 const examRequestPdfRoot = path.resolve(process.env.EXAM_REQUEST_PDF_DIR || path.join(process.cwd(), 'uploads', 'exam-requests'));
@@ -64,6 +65,10 @@ function appointmentManage(req: AuthRequest, res: Response, next: NextFunction) 
 function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
   if (req.user?.profile !== Profile.MEDICO) return res.status(403).json({ message: 'Acesso restrito ao perfil Médico.' });
   next();
+}
+
+function clinicTodayDate() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: clinicTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
 function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
@@ -390,7 +395,7 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
   if (pending.length > 0) {
     await prisma.$transaction(async tx => {
       for (const group of pending) {
-        const created = await tx.examRequest.create({ data: { medicalRecordId, patientId: record.patientId, examGroupId: group.id, groupName: group.name, code: `TMP-${crypto.randomUUID()}`, requestedById: req.user!.id } });
+        const created = await tx.examRequest.create({ data: { medicalRecordId, patientId: record.patientId, examGroupId: group.id, groupName: group.name, code: `TMP-${crypto.randomBytes(6).toString('hex')}`, requestedById: req.user!.id } });
         const code = `RX-${String(created.id).padStart(6, '0')}`;
         await tx.examRequest.update({ where: { id: created.id }, data: { code, pdfUrl: `/medical-record-exam-requests/${created.id}/pdf` } });
         createdIds.push(created.id);
@@ -418,8 +423,7 @@ app.post('/api/medical-records/:id/injectable-requests', auth, doctorOnly, async
   if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um injetável e informe via e sessões.' });
   const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
   const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
-  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0); const tomorrowDate = new Date(todayDate); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const todayAppointment = record ? await prisma.appointment.findFirst({ where: { patientId: record.patientId, appointmentDate: { gte: todayDate, lt: tomorrowDate } }, select: { id: true } }) : null;
+  const todayAppointment = record ? await prisma.appointment.findFirst({ where: { patientId: record.patientId, appointmentDate: new Date(`${clinicTodayDate()}T00:00:00.000Z`) }, select: { id: true } }) : null;
   if (!record || !todayAppointment) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente para atendimentos do dia.' });
   const items = parsed.data.items.filter((item, index, all) => all.findIndex(other => other.injectableId === item.injectableId) === index);
   const ids = items.map(item => item.injectableId);
@@ -446,6 +450,13 @@ app.get('/api/appointments', auth, appointmentAccess, async (req, res) => {
   const date = String(req.query.date || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Informe a data no formato AAAA-MM-DD.' });
   res.json(await prisma.appointment.findMany({ where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) }, orderBy: [{ scheduledTime: 'asc' }, { doctor: { fullName: 'asc' } }], include: appointmentInclude }));
+});
+app.patch('/api/appointments/:id/start', auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res); if (id === null) return;
+  const appointment = await prisma.appointment.findUnique({ where: { id }, select: { id: true, appointmentDate: true } });
+  if (!appointment) return res.status(404).json({ message: 'Agendamento não encontrado.' });
+  if (appointment.appointmentDate.toISOString().slice(0, 10) !== clinicTodayDate()) return res.status(400).json({ message: 'Só é possível iniciar atendimentos agendados para hoje.' });
+  res.json(await prisma.appointment.update({ where: { id }, data: { status: AppointmentStatus.EM_ATENDIMENTO }, include: appointmentInclude }));
 });
 app.post('/api/appointments', auth, appointmentManage, async (req, res) => {
   const parsed = appointmentSchema.safeParse(req.body);
