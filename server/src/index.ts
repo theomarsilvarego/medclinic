@@ -161,13 +161,15 @@ const medicalRecordSchema = z.object({
 
 const injectableRequestInclude = { injectable: { select: { id: true, name: true, type: true } }, requestedBy: { select: { id: true, fullName: true } } };
 const examRequestInclude = { examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
+const procedureRequestInclude = { procedure: { select: { id: true, name: true, value: true } }, requestedBy: { select: { id: true, fullName: true } } };
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
   appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } },
   attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } },
   examRequests: { orderBy: { requestedAt: 'asc' as const }, include: examRequestInclude },
-  injectableRequests: { orderBy: { requestedAt: 'asc' as const }, include: injectableRequestInclude }
+  injectableRequests: { orderBy: { requestedAt: 'asc' as const }, include: injectableRequestInclude },
+  procedureRequests: { orderBy: { requestedAt: 'asc' as const }, include: procedureRequestInclude }
 };
 const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
 
@@ -349,6 +351,9 @@ app.get('/api/exam-types/catalog', auth, doctorOnly, async (_req, res) => {
 app.get('/api/injectables/catalog', auth, doctorOnly, async (_req, res) => {
   res.json(await prisma.injectable.findMany({ orderBy: [{ type: 'asc' }, { name: 'asc' }], select: { id: true, name: true, type: true } }));
 });
+app.get('/api/procedures/catalog', auth, doctorOnly, async (_req, res) => {
+  res.json(await prisma.procedure.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, value: true } }));
+});
 app.get('/api/exam-groups', auth, doctorOnly, async (req: AuthRequest, res) => {
   res.json(await prisma.examGroup.findMany({ where: { createdById: req.user!.id }, orderBy: { name: 'asc' }, include: examGroupInclude }));
 });
@@ -434,6 +439,23 @@ app.post('/api/medical-records/:id/injectable-requests', auth, doctorOnly, async
   const data = items.filter(item => !existingIds.has(item.injectableId)).map(item => { const injectable = injectables.find(row => row.id === item.injectableId)!; return { medicalRecordId, patientId: record.patientId, injectableId: item.injectableId, name: injectable.name, category: injectable.type, route: item.route as any, sessions: item.sessions, requestedById: req.user!.id }; });
   if (data.length) await prisma.injectableRequest.createMany({ data });
   res.status(201).json(await prisma.injectableRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: injectableRequestInclude }));
+});
+
+app.post('/api/medical-records/:id/procedure-requests', auth, doctorOnly, async (req: AuthRequest, res) => {
+  const rawIds = Array.isArray(req.body?.procedureIds) ? req.body.procedureIds : [];
+  const procedureIds = Array.from(new Set(rawIds.map((raw: unknown) => Number(raw)).filter((id: unknown): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0))) as number[];
+  if (!procedureIds.length) return res.status(400).json({ message: 'Selecione pelo menos um procedimento.' });
+  const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
+  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
+  const todayAppointment = record ? await prisma.appointment.findFirst({ where: { patientId: record.patientId, appointmentDate: new Date(`${clinicTodayDate()}T00:00:00.000Z`) }, select: { id: true } }) : null;
+  if (!record || !todayAppointment) return res.status(403).json({ message: 'As solicitações de procedimentos estão disponíveis somente para atendimentos do dia.' });
+  const procedures = await prisma.procedure.findMany({ where: { id: { in: procedureIds }, active: true }, select: { id: true, name: true, value: true } });
+  if (procedures.length !== procedureIds.length) return res.status(400).json({ message: 'Um ou mais procedimentos não estão disponíveis.' });
+  const existing = await prisma.procedureRequest.findMany({ where: { medicalRecordId, procedureId: { in: procedureIds } }, select: { procedureId: true } });
+  const existingIds = new Set(existing.map(item => item.procedureId));
+  const data = procedures.filter(item => !existingIds.has(item.id)).map(item => ({ medicalRecordId, patientId: record.patientId, procedureId: item.id, name: item.name, value: item.value, requestedById: req.user!.id }));
+  if (data.length) await prisma.procedureRequest.createMany({ data });
+  res.status(201).json(await prisma.procedureRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: procedureRequestInclude }));
 });
 
 app.get('/api/appointments/meta', auth, appointmentAccess, async (_req, res) => {

@@ -26,6 +26,7 @@ model User {
   examGroups          ExamGroup[]               @relation("ExamGroupAuthor")
   examRequests        ExamRequest[]             @relation("ExamRequestAuthor")
   injectableRequests  InjectableRequest[]      @relation("InjectableRequestAuthor")
+  procedureRequests   ProcedureRequest[]       @relation("ProcedureRequestAuthor")
 
   @@map("users")
 }
@@ -81,6 +82,7 @@ model Procedure {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   appointments Appointment[]
+  requests    ProcedureRequest[]
 
   @@map("procedures")
 }
@@ -188,6 +190,7 @@ model Patient {
   recordAttachments     MedicalRecordAttachment[]
   examRequests          ExamRequest[]
   injectableRequests    InjectableRequest[]
+  procedureRequests     ProcedureRequest[]
 
   @@index([fullName])
   @@index([cpf])
@@ -270,6 +273,7 @@ model MedicalRecord {
   attachments    MedicalRecordAttachment[]
   examRequests   ExamRequest[]
   injectableRequests InjectableRequest[]
+  procedureRequests ProcedureRequest[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
@@ -355,4 +359,29 @@ model MedicalRecordAttachment {
   @@index([patientId])
   @@index([uploadedById])
   @@map("medical_record_attachments")
+}
+
+enum ProcedureRequestStatus {
+  AGUARDANDO_AGENDAMENTO
+}
+
+model ProcedureRequest {
+  id              Int                   @id @default(autoincrement())
+  medicalRecordId Int                   @map("medical_record_id")
+  patientId       Int                   @map("patient_id")
+  procedureId     Int                   @map("procedure_id")
+  name            String                @db.VarChar(160)
+  value           Decimal               @db.Decimal(10, 2)
+  status          ProcedureRequestStatus @default(AGUARDANDO_AGENDAMENTO)
+  requestedById   Int                   @map("requested_by_id")
+  requestedAt     DateTime              @default(now()) @map("requested_at")
+  medicalRecord   MedicalRecord         @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  patient         Patient               @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  procedure       Procedure             @relation(fields: [procedureId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  requestedBy     User                  @relation("ProcedureRequestAuthor", fields: [requestedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([medicalRecordId, procedureId])
+  @@index([patientId])
+  @@index([requestedById])
+  @@map("procedure_requests")
 }
