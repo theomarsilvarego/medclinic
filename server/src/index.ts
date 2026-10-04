@@ -13,6 +13,8 @@ import { SignPdf } from '@signpdf/signpdf';
 import { plainAddPlaceholder } from '@signpdf/placeholder-plain';
 import { P12Signer } from '@signpdf/signer-p12';
 import { z } from 'zod';
+import QRCode from 'qrcode';
+import forge from 'node-forge';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -82,16 +84,6 @@ function encryptSecret(value: Buffer | string) {
 }
 function decryptSecret(value: string) {
   const packed = Buffer.from(value, 'base64'); const decipher = crypto.createDecipheriv('aes-256-gcm', certificateEncryptionKey, packed.subarray(0, 12)); decipher.setAuthTag(packed.subarray(12, 28)); return Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]);
-}
-async function signPdfWithActiveCertificate(pdfPath: string) {
-  const certificate = await prisma.digitalCertificate.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } });
-  if (!certificate) return false;
-  const pfx = decryptSecret(certificate.pfxEncrypted); const password = decryptSecret(certificate.passwordEncrypted).toString('utf8');
-  const pdfBuffer = fs.readFileSync(pdfPath);
-  const placeholder = plainAddPlaceholder({ pdfBuffer, reason: 'Assinatura digital de pedido de exames laboratoriais', name: certificate.name, contactInfo: 'MedClinic', location: 'Brasil' });
-  const signedPdf = await new SignPdf().sign(placeholder, new P12Signer(pfx, { passphrase: password }));
-  fs.writeFileSync(pdfPath, signedPdf);
-  return true;
 }
 
 function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
@@ -196,36 +188,59 @@ const medicalRecordInclude = {
 };
 const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
 
-function pdfDate(value: Date | string) { return new Date(value).toLocaleDateString('pt-BR'); }
+function pdfDate(value: Date | string) { return new Date(value).toLocaleDateString('pt-BR', { timeZone: clinicTimeZone }); }
+function pdfDateTime(value: Date) { return value.toLocaleString('pt-BR', { timeZone: clinicTimeZone, dateStyle: 'short', timeStyle: 'medium' }); }
 function pdfMoney(value: unknown) { return `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`; }
+function certificateAttributes(pfx: Buffer, password: string) {
+  const asn1 = forge.asn1.fromDer(pfx.toString('binary'));
+  const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, false, password);
+  const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
+  const cert = bags[forge.pki.oids.certBag]?.[0]?.cert;
+  if (!cert) throw new Error('Não foi possível ler o certificado digital.');
+  const subject = cert.subject.attributes;
+  const commonName = String(subject.find((item: any) => item.shortName === 'CN')?.value || 'Titular do certificado');
+  const cpfMatch = commonName.match(/(?:^|:)\s*(\d{11})(?:$|:)/);
+  const name = commonName.replace(/:\s*\d{11}\s*$/, '').trim();
+  return { name, cpf: cpfMatch?.[1] || 'Não identificado', subject: subject.map((item: any) => `${item.shortName}=${item.value}`).join(', '), issuer: cert.issuer.attributes.map((item: any) => `${item.shortName}=${item.value}`).join(', '), serialNumber: cert.serialNumber, validFrom: cert.validity.notBefore, validTo: cert.validity.notAfter };
+}
+async function getActiveCertificateDetails() {
+  const certificate = await prisma.digitalCertificate.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } });
+  if (!certificate) return null;
+  const pfx = decryptSecret(certificate.pfxEncrypted); const password = decryptSecret(certificate.passwordEncrypted).toString('utf8');
+  return { ...certificateAttributes(pfx, password), certificate, pfx, password };
+}
+async function signPdfWithActiveCertificate(pdfPath: string) {
+  const details = await getActiveCertificateDetails();
+  if (!details) return false;
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  const placeholder = plainAddPlaceholder({ pdfBuffer, reason: 'Assinatura digital de pedido de exames laboratoriais', name: details.name, contactInfo: 'MedClinic', location: 'Brasil' });
+  const signedPdf = await new SignPdf().sign(placeholder, new P12Signer(details.pfx, { passphrase: details.password }));
+  fs.writeFileSync(pdfPath, signedPdf);
+  return true;
+}
 async function generateExamRequestPdf(data: any) {
   const pdfPath = path.join(examRequestPdfRoot, `${data.id}.pdf`);
-  const activeCertificate = await prisma.digitalCertificate.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' }, select: { name: true } });
+  const signedAt = new Date();
+  const certificate = await getActiveCertificateDetails();
+  const doctor = data.medicalRecord?.appointment?.doctor;
+  const qrBuffer = await QRCode.toBuffer(`https://validar.iti.gov.br/?documento=${encodeURIComponent(data.code || `RX-${String(data.id).padStart(6, '0')}`)}`, { errorCorrectionLevel: 'M', margin: 1, width: 82 });
   await new Promise<void>((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 48 });
+    const doc = new PDFDocument({ size: 'A4', margin: 48, autoFirstPage: true });
     const stream = fs.createWriteStream(pdfPath);
     stream.on('finish', resolve); stream.on('error', reject); doc.on('error', reject); doc.pipe(stream);
-    const wine = '#741447'; const pale = '#f8edf3'; const ink = '#29242a'; const gray = '#706970';
-    doc.rect(0, 0, 595, 128).fill(pale); doc.rect(0, 0, 595, 5).fill(wine);
-    doc.fillColor(wine).font('Helvetica-Bold').fontSize(26).text('intimavie', 48, 38);
-    doc.fillColor('#76566b').font('Helvetica').fontSize(10).text('MEDICINA ÍNTIMA', 51, 73);
-    doc.fillColor(wine).font('Helvetica-Bold').fontSize(11).text('EXAMES & RECEITAS', 418, 51, { width: 128, align: 'right' });
-    doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('PEDIDO DE EXAMES', 48, 153);
-    doc.fillColor(gray).font('Helvetica').fontSize(10).text(`Código: ${data.code || `RX-${String(data.id).padStart(6, '0')}`}`, 410, 153, { width: 137, align: 'right' });
-    doc.roundedRect(48, 181, 499, 90, 8).fillAndStroke('#fff9fc', '#e5d3df');
-    doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('PACIENTE', 65, 201);
-    doc.fillColor(ink).font('Helvetica-Bold').fontSize(17).text(String(data.patient?.fullName || '').toUpperCase(), 65, 219, { width: 465 });
-    doc.fillColor(gray).font('Helvetica').fontSize(9).text(`CPF: ${data.patient?.cpf || 'Não informado'}`, 65, 251);
-    doc.text(`Nascimento: ${data.patient?.birthDate ? pdfDate(data.patient.birthDate) : 'Não informado'}`, 235, 251);
-    doc.text(`Telefone: ${data.patient?.phone || 'Não informado'}`, 410, 251, { width: 120, align: 'right' });
-    const tableTop = 307; doc.rect(48, tableTop, 499, 27).fill(wine);
-    doc.fillColor('#fff').font('Helvetica-Bold').fontSize(9).text('CÓDIGO', 65, tableTop + 9).text('EXAME', 142, tableTop + 9).text('VALOR', 480, tableTop + 9, { width: 50, align: 'right' });
-    let y = tableTop + 27; let total = 0;
-    const items = data.examGroup?.items || [];
-    items.forEach((item: any, index: number) => { const exam = item.examType || {}; const value = Number(exam.value || 0); total += value; if (index % 2 === 0) doc.rect(48, y, 499, 32).fill('#fff8fc'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text(String(exam.code || '—'), 65, y + 11, { width: 68 }); doc.fillColor(ink).font('Helvetica').text(String(exam.name || 'Exame'), 142, y + 11, { width: 315 }); doc.text(pdfMoney(value), 480, y + 11, { width: 50, align: 'right' }); y += 32; });
-    doc.strokeColor('#e5d3df').moveTo(48, y).lineTo(547, y).stroke();
-    doc.roundedRect(336, y + 24, 211, 62, 8).fillAndStroke(pale, '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('VALOR TOTAL', 355, y + 43); doc.fontSize(20).text(pdfMoney(total), 355, y + 60, { width: 172, align: 'right' });
-    const footerY = 735; doc.strokeColor('#d9c8d1').moveTo(65, footerY).lineTo(240, footerY).stroke(); doc.fillColor(gray).font('Helvetica').fontSize(9).text('Responsável pela emissão', 65, footerY + 12); doc.text(`Emitido por: ${data.requestedBy?.fullName || 'Médico'}`, 65, footerY + 31); if (activeCertificate) doc.fillColor(wine).fontSize(8).text(`Assinado digitalmente por ${activeCertificate.name}`, 65, footerY + 50); doc.fillColor('#8d8189').fontSize(8).text('Documento gerado pelo sistema Clínica Intimavie.', 195, footerY + 63, { width: 250, align: 'center' });
+    const wine = '#741447'; const pale = '#f8edf3'; const ink = '#29242a'; const gray = '#706970'; const pageWidth = 499; const bottomLimit = 610;
+    const drawBrand = (continuation = false) => { doc.rect(0, 0, 595, 96).fill(pale); doc.rect(0, 0, 595, 5).fill(wine); doc.fillColor(wine).font('Helvetica-Bold').fontSize(23).text('intimavie', 48, 30); doc.fillColor('#76566b').font('Helvetica').fontSize(9).text('MEDICINA ÍNTIMA', 51, 59); doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('EXAMES & RECEITAS', 418, 39, { width: 128, align: 'right' }); if (continuation) doc.fillColor(gray).font('Helvetica').fontSize(8).text(`PEDIDO ${data.code || ''} — continuação`, 48, 78); };
+    const drawTableHeader = (top: number) => { doc.rect(48, top, pageWidth, 25).fill(wine); doc.fillColor('#fff').font('Helvetica-Bold').fontSize(8).text('CÓDIGO', 64, top + 8).text('EXAME', 142, top + 8).text('VALOR', 480, top + 8, { width: 50, align: 'right' }); return top + 25; };
+    drawBrand();
+    doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('PEDIDO DE EXAMES', 48, 121); doc.fillColor(gray).font('Helvetica').fontSize(9).text(`Código: ${data.code || `RX-${String(data.id).padStart(6, '0')}`}`, 410, 121, { width: 137, align: 'right' });
+    doc.roundedRect(48, 147, pageWidth, 92, 8).fillAndStroke('#fff9fc', '#e5d3df'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text('PACIENTE', 65, 166); doc.fillColor(ink).font('Helvetica-Bold').fontSize(16).text(String(data.patient?.fullName || '').toUpperCase(), 65, 184, { width: 465 }); doc.fillColor(gray).font('Helvetica').fontSize(8).text(`CPF: ${data.patient?.cpf || 'Não informado'}`, 65, 218); doc.text(`Nascimento: ${data.patient?.birthDate ? pdfDate(data.patient.birthDate) : 'Não informado'}`, 235, 218); doc.text(`Telefone: ${data.patient?.phone || 'Não informado'}`, 410, 218, { width: 120, align: 'right' });
+    let y = drawTableHeader(273); let total = 0; const items = data.examGroup?.items || [];
+    items.forEach((item: any, index: number) => { const exam = item.examType || {}; const value = Number(exam.value || 0); total += value; const rowHeight = 27; if (y + rowHeight > bottomLimit) { doc.addPage(); drawBrand(true); y = drawTableHeader(112); } if (index % 2 === 0) doc.rect(48, y, pageWidth, rowHeight).fill('#fff8fc'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text(String(exam.code || '—'), 64, y + 9, { width: 68 }); doc.fillColor(ink).font('Helvetica').fontSize(8).text(String(exam.name || 'Exame'), 142, y + 9, { width: 315, ellipsis: true }); doc.text(pdfMoney(value), 480, y + 9, { width: 50, align: 'right' }); doc.strokeColor('#eadde2').moveTo(48, y + rowHeight).lineTo(547, y + rowHeight).stroke(); y += rowHeight; });
+    if (y + 96 > bottomLimit) { doc.addPage(); drawBrand(true); y = 112; }
+    doc.roundedRect(336, y + 18, 211, 58, 8).fillAndStroke(pale, '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text('VALOR TOTAL', 355, y + 35); doc.fontSize(18).text(pdfMoney(total), 355, y + 50, { width: 172, align: 'right' });
+    const stampY = y + 92; const requiredHeight = certificate ? 132 : 88; if (stampY + requiredHeight > 785) { doc.addPage(); drawBrand(true); }
+    const finalStampY = stampY + requiredHeight > 785 ? 125 : stampY; doc.roundedRect(48, finalStampY, pageWidth, requiredHeight, 8).fillAndStroke('#fff9fc', '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('ASSINATURA DIGITAL', 65, finalStampY + 15); doc.fillColor(ink).font('Helvetica-Bold').fontSize(9).text(`Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || 'Médico'}`, 65, finalStampY + 34); doc.fillColor(gray).font('Helvetica').fontSize(8).text(`CPF: ${certificate?.cpf || 'Não disponível'}`, 65, finalStampY + 49); doc.text(`CRM/UF: ${doctor?.crm || 'Não informado'}`, 65, finalStampY + 63); doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, finalStampY + 77); doc.text('Padrão: PAdES — certificado ICP-Brasil', 65, finalStampY + 91); doc.image(qrBuffer, 455, finalStampY + 10, { width: 70, height: 70 }); doc.fillColor(wine).font('Helvetica-Bold').fontSize(7).text('Documento assinado digitalmente conforme MP 2.200-2/2001', 65, finalStampY + requiredHeight - 27); doc.fillColor(gray).font('Helvetica').fontSize(7).text('Validação: validar.iti.gov.br', 65, finalStampY + requiredHeight - 15); doc.fillColor('#8d8189').fontSize(7).text('QR code direciona ao validador do ITI.', 455, finalStampY + 83, { width: 70, align: 'center' });
+    doc.fillColor('#8d8189').font('Helvetica').fontSize(7).text('Documento gerado pelo sistema Clínica Intimavie.', 195, 812, { width: 250, align: 'center' });
     doc.end();
   });
   await signPdfWithActiveCertificate(pdfPath);
@@ -432,7 +447,7 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
       }
     });
     for (const id of createdIds) {
-      const created = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } } } });
+      const created = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
       if (created) await generateExamRequestPdf(created);
     }
   }
@@ -441,10 +456,10 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
 
 app.get('/api/medical-record-exam-requests/:id/pdf', auth, doctorOnly, async (req: AuthRequest, res) => {
   const id = routeId(req, res); if (id === null) return;
-  const examRequest = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } } } });
+  const examRequest = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
   if (!examRequest) return res.status(404).json({ message: 'Pedido de exames não encontrado.' });
   const pdfPath = path.join(examRequestPdfRoot, `${examRequest.id}.pdf`);
-  if (!fs.existsSync(pdfPath)) await generateExamRequestPdf(examRequest);
+  await generateExamRequestPdf(examRequest);
   res.type('application/pdf').sendFile(pdfPath, { headers: { 'Content-Disposition': `inline; filename="${examRequest.code || `RX-${String(examRequest.id).padStart(6, '0')}`}.pdf"` } });
 });
 
