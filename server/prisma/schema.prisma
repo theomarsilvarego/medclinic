@@ -27,6 +27,7 @@ model User {
   examRequests        ExamRequest[]             @relation("ExamRequestAuthor")
   injectableRequests  InjectableRequest[]      @relation("InjectableRequestAuthor")
   procedureRequests   ProcedureRequest[]       @relation("ProcedureRequestAuthor")
+  uploadedCertificates DigitalCertificate[]    @relation("DigitalCertificateUploader")
 
   @@map("users")
 }
@@ -384,4 +385,26 @@ model ProcedureRequest {
   @@index([patientId])
   @@index([requestedById])
   @@map("procedure_requests")
+}
+
+
+model DigitalCertificate {
+  id                Int      @id @default(autoincrement())
+  name              String   @db.VarChar(160)
+  fileName          String   @map("file_name") @db.VarChar(255)
+  subject           String?  @db.VarChar(255)
+  issuer            String?  @db.VarChar(255)
+  serialNumber      String?  @map("serial_number") @db.VarChar(255)
+  validFrom         DateTime? @map("valid_from")
+  validTo           DateTime? @map("valid_to")
+  pfxEncrypted      String   @map("pfx_encrypted") @db.LongText
+  passwordEncrypted String   @map("password_encrypted") @db.Text
+  active            Boolean  @default(true)
+  uploadedById      Int      @map("uploaded_by_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  uploadedBy        User     @relation("DigitalCertificateUploader", fields: [uploadedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([active])
+  @@map("digital_certificates")
 }

@@ -9,6 +9,9 @@ import path from 'node:path';
 import { AppointmentItemType, AppointmentStatus, InjectableType, PrismaClient, Profile } from '@prisma/client';
 import multer from 'multer';
 import PDFDocument from 'pdfkit';
+import { SignPdf } from '@signpdf/signpdf';
+import { plainAddPlaceholder } from '@signpdf/placeholder-plain';
+import { P12Signer } from '@signpdf/signer-p12';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -16,6 +19,7 @@ const app = express();
 const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
 const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'America/Sao_Paulo';
+const certificateEncryptionKey = crypto.createHash('sha256').update(process.env.CERTIFICATE_ENCRYPTION_KEY || jwtSecret).digest();
 const attachmentRoot = path.resolve(process.env.MEDICAL_RECORD_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'medical-records'));
 fs.mkdirSync(attachmentRoot, { recursive: true });
 const examRequestPdfRoot = path.resolve(process.env.EXAM_REQUEST_PDF_DIR || path.join(process.cwd(), 'uploads', 'exam-requests'));
@@ -29,6 +33,7 @@ const attachmentUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => { if (!allowedAttachments[file.mimetype]) return callback(new Error('Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG.')); callback(null, true); }
 });
+const certificateUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, callback) => { if (!file.originalname.toLowerCase().endsWith('.pfx') && !file.originalname.toLowerCase().endsWith('.p12')) return callback(new Error('Envie um certificado digital no formato PFX ou P12.')); callback(null, true); } });
 
 type AuthRequest = Request & { user?: { id: number; profile: Profile; login: string } };
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || true }));
@@ -69,6 +74,24 @@ function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
 
 function clinicTodayDate() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: clinicTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+function encryptSecret(value: Buffer | string) {
+  const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', certificateEncryptionKey, iv); const encrypted = Buffer.concat([cipher.update(value), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64');
+}
+function decryptSecret(value: string) {
+  const packed = Buffer.from(value, 'base64'); const decipher = crypto.createDecipheriv('aes-256-gcm', certificateEncryptionKey, packed.subarray(0, 12)); decipher.setAuthTag(packed.subarray(12, 28)); return Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]);
+}
+async function signPdfWithActiveCertificate(pdfPath: string) {
+  const certificate = await prisma.digitalCertificate.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } });
+  if (!certificate) return false;
+  const pfx = decryptSecret(certificate.pfxEncrypted); const password = decryptSecret(certificate.passwordEncrypted).toString('utf8');
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  const placeholder = plainAddPlaceholder({ pdfBuffer, reason: 'Assinatura digital de pedido de exames laboratoriais', name: certificate.name, contactInfo: 'MedClinic', location: 'Brasil' });
+  const signedPdf = await new SignPdf().sign(placeholder, new P12Signer(pfx, { passphrase: password }));
+  fs.writeFileSync(pdfPath, signedPdf);
+  return true;
 }
 
 function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
@@ -177,6 +200,7 @@ function pdfDate(value: Date | string) { return new Date(value).toLocaleDateStri
 function pdfMoney(value: unknown) { return `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`; }
 async function generateExamRequestPdf(data: any) {
   const pdfPath = path.join(examRequestPdfRoot, `${data.id}.pdf`);
+  const activeCertificate = await prisma.digitalCertificate.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' }, select: { name: true } });
   await new Promise<void>((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 48 });
     const stream = fs.createWriteStream(pdfPath);
@@ -201,9 +225,10 @@ async function generateExamRequestPdf(data: any) {
     items.forEach((item: any, index: number) => { const exam = item.examType || {}; const value = Number(exam.value || 0); total += value; if (index % 2 === 0) doc.rect(48, y, 499, 32).fill('#fff8fc'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text(String(exam.code || '—'), 65, y + 11, { width: 68 }); doc.fillColor(ink).font('Helvetica').text(String(exam.name || 'Exame'), 142, y + 11, { width: 315 }); doc.text(pdfMoney(value), 480, y + 11, { width: 50, align: 'right' }); y += 32; });
     doc.strokeColor('#e5d3df').moveTo(48, y).lineTo(547, y).stroke();
     doc.roundedRect(336, y + 24, 211, 62, 8).fillAndStroke(pale, '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('VALOR TOTAL', 355, y + 43); doc.fontSize(20).text(pdfMoney(total), 355, y + 60, { width: 172, align: 'right' });
-    const footerY = 735; doc.strokeColor('#d9c8d1').moveTo(65, footerY).lineTo(240, footerY).stroke(); doc.fillColor(gray).font('Helvetica').fontSize(9).text('Responsável pela emissão', 65, footerY + 12); doc.text(`Emitido por: ${data.requestedBy?.fullName || 'Médico'}`, 65, footerY + 31); doc.fillColor('#8d8189').fontSize(8).text('Documento gerado pelo sistema Clínica Intimavie.', 195, footerY + 63, { width: 250, align: 'center' });
+    const footerY = 735; doc.strokeColor('#d9c8d1').moveTo(65, footerY).lineTo(240, footerY).stroke(); doc.fillColor(gray).font('Helvetica').fontSize(9).text('Responsável pela emissão', 65, footerY + 12); doc.text(`Emitido por: ${data.requestedBy?.fullName || 'Médico'}`, 65, footerY + 31); if (activeCertificate) doc.fillColor(wine).fontSize(8).text(`Assinado digitalmente por ${activeCertificate.name}`, 65, footerY + 50); doc.fillColor('#8d8189').fontSize(8).text('Documento gerado pelo sistema Clínica Intimavie.', 195, footerY + 63, { width: 250, align: 'center' });
     doc.end();
   });
+  await signPdfWithActiveCertificate(pdfPath);
   return pdfPath;
 }
 
@@ -496,6 +521,21 @@ app.put('/api/appointments/:id', auth, appointmentManage, async (req, res) => {
 app.delete('/api/appointments/:id', auth, appointmentManage, async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.appointment.delete({ where: { id } }); res.status(204).send(); });
 
 app.use('/api/admin', auth, adminOnly);
+
+app.get('/api/admin/digital-certificates', async (_req, res) => {
+  res.json(await prisma.digitalCertificate.findMany({ orderBy: { createdAt: 'desc' }, select: { id: true, name: true, fileName: true, subject: true, issuer: true, serialNumber: true, validFrom: true, validTo: true, active: true, createdAt: true, uploadedBy: { select: { fullName: true } } } }));
+});
+app.post('/api/admin/digital-certificates', certificateUpload.single('certificate'), async (req: AuthRequest, res) => {
+  const name = String(req.body?.name || '').trim(); const password = String(req.body?.password || '');
+  if (!req.file || !name || !password) return res.status(400).json({ message: 'Informe o nome, a senha e o arquivo PFX/P12 do certificado.' });
+  try {
+    new P12Signer(req.file.buffer, { passphrase: password });
+    await prisma.digitalCertificate.updateMany({ data: { active: false } });
+    const certificate = await prisma.digitalCertificate.create({ data: { name, fileName: req.file.originalname, pfxEncrypted: encryptSecret(req.file.buffer), passwordEncrypted: encryptSecret(password), active: true, uploadedById: req.user!.id }, select: { id: true, name: true, fileName: true, active: true, createdAt: true } });
+    res.status(201).json(certificate);
+  } catch (error: any) { res.status(400).json({ message: error?.message || 'Não foi possível salvar o certificado.' }); }
+});
+app.delete('/api/admin/digital-certificates/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.digitalCertificate.update({ where: { id }, data: { active: false } }); res.status(204).send(); });
 
 app.get('/api/admin/users', async (_req, res) => res.json(await prisma.user.findMany({ orderBy: { id: 'desc' }, select: { id: true, fullName: true, login: true, profile: true, createdAt: true } })));
 app.post('/api/admin/users', async (req, res) => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarCheck, ClipboardList, ClipboardPlus, Building2, Factory, FileText, FlaskConical, ShieldCheck, Syringe, Stethoscope, Users } from 'lucide-react';
+import { CalendarCheck, ClipboardList, ClipboardPlus, Building2, Factory, FileText, FlaskConical, KeyRound, ShieldCheck, Syringe, Stethoscope, Users } from 'lucide-react';
 import type { ModuleKey } from './app';
 export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; singular: string }[] = [
   { key: 'patients', label: 'Pacientes', singular: 'paciente', icon: <ClipboardPlus size={18}/> },
@@ -14,7 +14,8 @@ export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; si
   { key: 'procedures', label: 'Procedimentos', singular: 'procedimento', icon: <ClipboardList size={18}/> },
   { key: 'injectables', label: 'Injetáveis', singular: 'injetável', icon: <Syringe size={18}/> },
   { key: 'suppliers', label: 'Fornecedores', singular: 'fornecedor', icon: <Factory size={18}/> },
-  { key: 'exam-types', label: 'Tipos de Exames', singular: 'tipo de exame', icon: <FlaskConical size={18}/> }
+  { key: 'exam-types', label: 'Tipos de Exames', singular: 'tipo de exame', icon: <FlaskConical size={18}/> },
+  { key: 'certificates', label: 'Certificados Digitais', singular: 'certificado digital', icon: <KeyRound size={18}/> }
 ];
 
-export function canAccessModule(profile: string, key: ModuleKey) { if (key === 'medical-records' || key === 'exam-groups') return profile === 'MEDICO'; return profile === 'ADMINISTRADOR' || key === 'patients' || (key === 'appointments' && profile !== 'MEDICO'); }
+export function canAccessModule(profile: string, key: ModuleKey) { if (key === 'medical-records' || key === 'exam-groups') return profile === 'MEDICO'; if (key === 'certificates') return profile === 'ADMINISTRADOR'; return profile === 'ADMINISTRADOR' || key === 'patients' || (key === 'appointments' && profile !== 'MEDICO'); }
