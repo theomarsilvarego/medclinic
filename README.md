@@ -69,7 +69,7 @@ Acesse `http://localhost:5173`.
 
 ## Acesso inicial
 
-- **Login:** `theomar_rego@hotmail`
+- **Login:** `theomar_rego@hotmail.com`
 - **Senha:** `123456`
 - **Perfil:** Administrador
 

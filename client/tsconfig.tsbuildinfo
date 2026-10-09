@@ -1,1 +1,1 @@
-{"root":["./src/main.tsx","./src/vite-env.d.ts"],"version":"5.9.3"}
+{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/lib/app.ts","./src/lib/configs.ts","./src/lib/modules.tsx","./src/pages/App.tsx","./src/pages/AppointmentModal.tsx","./src/pages/AppointmentsPage.tsx","./src/pages/CertificateSettingsPage.tsx","./src/pages/CrudPage.tsx","./src/pages/Dashboard.tsx","./src/pages/DoctorAgendaPage.tsx","./src/pages/ExamGroupsPage.tsx","./src/pages/Login.tsx","./src/pages/MedicalRecordsPage.tsx","./src/pages/Modal.tsx"],"version":"5.9.3"}

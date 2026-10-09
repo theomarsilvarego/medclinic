@@ -8,7 +8,7 @@ async function main() {
   await prisma.user.upsert({
     where: { login: 'theomar_rego@hotmail' },
     update: { fullName: 'Administrador MedClinic', passwordHash, profile: Profile.ADMINISTRADOR },
-    create: { fullName: 'Administrador MedClinic', login: 'theomar_rego@hotmail', passwordHash, profile: Profile.ADMINISTRADOR }
+    create: { fullName: 'Administrador MedClinic', login: 'theomar_rego@hotmail.com', passwordHash, profile: Profile.ADMINISTRADOR }
   });
   await prisma.user.upsert({
     where: { login: 'christiane.calixto@hotmail.com' },
