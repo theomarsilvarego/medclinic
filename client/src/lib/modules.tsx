@@ -18,4 +18,4 @@ export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; si
   { key: 'certificates', label: 'Certificados Digitais', singular: 'certificado digital', icon: <KeyRound size={18}/> }
 ];
 
-export function canAccessModule(profile: string, key: ModuleKey) { if (key === 'medical-records' || key === 'exam-groups') return profile === 'MEDICO'; if (key === 'certificates') return profile === 'ADMINISTRADOR'; return profile === 'ADMINISTRADOR' || key === 'patients' || (key === 'appointments' && profile !== 'MEDICO'); }
+export function canAccessModule(profile: string, key: ModuleKey) { const normalizedProfile = String(profile || '').toUpperCase(); if (key === 'patients') return ['ADMINISTRADOR', 'MEDICO', 'SECRETARIA'].includes(normalizedProfile); if (key === 'medical-records' || key === 'exam-groups') return normalizedProfile === 'MEDICO'; if (key === 'certificates') return normalizedProfile === 'ADMINISTRADOR'; return normalizedProfile === 'ADMINISTRADOR' || (key === 'appointments' && normalizedProfile === 'SECRETARIA'); }
