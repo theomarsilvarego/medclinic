@@ -21,14 +21,15 @@ export function CrudPage({ module, profile, onOpenPatientRecords }: CrudPageProp
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
-  const fields = module === 'attendances' ? config.fields.map(f => f.key === 'insuranceId' ? { ...f, options: insuranceOptions } : f) : module === 'injectables' ? config.fields.map(f => f.key === 'supplier' ? { ...f, options: supplierOptions } : f) : config.fields;
+  const fields = module === 'attendances' ? config.fields.map(f => f.key === 'insuranceId' ? { ...f, options: insuranceOptions } : f) : module === 'patients' ? config.fields.map(f => f.key === 'insuranceCode' ? { ...f, options: insuranceOptions } : f) : module === 'injectables' ? config.fields.map(f => f.key === 'supplier' ? { ...f, options: supplierOptions } : f) : config.fields;
 
   async function load() {
     setLoading(true);
     try {
-      const result = await Promise.all([request(`${config.basePath === '' ? '' : '/admin'}/${config.path}`), module === 'attendances' ? request('/admin/insurances') : module === 'injectables' ? request('/admin/suppliers') : Promise.resolve([])]);
+      const result = await Promise.all([request(`${config.basePath === '' ? '' : '/admin'}/${config.path}`), module === 'attendances' || module === 'patients' ? request('/admin/insurances') : module === 'injectables' ? request('/admin/suppliers') : Promise.resolve([])]);
       setRows(result[0] || []);
       if (module === 'attendances') setInsuranceOptions((result[1] || []).filter((x: Row) => x.active).map((x: Row) => ({ value: x.id, label: x.name })));
+      if (module === 'patients') setInsuranceOptions((result[1] || []).filter((x: Row) => x.active).map((x: Row) => ({ value: x.id, label: `${x.id} - ${x.name}` })));
       if (module === 'injectables') setSupplierOptions((result[1] || []).map((x: Row) => ({ value: x.name, label: x.name })));
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
   }
