@@ -298,6 +298,9 @@ app.get('/api/patients', auth, async (_req, res) => {
   const insuranceNames = new Map(insurances.map(insurance => [insurance.id, insurance.name]));
   res.json(patients.map(patient => ({ ...patient, insuranceName: patient.insuranceCode ? insuranceNames.get(patient.insuranceCode) || null : null })));
 });
+app.get('/api/insurances', auth, async (_req, res) => {
+  res.json(await prisma.insurance.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }));
+});
 app.post('/api/patients', auth, async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Preencha nome e código do paciente corretamente.' });

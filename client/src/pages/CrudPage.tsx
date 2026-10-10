@@ -26,7 +26,7 @@ export function CrudPage({ module, profile, onOpenPatientRecords }: CrudPageProp
   async function load() {
     setLoading(true);
     try {
-      const result = await Promise.all([request(`${config.basePath === '' ? '' : '/admin'}/${config.path}`), module === 'attendances' || module === 'patients' ? request('/admin/insurances') : module === 'injectables' ? request('/admin/suppliers') : Promise.resolve([])]);
+      const result = await Promise.all([request(`${config.basePath === '' ? '' : '/admin'}/${config.path}`), module === 'attendances' ? request('/admin/insurances') : module === 'patients' ? request('/insurances') : module === 'injectables' ? request('/admin/suppliers') : Promise.resolve([])]);
       setRows(result[0] || []);
       if (module === 'attendances') setInsuranceOptions((result[1] || []).filter((x: Row) => x.active).map((x: Row) => ({ value: x.id, label: x.name })));
       if (module === 'patients') setInsuranceOptions((result[1] || []).filter((x: Row) => x.active).map((x: Row) => ({ value: x.id, label: `${x.id} - ${x.name}` })));
