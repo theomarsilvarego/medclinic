@@ -15,6 +15,7 @@ export function AppointmentModal({
   onSave: (data: Row) => void;
 }) {
   const [data, setData] = useState<Row>({ ...initial });
+  const [patientSearch, setPatientSearch] = useState("");
   const update = (key: string, value: any) =>
     setData({ ...data, [key]: value });
   const itemType = data.itemType || "ATENDIMENTO";
@@ -22,6 +23,15 @@ export function AppointmentModal({
     (x: Row) =>
       !data.insuranceId || Number(x.insuranceId) === Number(data.insuranceId),
   );
+  const normalizedPatientSearch = patientSearch.trim().toLocaleLowerCase("pt-BR");
+  const filteredPatients = (meta.patients || []).filter((patient: Row) => {
+    if (!normalizedPatientSearch) return true;
+    return String(patient.fullName || "").toLocaleLowerCase("pt-BR").includes(normalizedPatientSearch);
+  });
+  const selectedPatient = (meta.patients || []).find((patient: Row) => Number(patient.id) === Number(data.patientId));
+  const patientOptions = selectedPatient && !filteredPatients.some((patient: Row) => Number(patient.id) === Number(selectedPatient.id))
+    ? [selectedPatient, ...filteredPatients]
+    : filteredPatients;
   return (
     <div className="modal-backdrop">
       <div className="modal appointment-modal">
@@ -37,12 +47,20 @@ export function AppointmentModal({
         <div className="modal-fields">
           <label>
             Paciente
+            <input
+              className="appointment-patient-search"
+              type="search"
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              placeholder="Consultar por nome…"
+              aria-label="Consultar paciente por nome"
+            />
             <select
               value={data.patientId || ""}
               onChange={(e) => update("patientId", e.target.value)}
             >
               <option value="">Selecione…</option>
-              {meta.patients.map((x: Row) => (
+              {patientOptions.map((x: Row) => (
                 <option key={x.id} value={x.id}>
                   {x.fullName}
                 </option>

@@ -849,6 +849,9 @@ tr:last-child td {
 .modal-fields label:has(input[type="password"]) {
   grid-column: span 1;
 }
+.appointment-patient-search {
+  margin-bottom: 8px;
+}
 .check-label {
   flex-direction: row !important;
   align-items: center;
