@@ -276,8 +276,8 @@ app.get('/api/auth/me', auth, async (req: AuthRequest, res) => {
 });
 
 const patientSchema = z.object({
-  sourceCode: z.coerce.number().int().positive(),
-  recordNumber: z.string().trim().optional().nullable(),
+  sourceCode: z.preprocess(value => value === '' || value === null || value === undefined ? null : value, z.coerce.number().int().positive().nullable().optional()),
+  recordNumber: z.preprocess(value => value === '' ? null : value, z.string().trim().optional().nullable()),
   fullName: requiredText,
   sex: z.coerce.number().int().optional().nullable(),
   maritalStatus: z.coerce.number().int().optional().nullable(),
