@@ -299,11 +299,15 @@ app.get('/api/patients', auth, async (_req, res) => {
   res.json(patients.map(patient => ({ ...patient, insuranceName: patient.insuranceCode ? insuranceNames.get(patient.insuranceCode) || null : null })));
 });
 app.get('/api/insurances', auth, async (_req, res) => {
-  res.json(await prisma.insurance.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }));
+  res.json(await prisma.insurance.findMany({ where: { active: true }, select: { id: true, name: true, active: true }, orderBy: { name: 'asc' } }));
 });
 app.post('/api/patients', auth, async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Preencha nome e código do paciente corretamente.' });
+  if (parsed.data.insuranceCode !== null && parsed.data.insuranceCode !== undefined) {
+    const insurance = await prisma.insurance.findUnique({ where: { id: parsed.data.insuranceCode }, select: { id: true } });
+    if (!insurance) return res.status(400).json({ message: 'O convênio selecionado não está cadastrado no sistema.' });
+  }
   res.status(201).json(await prisma.patient.create({ data: parsed.data }));
 });
 app.put('/api/patients/:id', auth, async (req, res) => {
@@ -311,6 +315,10 @@ app.put('/api/patients/:id', auth, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: 'Dados do paciente inválidos.' });
   const id = routeId(req, res, req.body?.id);
   if (id === null) return;
+  if (parsed.data.insuranceCode !== null && parsed.data.insuranceCode !== undefined) {
+    const insurance = await prisma.insurance.findUnique({ where: { id: parsed.data.insuranceCode }, select: { id: true } });
+    if (!insurance) return res.status(400).json({ message: 'O convênio selecionado não está cadastrado no sistema.' });
+  }
   res.json(await prisma.patient.update({ where: { id }, data: parsed.data }));
 });
 app.delete('/api/patients/:id', auth, async (req, res) => {
