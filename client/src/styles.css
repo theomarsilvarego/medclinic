@@ -852,6 +852,49 @@ tr:last-child td {
 .appointment-patient-search {
   margin-bottom: 8px;
 }
+.appointment-patient-picker {
+  position: relative;
+}
+.appointment-patient-picker .appointment-patient-search {
+  margin-bottom: 0;
+  padding-right: 42px;
+}
+.appointment-patient-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 30px #4c283326;
+}
+.appointment-patient-options button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.appointment-patient-options button:hover,
+.appointment-patient-options button.selected {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.appointment-patient-empty {
+  display: block;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .check-label {
   flex-direction: row !important;
   align-items: center;

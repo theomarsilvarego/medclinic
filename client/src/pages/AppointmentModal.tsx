@@ -16,6 +16,7 @@ export function AppointmentModal({
 }) {
   const [data, setData] = useState<Row>({ ...initial });
   const [patientSearch, setPatientSearch] = useState("");
+  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const update = (key: string, value: any) =>
     setData({ ...data, [key]: value });
   const itemType = data.itemType || "ATENDIMENTO";
@@ -47,25 +48,41 @@ export function AppointmentModal({
         <div className="modal-fields">
           <label>
             Paciente
-            <input
-              className="appointment-patient-search"
-              type="search"
-              value={patientSearch}
-              onChange={(e) => setPatientSearch(e.target.value)}
-              placeholder="Consultar por nome…"
-              aria-label="Consultar paciente por nome"
-            />
-            <select
-              value={data.patientId || ""}
-              onChange={(e) => update("patientId", e.target.value)}
-            >
-              <option value="">Selecione…</option>
-              {patientOptions.map((x: Row) => (
-                <option key={x.id} value={x.id}>
-                  {x.fullName}
-                </option>
-              ))}
-            </select>
+            <div className="appointment-patient-picker">
+              <input
+                className="appointment-patient-search"
+                type="search"
+                value={patientSearch || selectedPatient?.fullName || ""}
+                onFocus={() => setPatientPickerOpen(true)}
+                onBlur={() => setTimeout(() => setPatientPickerOpen(false), 120)}
+                onChange={(e) => {
+                  setPatientSearch(e.target.value);
+                  setPatientPickerOpen(true);
+                  if (!e.target.value) update("patientId", "");
+                }}
+                placeholder="Consultar por nome…"
+                aria-label="Consultar paciente por nome"
+              />
+              {patientPickerOpen && (
+                <div className="appointment-patient-options" role="listbox">
+                  {patientOptions.length ? patientOptions.map((x: Row) => (
+                    <button
+                      type="button"
+                      key={x.id}
+                      className={Number(data.patientId) === Number(x.id) ? "selected" : ""}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        update("patientId", x.id);
+                        setPatientSearch(x.fullName);
+                        setPatientPickerOpen(false);
+                      }}
+                    >
+                      {x.fullName}
+                    </button>
+                  )) : <span className="appointment-patient-empty">Nenhum paciente encontrado.</span>}
+                </div>
+              )}
+            </div>
           </label>
           <label>
             Médico
