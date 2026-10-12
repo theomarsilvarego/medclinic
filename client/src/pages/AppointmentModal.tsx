@@ -186,8 +186,9 @@ export function AppointmentModal({
               value={data.scheduledTime || "08:00"}
               onChange={(e) => update("scheduledTime", e.target.value)}
             >
-              {Array.from({ length: 25 }, (_, i) => {
-                const t = `${String(8 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`;
+              {Array.from({ length: 49 }, (_, i) => {
+                const minutes = 8 * 60 + i * 15;
+                const t = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
                 return <option key={t}>{t}</option>;
               })}
             </select>

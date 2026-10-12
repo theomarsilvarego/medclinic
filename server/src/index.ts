@@ -142,7 +142,7 @@ const injectableRequestSchema = z.object({
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
-  scheduledTime: z.string().regex(/^(20:00|(?:08|09|10|11|12|13|14|15|16|17|18|19):(00|30))$/, 'Horário inválido.'),
+  scheduledTime: z.string().regex(/^(20:00|(?:08|09|10|11|12|13|14|15|16|17|18|19):(00|15|30|45))$/, 'Horário inválido.'),
   patientId: z.coerce.number().int().positive(),
   doctorId: z.coerce.number().int().positive(),
   insuranceId: z.coerce.number().int().positive(),

@@ -963,14 +963,14 @@ tr:last-child td {
 .agenda-row {
   display: grid;
   grid-template-columns: 76px 1fr;
-  min-height: 74px;
+  min-height: 58px;
   border-bottom: 1px solid #f2e9ea;
 }
 .agenda-row:last-child {
   border-bottom: 0;
 }
 .agenda-time {
-  padding: 23px 16px;
+  padding: 17px 16px;
   color: #9d8c92;
   font-size: 12px;
   font-weight: 800;
