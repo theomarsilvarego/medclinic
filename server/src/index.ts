@@ -21,6 +21,12 @@ const app = express();
 const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
 const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'America/Sao_Paulo';
+const corsOrigins = new Set([
+  'http://192.168.0.200:3000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  ...(process.env.CORS_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean)
+]);
 const certificateEncryptionKey = crypto.createHash('sha256').update(process.env.CERTIFICATE_ENCRYPTION_KEY || jwtSecret).digest();
 const attachmentRoot = path.resolve(process.env.MEDICAL_RECORD_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'medical-records'));
 fs.mkdirSync(attachmentRoot, { recursive: true });
@@ -38,7 +44,15 @@ const attachmentUpload = multer({
 const certificateUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, callback) => { if (!file.originalname.toLowerCase().endsWith('.pfx') && !file.originalname.toLowerCase().endsWith('.p12')) return callback(new Error('Envie um certificado digital no formato PFX ou P12.')); callback(null, true); } });
 
 type AuthRequest = Request & { user?: { id: number; profile: Profile; login: string } };
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || corsOrigins.has(origin)) return callback(null, true);
+    callback(new Error(`Origem não autorizada pelo CORS: ${origin}`));
+  },
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204
+}));
 app.use(express.json());
 
 function signToken(user: { id: number; profile: Profile; login: string }) {
