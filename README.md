@@ -67,6 +67,18 @@ cd client && npm run dev
 
 Acesse `http://localhost:5173`.
 
+## Executar server e client simultaneamente
+
+Na pasta raiz do projeto, execute:
+
+```bash
+npm run up
+```
+
+Esse comando instala as dependências do `server` e do `client`, executa o build dos dois projetos e inicia ambos em modo desenvolvimento.
+
+Para encerrar os dois processos, pressione `Ctrl+C`.
+
 ## Acesso inicial
 
 - **Login:** `theomar_rego@hotmail.com`
