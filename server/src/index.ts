@@ -658,4 +658,4 @@ app.put('/api/admin/exam-types/:id', async (req, res) => { const p = examTypeSch
 app.delete('/api/admin/exam-types/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.examType.delete({ where: { id } }); res.status(204).send(); });
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); const message = err?.code === 'LIMIT_FILE_SIZE' ? 'O arquivo excede o limite de 10 MB.' : err?.message || 'Erro interno do servidor.'; res.status(err?.code === 'LIMIT_FILE_SIZE' || err?.status === 400 || message.startsWith('Tipo de arquivo') ? 400 : 500).json({ message }); });
-app.listen(port, '0.0.0.0', () => console.log(`MedClinic API em http://localhost:${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`MedClinic API em http://192.168.0.200:${port}`));
