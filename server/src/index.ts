@@ -271,7 +271,13 @@ function appointmentData(data: z.infer<typeof appointmentSchema>) {
   if (!isAttendance && !data.procedureId) throw new Error('Selecione um procedimento.');
   return { ...data, appointmentDate: new Date(`${data.appointmentDate}T00:00:00.000Z`), attendanceId: isAttendance ? data.attendanceId : null, procedureId: isAttendance ? null : data.procedureId };
 }
-
+async function clinicalRequestRecord(id: number) {
+  const record = await prisma.medicalRecord.findUnique({ where: { id }, select: { id: true, patientId: true, appointmentId: true, recordDate: true } });
+  const todayDate = clinicTodayDate();
+  if (!record || !record.appointmentId || record.recordDate.toISOString().slice(0, 10) !== todayDate) return null;
+  const appointment = await prisma.appointment.findFirst({ where: { id: record.appointmentId, patientId: record.patientId, appointmentDate: new Date(`${todayDate}T00:00:00.000Z`), status: AppointmentStatus.EM_ATENDIMENTO }, select: { id: true } });
+  return appointment ? record : null;
+}
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'MedClinic API' }));
 app.post('/api/auth/login', async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
@@ -463,7 +469,7 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
   const parsed = examRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um grupo de exames.' });
   const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
+  const record = await clinicalRequestRecord(medicalRecordId);
   if (!record) return res.status(404).json({ message: 'Prontuário não encontrado.' });
   const groupIds = [...new Set(parsed.data.examGroupIds)];
   const groups = await prisma.examGroup.findMany({ where: { id: { in: groupIds }, createdById: req.user!.id }, select: { id: true, name: true } });
@@ -502,9 +508,8 @@ app.post('/api/medical-records/:id/injectable-requests', auth, doctorOnly, async
   const parsed = injectableRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um injetável e informe via e sessões.' });
   const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
-  const todayAppointment = record ? await prisma.appointment.findFirst({ where: { patientId: record.patientId, appointmentDate: new Date(`${clinicTodayDate()}T00:00:00.000Z`) }, select: { id: true } }) : null;
-  if (!record || !todayAppointment) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente para atendimentos do dia.' });
+  const record = await clinicalRequestRecord(medicalRecordId);
+  if (!record) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente no novo registro do atendimento iniciado hoje.' });
   const items = parsed.data.items.filter((item, index, all) => all.findIndex(other => other.injectableId === item.injectableId) === index);
   const ids = items.map(item => item.injectableId);
   const injectables = await prisma.injectable.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, type: true } });
@@ -521,9 +526,8 @@ app.post('/api/medical-records/:id/procedure-requests', auth, doctorOnly, async 
   const procedureIds = Array.from(new Set(rawIds.map((raw: unknown) => Number(raw)).filter((id: unknown): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0))) as number[];
   if (!procedureIds.length) return res.status(400).json({ message: 'Selecione pelo menos um procedimento.' });
   const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await prisma.medicalRecord.findUnique({ where: { id: medicalRecordId }, select: { id: true, patientId: true } });
-  const todayAppointment = record ? await prisma.appointment.findFirst({ where: { patientId: record.patientId, appointmentDate: new Date(`${clinicTodayDate()}T00:00:00.000Z`) }, select: { id: true } }) : null;
-  if (!record || !todayAppointment) return res.status(403).json({ message: 'As solicitações de procedimentos estão disponíveis somente para atendimentos do dia.' });
+  const record = await clinicalRequestRecord(medicalRecordId);
+  if (!record) return res.status(403).json({ message: 'As solicitações de procedimentos estão disponíveis somente no novo registro do atendimento iniciado hoje.' });
   const procedures = await prisma.procedure.findMany({ where: { id: { in: procedureIds }, active: true }, select: { id: true, name: true, value: true } });
   if (procedures.length !== procedureIds.length) return res.status(400).json({ message: 'Um ou mais procedimentos não estão disponíveis.' });
   const existing = await prisma.procedureRequest.findMany({ where: { medicalRecordId, procedureId: { in: procedureIds } }, select: { procedureId: true } });

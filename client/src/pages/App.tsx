@@ -32,6 +32,7 @@ export function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [recordPatientId, setRecordPatientId] = useState<number | null>(null);
+  const [recordAppointmentId, setRecordAppointmentId] = useState<number | null>(null);
   const [allowNewRecord, setAllowNewRecord] = useState(false);
   const dataAtual = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -93,6 +94,7 @@ export function App() {
                   setModule(item.key);
                   if (item.key === "medical-records") {
                     setRecordPatientId(null);
+                    setRecordAppointmentId(null);
                     setAllowNewRecord(false);
                   }
                   setMobileMenu(false);
@@ -174,8 +176,9 @@ export function App() {
           ) : module === "doctor-day" ? (
             user.profile === "MEDICO" ? (
               <DoctorAgendaPage
-                onOpenPatient={(patientId) => {
+                onOpenPatient={(patientId, appointmentId) => {
                   setRecordPatientId(patientId);
+                  setRecordAppointmentId(appointmentId);
                   setAllowNewRecord(true);
                   setModule("medical-records");
                 }}
@@ -187,6 +190,7 @@ export function App() {
             user.profile === "MEDICO" ? (
               <MedicalRecordsPage
                 patientId={recordPatientId}
+                appointmentId={recordAppointmentId}
                 allowNewRecord={allowNewRecord}
                 enableExamRequests={allowNewRecord}
               />
@@ -207,6 +211,7 @@ export function App() {
               profile={user.profile}
               onOpenPatientRecords={(patientId) => {
                 setRecordPatientId(patientId);
+                setRecordAppointmentId(null);
                 setAllowNewRecord(false);
                 setModule("medical-records");
               }}

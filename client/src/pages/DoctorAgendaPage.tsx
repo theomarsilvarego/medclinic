@@ -6,7 +6,7 @@ import { request } from '../lib/app';
 const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const statusLabel: Record<string, string> = { AGENDADO: 'Agendado', CONFIRMADO: 'Confirmado', EM_ATENDIMENTO: 'Em Atendimento', ATENDIDO: 'Atendido', FALTOU: 'Faltou' };
 
-export function DoctorAgendaPage({ onOpenPatient }: { onOpenPatient: (patientId: number) => void }) {
+export function DoctorAgendaPage({ onOpenPatient }: { onOpenPatient: (patientId: number, appointmentId: number) => void }) {
   const date = localDate(new Date());
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ export function DoctorAgendaPage({ onOpenPatient }: { onOpenPatient: (patientId:
 
   const startAppointment = async (row: Row) => {
     setStartingId(Number(row.id)); setError('');
-    try { await request(`/appointments/${row.id}/start`, { method: 'PATCH' }); onOpenPatient(Number(row.patient?.id)); }
+    try { await request(`/appointments/${row.id}/start`, { method: 'PATCH' }); onOpenPatient(Number(row.patient?.id), Number(row.id)); }
     catch (e: any) { setError(e.message); }
     finally { setStartingId(null); }
   };

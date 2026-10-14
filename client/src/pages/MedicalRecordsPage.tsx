@@ -20,13 +20,14 @@ import {
 import type { Row } from "../lib/app";
 import { API, request } from "../lib/app";
 
-type MedicalRecordsPageProps = { patientId: number | null };
+type MedicalRecordsPageProps = { patientId: number | null; appointmentId?: number | null };
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const emptyRecord = (patientId: number | null): Row => ({
+const emptyRecord = (patientId: number | null, appointmentId?: number | null): Row => ({
   patientId: patientId || "",
+  appointmentId: appointmentId || "",
   recordDate: today(),
   title: "Atendimento",
   chiefComplaint: "",
@@ -891,6 +892,7 @@ function ProcedureRequestsArea({
 
 export function MedicalRecordsPage({
   patientId,
+  appointmentId = null,
   allowNewRecord = false,
   enableExamRequests = false,
 }: MedicalRecordsPageProps & {
@@ -903,11 +905,13 @@ export function MedicalRecordsPage({
   );
   const [records, setRecords] = useState<Row[]>([]);
   const [editing, setEditing] = useState<Row | null>(null);
+  const [composingRecordId, setComposingRecordId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     setSelectedPatientId(patientId);
+    setComposingRecordId(null);
   }, [patientId]);
   useEffect(() => {
     request("/patients")
@@ -941,10 +945,13 @@ export function MedicalRecordsPage({
         title: values.title || "Atendimento",
       };
       if (!payload.patientId) throw new Error("Selecione um paciente.");
-      await request(`/medical-records${editing?.id ? `/${editing.id}` : ""}`, {
+      const savedRecord = await request(`/medical-records${editing?.id ? `/${editing.id}` : ""}`, {
         method: editing?.id ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
+      if (!editing?.id && payload.recordDate === today() && appointmentId) {
+        setComposingRecordId(Number(savedRecord.id));
+      }
       setEditing(null);
       await reload(payload.patientId);
     } catch (e: any) {
@@ -979,7 +986,7 @@ export function MedicalRecordsPage({
           <button
             className="primary"
             disabled={!selectedPatientId}
-            onClick={() => setEditing(emptyRecord(selectedPatientId))}
+            onClick={() => setEditing(emptyRecord(selectedPatientId, appointmentId))}
           >
             <Plus size={17} /> Novo registro
           </button>
@@ -1104,19 +1111,19 @@ export function MedicalRecordsPage({
                 <ExamRequestsArea
                   recordId={record.id}
                   requests={record.examRequests}
-                  canCompose={enableExamRequests}
+                  canCompose={enableExamRequests && composingRecordId === record.id}
                   onChanged={() => reload(selectedPatientId)}
                 />
                 <InjectableRequestsArea
                   recordId={record.id}
                   requests={record.injectableRequests}
-                  canCompose={enableExamRequests}
+                  canCompose={enableExamRequests && composingRecordId === record.id}
                   onChanged={() => reload(selectedPatientId)}
                 />
                 <ProcedureRequestsArea
                   recordId={record.id}
                   requests={record.procedureRequests}
-                  canCompose={enableExamRequests}
+                  canCompose={enableExamRequests && composingRecordId === record.id}
                   onChanged={() => reload(selectedPatientId)}
                 />
                 <AttachmentsArea
