@@ -34,10 +34,7 @@ const examRequestPdfRoot = path.resolve(process.env.EXAM_REQUEST_PDF_DIR || path
 fs.mkdirSync(examRequestPdfRoot, { recursive: true });
 const allowedAttachments: Record<string, string> = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png' };
 const attachmentUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, callback) => callback(null, attachmentRoot),
-    filename: (_req, file, callback) => callback(null, `${crypto.randomUUID()}${allowedAttachments[file.mimetype] || ''}`)
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => { if (!allowedAttachments[file.mimetype]) return callback(new Error('Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG.')); callback(null, true); }
 });
@@ -373,9 +370,13 @@ app.post('/api/medical-records/:id/attachments', auth, doctorOnly, attachmentUpl
   if (!req.file) return res.status(400).json({ message: 'Selecione um arquivo PDF, JPG ou PNG.' });
   const record = await prisma.medicalRecord.findUnique({ where: { id }, select: { id: true, patientId: true } });
   if (!record) {
-    await fs.promises.unlink(req.file.path).catch(() => undefined);
     return res.status(404).json({ message: 'Prontuário não encontrado.' });
   }
+  const patientDirectory = path.join(attachmentRoot, String(record.patientId));
+  await fs.promises.mkdir(patientDirectory, { recursive: true });
+  const storageKey = `${record.patientId}/${crypto.randomUUID()}${allowedAttachments[req.file.mimetype]}`;
+  const filePath = path.resolve(attachmentRoot, storageKey);
+  await fs.promises.writeFile(filePath, req.file.buffer);
   const attachment = await prisma.medicalRecordAttachment.create({
     data: {
       medicalRecordId: record.id,
@@ -383,13 +384,22 @@ app.post('/api/medical-records/:id/attachments', auth, doctorOnly, attachmentUpl
       fileName: req.file.originalname,
       mimeType: req.file.mimetype,
       sizeBytes: req.file.size,
-      storageKey: req.file.filename,
-      url: `/medical-record-attachments/${req.file.filename}/file`,
+      storageKey,
+      url: `/medical-record-attachments/file?key=${encodeURIComponent(storageKey)}`,
       uploadedById: req.user!.id
     },
     include: { uploadedBy: { select: { id: true, fullName: true } } }
   });
   res.status(201).json(attachment);
+});
+
+app.get('/api/medical-record-attachments/file', auth, doctorOnly, async (req, res) => {
+  const storageKey = String(req.query.key || '');
+  const attachment = await prisma.medicalRecordAttachment.findFirst({ where: { storageKey }, select: { storageKey: true, fileName: true, mimeType: true } });
+  if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
+  const filePath = path.resolve(attachmentRoot, attachment.storageKey);
+  if (!filePath.startsWith(`${attachmentRoot}${path.sep}`)) return res.status(400).json({ message: 'Arquivo inválido.' });
+  res.type(attachment.mimeType).download(filePath, attachment.fileName);
 });
 
 app.get('/api/medical-record-attachments/:storageKey/file', auth, doctorOnly, async (req, res) => {
