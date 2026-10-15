@@ -260,12 +260,7 @@ model MedicalRecord {
   appointmentId  Int?         @map("appointment_id")
   recordDate     DateTime     @map("record_date") @db.Date
   title          String       @db.VarChar(160)
-  chiefComplaint String?      @map("chief_complaint") @db.Text
-  medicalHistory String?      @map("medical_history") @db.Text
-  physicalExam   String?      @map("physical_exam") @db.Text
-  diagnosis      String?      @db.Text
   conduct        String?      @db.Text
-  prescription   String?      @db.Text
   patient        Patient      @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
   author         User         @relation("MedicalRecordAuthor", fields: [authorId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   appointment    Appointment? @relation(fields: [appointmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)

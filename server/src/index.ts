@@ -177,12 +177,7 @@ const medicalRecordSchema = z.object({
   appointmentId: z.coerce.number().int().positive().nullable().optional(),
   recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
   title: requiredText,
-  chiefComplaint: z.string().optional().nullable(),
-  medicalHistory: z.string().optional().nullable(),
-  physicalExam: z.string().optional().nullable(),
-  diagnosis: z.string().optional().nullable(),
-  conduct: z.string().optional().nullable(),
-  prescription: z.string().optional().nullable()
+  conduct: z.string().optional().nullable()
 });
 
 const injectableRequestInclude = { injectable: { select: { id: true, name: true, type: true } }, requestedBy: { select: { id: true, fullName: true } } };

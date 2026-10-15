@@ -30,20 +30,10 @@ const emptyRecord = (patientId: number | null, appointmentId?: number | null): R
   appointmentId: appointmentId || "",
   recordDate: today(),
   title: "Atendimento",
-  chiefComplaint: "",
-  medicalHistory: "",
-  physicalExam: "",
-  diagnosis: "",
   conduct: "",
-  prescription: "",
 });
 const sections = [
-  ["chiefComplaint", "Queixa principal"],
-  ["medicalHistory", "História da moléstia atual"],
-  ["physicalExam", "Exame físico"],
-  ["diagnosis", "Hipótese diagnóstica"],
   ["conduct", "Condutas"],
-  ["prescription", "Prescrição"],
 ] as const;
 
 function dateLabel(value: string) {
