@@ -251,6 +251,7 @@ function ExamRequestsArea({
 }) {
   const [groups, setGroups] = useState<Row[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedExamTypeIds, setSelectedExamTypeIds] = useState<Record<number, number[]>>({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -280,25 +281,40 @@ function ExamRequestsArea({
     )
     .slice(0, 8);
   function addGroup(id: number) {
+    const group = groups.find((item) => Number(item.id) === id);
     setSelectedIds((current) =>
       current.includes(id) ? current : [...current, id],
     );
+    setSelectedExamTypeIds((current) => current[id] ? current : ({ ...current, [id]: (group?.items || []).filter((item: Row) => item.examType?.active !== false).map((item: Row) => Number(item.examTypeId || item.examType?.id)) }));
     setSearch("");
     setMessage("");
   }
   function removeSelected(id: number) {
     setSelectedIds((current) => current.filter((item) => item !== id));
+    setSelectedExamTypeIds((current) => { const next = { ...current }; delete next[id]; return next; });
+  }
+  function toggleExamType(groupId: number, examTypeId: number) {
+    setSelectedExamTypeIds((current) => ({
+      ...current,
+      [groupId]: (current[groupId] || []).includes(examTypeId)
+        ? (current[groupId] || []).filter((id) => id !== examTypeId)
+        : [...(current[groupId] || []), examTypeId],
+    }));
   }
   async function generate() {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0 || selectedIds.some((id) => !(selectedExamTypeIds[id] || []).length)) {
+      setMessage("Mantenha pelo menos um tipo de exame em cada grupo.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     try {
       await request(`/medical-records/${recordId}/exam-requests`, {
         method: "POST",
-        body: JSON.stringify({ examGroupIds: selectedIds }),
+        body: JSON.stringify({ groups: selectedIds.map((examGroupId) => ({ examGroupId, examTypeIds: selectedExamTypeIds[examGroupId] || [] })) }),
       });
       setSelectedIds([]);
+      setSelectedExamTypeIds({});
       setSearch("");
       await onChanged();
     } catch (error: any) {
@@ -375,16 +391,25 @@ function ExamRequestsArea({
           {selectedGroups.length > 0 && (
             <div className="exam-request-selection">
               {selectedGroups.map((group) => (
-                <span className="exam-request-chip selected" key={group.id}>
-                  <span>{group.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeSelected(Number(group.id))}
-                    title="Remover grupo"
-                  >
-                    <X size={13} />
-                  </button>
-                </span>
+                <div className="exam-request-group-editor" key={group.id}>
+                  <div className="exam-request-chip selected">
+                    <span>{group.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSelected(Number(group.id))}
+                      title="Remover grupo"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <div className="exam-request-group-items">
+                    {(group.items || []).filter((item: Row) => item.examType?.active !== false).map((item: Row) => {
+                      const examTypeId = Number(item.examTypeId || item.examType?.id);
+                      const checked = (selectedExamTypeIds[Number(group.id)] || []).includes(examTypeId);
+                      return <label className="exam-request-type-option" key={examTypeId}><input type="checkbox" checked={checked} onChange={() => toggleExamType(Number(group.id), examTypeId)} /><span>{item.examType?.code ? `${item.examType.code} · ` : ""}{item.examType?.name || "Exame"}</span></label>;
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -438,7 +463,10 @@ function ExamRequestsArea({
             <button
               type="button"
               className="secondary"
-              onClick={() => setSelectedIds([])}
+              onClick={() => {
+                setSelectedIds([]);
+                setSelectedExamTypeIds({});
+              }}
             >
               Limpar
             </button>

@@ -145,7 +145,10 @@ const examGroupSchema = z.object({
   examTypeIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um exame.').transform(ids => [...new Set(ids)])
 });
 const examRequestSchema = z.object({
-  examGroupIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um grupo.')
+  groups: z.array(z.object({
+    examGroupId: z.coerce.number().int().positive(),
+    examTypeIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um exame.')
+  })).min(1, 'Selecione pelo menos um grupo.')
 });
 const injectableRequestSchema = z.object({
   items: z.array(z.object({ injectableId: z.coerce.number().int().positive(), route: z.enum(['IM', 'EV', 'SC']), sessions: z.coerce.number().int().min(1).max(99) })).min(1, 'Selecione pelo menos um injetável.')
@@ -181,7 +184,7 @@ const medicalRecordSchema = z.object({
 });
 
 const injectableRequestInclude = { injectable: { select: { id: true, name: true, type: true } }, requestedBy: { select: { id: true, fullName: true } } };
-const examRequestInclude = { examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
+const examRequestInclude = { examTypeIds: true, examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
 const procedureRequestInclude = { procedure: { select: { id: true, name: true, value: true } }, requestedBy: { select: { id: true, fullName: true } } };
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
@@ -240,7 +243,7 @@ async function generateExamRequestPdf(data: any) {
     drawBrand();
     doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('PEDIDO DE EXAMES', 48, 121); doc.fillColor(gray).font('Helvetica').fontSize(9).text(`Código: ${data.code || `RX-${String(data.id).padStart(6, '0')}`}`, 410, 121, { width: 137, align: 'right' });
     doc.roundedRect(48, 147, pageWidth, 92, 8).fillAndStroke('#fff9fc', '#e5d3df'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text('PACIENTE', 65, 166); doc.fillColor(ink).font('Helvetica-Bold').fontSize(16).text(String(data.patient?.fullName || '').toUpperCase(), 65, 184, { width: 465 }); doc.fillColor(gray).font('Helvetica').fontSize(8).text(`CPF: ${data.patient?.cpf || 'Não informado'}`, 65, 218); doc.text(`Nascimento: ${data.patient?.birthDate ? pdfDate(data.patient.birthDate) : 'Não informado'}`, 235, 218); doc.text(`Telefone: ${data.patient?.phone || 'Não informado'}`, 410, 218, { width: 120, align: 'right' });
-    let y = drawTableHeader(273); let total = 0; const items = data.examGroup?.items || [];
+    let y = drawTableHeader(273); let total = 0; const selectedExamTypeIds = Array.isArray(data.examTypeIds) ? new Set(data.examTypeIds.map((id: unknown) => Number(id))) : null; const items = (data.examGroup?.items || []).filter((item: any) => !selectedExamTypeIds || selectedExamTypeIds.has(Number(item.examType?.id)));
     items.forEach((item: any, index: number) => { const exam = item.examType || {}; const value = Number(exam.value || 0); total += value; const rowHeight = 27; if (y + rowHeight > bottomLimit) { doc.addPage(); drawBrand(true); y = drawTableHeader(112); } if (index % 2 === 0) doc.rect(48, y, pageWidth, rowHeight).fill('#fff8fc'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text(String(exam.code || '—'), 64, y + 9, { width: 68 }); doc.fillColor(ink).font('Helvetica').fontSize(8).text(String(exam.name || 'Exame'), 142, y + 9, { width: 315, ellipsis: true }); doc.text(pdfMoney(value), 480, y + 9, { width: 50, align: 'right' }); doc.strokeColor('#eadde2').moveTo(48, y + rowHeight).lineTo(547, y + rowHeight).stroke(); y += rowHeight; });
     if (y + 96 > bottomLimit) { doc.addPage(); drawBrand(true); y = 112; }
     doc.roundedRect(336, y + 18, 211, 58, 8).fillAndStroke(pale, '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text('VALOR TOTAL', 355, y + 35); doc.fontSize(18).text(pdfMoney(total), 355, y + 50, { width: 172, align: 'right' });
@@ -466,24 +469,31 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
   const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
   const record = await clinicalRequestRecord(medicalRecordId);
   if (!record) return res.status(404).json({ message: 'Prontuário não encontrado.' });
-  const groupIds = [...new Set(parsed.data.examGroupIds)];
-  const groups = await prisma.examGroup.findMany({ where: { id: { in: groupIds }, createdById: req.user!.id }, select: { id: true, name: true } });
+  const requestedGroups = parsed.data.groups.map(group => ({ examGroupId: group.examGroupId, examTypeIds: [...new Set(group.examTypeIds)] }));
+  const groupIds = [...new Set(requestedGroups.map(group => group.examGroupId))];
+  const groups = await prisma.examGroup.findMany({ where: { id: { in: groupIds }, createdById: req.user!.id }, select: { id: true, name: true, items: { where: { examType: { active: true } }, select: { examTypeId: true } } } });
   if (groups.length !== groupIds.length) return res.status(400).json({ message: 'Um ou mais grupos não estão disponíveis para este médico.' });
+  const groupMap = new Map(groups.map(group => [group.id, group]));
+  for (const requested of requestedGroups) {
+    const group = groupMap.get(requested.examGroupId);
+    const availableIds = new Set(group?.items.map(item => item.examTypeId) || []);
+    if (!requested.examTypeIds.every(examTypeId => availableIds.has(examTypeId))) return res.status(400).json({ message: 'Um ou mais exames selecionados não pertencem ao grupo ou estão inativos.' });
+  }
   const existing = await prisma.examRequest.findMany({ where: { medicalRecordId, examGroupId: { in: groupIds } }, select: { examGroupId: true } });
   const existingIds = new Set(existing.map(item => item.examGroupId));
-  const pending = groups.filter(group => !existingIds.has(group.id));
+  const pending = requestedGroups.filter(group => !existingIds.has(group.examGroupId));
   const createdIds: number[] = [];
   if (pending.length > 0) {
     await prisma.$transaction(async tx => {
       for (const group of pending) {
-        const created = await tx.examRequest.create({ data: { medicalRecordId, patientId: record.patientId, examGroupId: group.id, groupName: group.name, code: `TMP-${crypto.randomBytes(6).toString('hex')}`, requestedById: req.user!.id } });
+        const created = await tx.examRequest.create({ data: { medicalRecordId, patientId: record.patientId, examGroupId: group.examGroupId, examTypeIds: group.examTypeIds, groupName: groupMap.get(group.examGroupId)!.name, code: `TMP-${crypto.randomBytes(6).toString('hex')}`, requestedById: req.user!.id } });
         const code = `RX-${String(created.id).padStart(6, '0')}`;
         await tx.examRequest.update({ where: { id: created.id }, data: { code, pdfUrl: `/medical-record-exam-requests/${created.id}/pdf` } });
         createdIds.push(created.id);
       }
     });
     for (const id of createdIds) {
-      const created = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
+      const created = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { id: true, code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
       if (created) await generateExamRequestPdf(created);
     }
   }
@@ -492,7 +502,7 @@ app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req:
 
 app.get('/api/medical-record-exam-requests/:id/pdf', auth, doctorOnly, async (req: AuthRequest, res) => {
   const id = routeId(req, res); if (id === null) return;
-  const examRequest = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
+  const examRequest = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { id: true, code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
   if (!examRequest) return res.status(404).json({ message: 'Pedido de exames não encontrado.' });
   const pdfPath = path.join(examRequestPdfRoot, `${examRequest.id}.pdf`);
   await generateExamRequestPdf(examRequest);

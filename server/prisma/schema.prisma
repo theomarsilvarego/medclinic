@@ -286,6 +286,7 @@ model ExamRequest {
   medicalRecordId Int              @map("medical_record_id")
   patientId      Int               @map("patient_id")
   examGroupId    Int               @map("exam_group_id")
+  examTypeIds    Json?             @map("exam_type_ids")
   code           String            @unique @db.VarChar(20)
   groupName      String            @map("group_name") @db.VarChar(160)
   status         ExamRequestStatus @default(AGUARDANDO_RESULTADO)
