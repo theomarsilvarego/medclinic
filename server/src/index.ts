@@ -184,7 +184,7 @@ const medicalRecordSchema = z.object({
 });
 
 const injectableRequestInclude = { injectable: { select: { id: true, name: true, type: true } }, requestedBy: { select: { id: true, fullName: true } } };
-const examRequestInclude = { examTypeIds: true, examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
+const examRequestInclude = { examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
 const procedureRequestInclude = { procedure: { select: { id: true, name: true, value: true } }, requestedBy: { select: { id: true, fullName: true } } };
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
