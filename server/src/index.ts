@@ -422,7 +422,7 @@ app.delete('/api/medical-record-attachments/:id', auth, doctorOnly, async (req, 
 });
 
 app.get('/api/exam-types/catalog', auth, doctorOnly, async (_req, res) => {
-  res.json(await prisma.examType.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { code: 'asc' }], select: { id: true, code: true, name: true, value: true } }));
+  res.json(await prisma.examType.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { code: 'asc' }], select: { id: true, code: true, name: true, value: true, active: true } }));
 });
 app.get('/api/injectables/catalog', auth, doctorOnly, async (_req, res) => {
   res.json(await prisma.injectable.findMany({ orderBy: [{ type: 'asc' }, { name: 'asc' }], select: { id: true, name: true, type: true } }));

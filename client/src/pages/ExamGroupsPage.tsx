@@ -17,7 +17,7 @@ export function ExamGroupsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  async function reload() { setLoading(true); try { const [groupResult, examResult] = await Promise.all([request('/exam-groups'), request('/exam-types/catalog')]); setGroups(groupResult || []); setExams(examResult || []); } catch (e: any) { setError(e.message); } finally { setLoading(false); } }
+  async function reload() { setLoading(true); try { const [groupResult, examResult] = await Promise.all([request('/exam-groups'), request('/exam-types/catalog')]); setGroups(groupResult || []); setExams((examResult || []).filter((exam: Row) => exam.active === true)); } catch (e: any) { setError(e.message); } finally { setLoading(false); } }
   useEffect(() => { void reload(); }, []);
   function openNew() { setEditing({}); setName(''); setSelectedIds([]); setExamSearch(''); setError(''); }
   function openEdit(group: ExamGroup) { setEditing(group); setName(group.name || ''); setSelectedIds((group.items || []).map(item => Number(item.examTypeId || item.examType?.id)).filter(id => exams.some(exam => Number(exam.id) === id))); setExamSearch(''); setError(''); }
