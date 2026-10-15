@@ -250,16 +250,18 @@ function ExamRequestsArea({
   canCompose: boolean;
 }) {
   const [groups, setGroups] = useState<Row[]>([]);
+  const [examCatalog, setExamCatalog] = useState<Row[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedExamTypeIds, setSelectedExamTypeIds] = useState<Record<number, number[]>>({});
+  const [examTypeSearch, setExamTypeSearch] = useState<Record<number, string>>({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
     if (canCompose)
-      request("/exam-groups")
-        .then(setGroups)
+      Promise.all([request("/exam-groups"), request("/exam-types/catalog")])
+        .then(([groupResult, catalogResult]) => { setGroups(groupResult || []); setExamCatalog(catalogResult || []); })
         .catch((error: any) => setMessage(error.message))
         .finally(() => setLoading(false));
     else setLoading(false);
@@ -292,6 +294,11 @@ function ExamRequestsArea({
   function removeSelected(id: number) {
     setSelectedIds((current) => current.filter((item) => item !== id));
     setSelectedExamTypeIds((current) => { const next = { ...current }; delete next[id]; return next; });
+    setExamTypeSearch((current) => { const next = { ...current }; delete next[id]; return next; });
+  }
+  function addExamType(groupId: number, examTypeId: number) {
+    setSelectedExamTypeIds((current) => ({ ...current, [groupId]: [...new Set([...(current[groupId] || []), examTypeId])] }));
+    setExamTypeSearch((current) => ({ ...current, [groupId]: "" }));
   }
   function toggleExamType(groupId: number, examTypeId: number) {
     setSelectedExamTypeIds((current) => ({
@@ -315,6 +322,7 @@ function ExamRequestsArea({
       });
       setSelectedIds([]);
       setSelectedExamTypeIds({});
+      setExamTypeSearch({});
       setSearch("");
       await onChanged();
     } catch (error: any) {
@@ -402,11 +410,13 @@ function ExamRequestsArea({
                       <X size={13} />
                     </button>
                   </div>
+                  <label className="exam-request-type-search"><Search size={13} /><input value={examTypeSearch[Number(group.id)] || ""} onChange={(event) => setExamTypeSearch((current) => ({ ...current, [Number(group.id)]: event.target.value }))} placeholder="Acrescentar exame ativo..." /></label>
+                  {(examTypeSearch[Number(group.id)] || "").trim() && <div className="exam-request-type-suggestions">{examCatalog.filter((exam) => !(selectedExamTypeIds[Number(group.id)] || []).includes(Number(exam.id)) && `${exam.code} ${exam.name}`.toLocaleLowerCase().includes((examTypeSearch[Number(group.id)] || "").toLocaleLowerCase())).slice(0, 6).map((exam) => <button type="button" key={exam.id} onClick={() => addExamType(Number(group.id), Number(exam.id))}><strong>{exam.code}</strong><span>{exam.name}</span></button>)}</div>}
                   <div className="exam-request-group-items">
-                    {(group.items || []).filter((item: Row) => item.examType?.active !== false).map((item: Row) => {
-                      const examTypeId = Number(item.examTypeId || item.examType?.id);
+                    {(selectedExamTypeIds[Number(group.id)] || []).map((examTypeId) => {
+                      const exam = examCatalog.find((item) => Number(item.id) === examTypeId) || (group.items || []).find((item: Row) => Number(item.examTypeId || item.examType?.id) === examTypeId)?.examType;
                       const checked = (selectedExamTypeIds[Number(group.id)] || []).includes(examTypeId);
-                      return <label className="exam-request-type-option" key={examTypeId}><input type="checkbox" checked={checked} onChange={() => toggleExamType(Number(group.id), examTypeId)} /><span>{item.examType?.code ? `${item.examType.code} · ` : ""}{item.examType?.name || "Exame"}</span></label>;
+                      return <label className="exam-request-type-option" key={examTypeId}><input type="checkbox" checked={checked} onChange={() => toggleExamType(Number(group.id), examTypeId)} /><span>{exam?.code ? `${exam.code} · ` : ""}{exam?.name || "Exame"}</span></label>;
                     })}
                   </div>
                 </div>
@@ -466,6 +476,7 @@ function ExamRequestsArea({
               onClick={() => {
                 setSelectedIds([]);
                 setSelectedExamTypeIds({});
+                setExamTypeSearch({});
               }}
             >
               Limpar
