@@ -1,121 +1,257 @@
-import 'dotenv/config';
-import express, { NextFunction, Request, Response } from 'express';
-import cors from 'cors';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-import { AppointmentItemType, AppointmentStatus, InjectableType, PrismaClient, Profile } from '@prisma/client';
-import multer from 'multer';
-import PDFDocument from 'pdfkit';
-import { SignPdf } from '@signpdf/signpdf';
-import { plainAddPlaceholder } from '@signpdf/placeholder-plain';
-import { P12Signer } from '@signpdf/signer-p12';
-import { z } from 'zod';
-import QRCode from 'qrcode';
-import forge from 'node-forge';
+import "dotenv/config";
+import express, { NextFunction, Request, Response } from "express";
+import cors from "cors";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import {
+  AppointmentItemType,
+  AppointmentStatus,
+  InjectableType,
+  PrismaClient,
+  Profile,
+} from "@prisma/client";
+import multer from "multer";
+import PDFDocument from "pdfkit";
+import { SignPdf } from "@signpdf/signpdf";
+import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
+import { P12Signer } from "@signpdf/signer-p12";
+import { z } from "zod";
+import QRCode from "qrcode";
+import forge from "node-forge";
 
 const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3333);
-const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
-const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'America/Sao_Paulo';
+const jwtSecret = process.env.JWT_SECRET || "dev-secret";
+const clinicTimeZone = process.env.CLINIC_TIMEZONE || "America/Sao_Paulo";
 const corsOrigins = new Set([
-  'http://192.168.0.200:3000',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  ...(process.env.CORS_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean)
+  "http://192.168.0.200:3000",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  ...(process.env.CORS_ORIGIN || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 ]);
-const certificateEncryptionKey = crypto.createHash('sha256').update(process.env.CERTIFICATE_ENCRYPTION_KEY || jwtSecret).digest();
-const attachmentRoot = path.resolve(process.env.MEDICAL_RECORD_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'medical-records'));
+const certificateEncryptionKey = crypto
+  .createHash("sha256")
+  .update(process.env.CERTIFICATE_ENCRYPTION_KEY || jwtSecret)
+  .digest();
+const attachmentRoot = path.resolve(
+  process.env.MEDICAL_RECORD_UPLOAD_DIR ||
+    path.join(process.cwd(), "uploads", "medical-records"),
+);
 fs.mkdirSync(attachmentRoot, { recursive: true });
-const examRequestPdfRoot = path.resolve(process.env.EXAM_REQUEST_PDF_DIR || path.join(process.cwd(), 'uploads', 'exam-requests'));
+const examRequestPdfRoot = path.resolve(
+  process.env.EXAM_REQUEST_PDF_DIR ||
+    path.join(process.cwd(), "uploads", "exam-requests"),
+);
 fs.mkdirSync(examRequestPdfRoot, { recursive: true });
-const allowedAttachments: Record<string, string> = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png' };
+const allowedAttachments: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+};
 const attachmentUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, callback) => { if (!allowedAttachments[file.mimetype]) return callback(new Error('Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG.')); callback(null, true); }
-});
-const certificateUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, callback) => { if (!file.originalname.toLowerCase().endsWith('.pfx') && !file.originalname.toLowerCase().endsWith('.p12')) return callback(new Error('Envie um certificado digital no formato PFX ou P12.')); callback(null, true); } });
-
-type AuthRequest = Request & { user?: { id: number; profile: Profile; login: string } };
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || corsOrigins.has(origin)) return callback(null, true);
-    callback(new Error(`Origem não autorizada pelo CORS: ${origin}`));
+  fileFilter: (_req, file, callback) => {
+    if (!allowedAttachments[file.mimetype])
+      return callback(
+        new Error(
+          "Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG.",
+        ),
+      );
+    callback(null, true);
   },
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 204
-}));
+});
+const certificateUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (
+      !file.originalname.toLowerCase().endsWith(".pfx") &&
+      !file.originalname.toLowerCase().endsWith(".p12")
+    )
+      return callback(
+        new Error("Envie um certificado digital no formato PFX ou P12."),
+      );
+    callback(null, true);
+  },
+});
+
+type AuthRequest = Request & {
+  user?: { id: number; profile: Profile; login: string };
+};
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.has(origin)) return callback(null, true);
+      callback(new Error(`Origem não autorizada pelo CORS: ${origin}`));
+    },
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+  }),
+);
 app.use(express.json());
 
 function signToken(user: { id: number; profile: Profile; login: string }) {
-  return jwt.sign(user, jwtSecret, { expiresIn: '8h' });
+  return jwt.sign(user, jwtSecret, { expiresIn: "8h" });
 }
 
 function auth(req: AuthRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) return res.status(401).json({ message: 'Token não informado.' });
+  if (!header?.startsWith("Bearer "))
+    return res.status(401).json({ message: "Token não informado." });
   try {
-    req.user = jwt.verify(header.slice(7), jwtSecret) as AuthRequest['user'];
+    req.user = jwt.verify(header.slice(7), jwtSecret) as AuthRequest["user"];
     next();
-  } catch { res.status(401).json({ message: 'Token inválido ou expirado.' }); }
+  } catch {
+    res.status(401).json({ message: "Token inválido ou expirado." });
+  }
 }
 
 function adminOnly(req: AuthRequest, res: Response, next: NextFunction) {
-  if (req.user?.profile !== Profile.ADMINISTRADOR) return res.status(403).json({ message: 'Acesso restrito ao administrador.' });
+  if (req.user?.profile !== Profile.ADMINISTRADOR)
+    return res
+      .status(403)
+      .json({ message: "Acesso restrito ao administrador." });
   next();
 }
 
-function appointmentAccess(req: AuthRequest, res: Response, next: NextFunction) {
-  if (![Profile.ADMINISTRADOR, Profile.SECRETARIA, Profile.MEDICO].includes(req.user?.profile as Profile)) return res.status(403).json({ message: 'Perfil sem acesso à agenda.' });
+function appointmentAccess(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  if (
+    ![Profile.ADMINISTRADOR, Profile.SECRETARIA, Profile.MEDICO].includes(
+      req.user?.profile as Profile,
+    )
+  )
+    return res.status(403).json({ message: "Perfil sem acesso à agenda." });
   next();
 }
 
-function appointmentManage(req: AuthRequest, res: Response, next: NextFunction) {
-  if (req.user?.profile !== Profile.ADMINISTRADOR && req.user?.profile !== Profile.SECRETARIA) return res.status(403).json({ message: 'Apenas administrador e secretária podem gerenciar agendamentos.' });
+function appointmentManage(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  if (
+    req.user?.profile !== Profile.ADMINISTRADOR &&
+    req.user?.profile !== Profile.SECRETARIA
+  )
+    return res.status(403).json({
+      message:
+        "Apenas administrador e secretária podem gerenciar agendamentos.",
+    });
   next();
 }
 
 function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
-  if (req.user?.profile !== Profile.MEDICO) return res.status(403).json({ message: 'Acesso restrito ao perfil Médico.' });
+  if (req.user?.profile !== Profile.MEDICO)
+    return res
+      .status(403)
+      .json({ message: "Acesso restrito ao perfil Médico." });
   next();
 }
 
 function clinicTodayDate() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: clinicTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: clinicTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function encryptSecret(value: Buffer | string) {
-  const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', certificateEncryptionKey, iv); const encrypted = Buffer.concat([cipher.update(value), cipher.final()]);
-  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(
+    "aes-256-gcm",
+    certificateEncryptionKey,
+    iv,
+  );
+  const encrypted = Buffer.concat([cipher.update(value), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
 }
 function decryptSecret(value: string) {
-  const packed = Buffer.from(value, 'base64'); const decipher = crypto.createDecipheriv('aes-256-gcm', certificateEncryptionKey, packed.subarray(0, 12)); decipher.setAuthTag(packed.subarray(12, 28)); return Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]);
+  const packed = Buffer.from(value, "base64");
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    certificateEncryptionKey,
+    packed.subarray(0, 12),
+  );
+  decipher.setAuthTag(packed.subarray(12, 28));
+  return Buffer.concat([
+    decipher.update(packed.subarray(28)),
+    decipher.final(),
+  ]);
 }
 
-function routeId(req: Request, res: Response, fallback?: unknown, respond = true) {
+function routeId(
+  req: Request,
+  res: Response,
+  fallback?: unknown,
+  respond = true,
+) {
   const paramId = req.params.id;
-  const rawId = paramId && paramId !== 'undefined' && paramId !== 'null' && paramId !== 'NaN' ? paramId : fallback;
+  const rawId =
+    paramId &&
+    paramId !== "undefined" &&
+    paramId !== "null" &&
+    paramId !== "NaN"
+      ? paramId
+      : fallback;
   const id = Number(rawId);
   if (!Number.isInteger(id) || id <= 0) {
-    if (respond) res.status(400).json({ message: 'ID do cadastro inválido. Atualize a lista e tente novamente.' });
+    if (respond)
+      res.status(400).json({
+        message: "ID do cadastro inválido. Atualize a lista e tente novamente.",
+      });
     return null;
   }
   return id;
 }
 
 const requiredText = z.string().trim().min(1);
-const loginSchema = z.object({ login: requiredText, password: z.string().min(1) });
-const userSchema = z.object({ fullName: requiredText, login: requiredText, password: z.string().optional(), profile: z.nativeEnum(Profile) });
-const clinicSchema = z.object({ legalName: requiredText, tradeName: requiredText, cnpj: requiredText, cnae: requiredText, address: requiredText });
-const doctorSchema = z.object({ fullName: requiredText, crm: requiredText, rqe: requiredText, specialty: requiredText });
-const financialSchema = z.object({ name: requiredText, value: z.coerce.number().nonnegative(), active: z.boolean().default(true) });
+const loginSchema = z.object({
+  login: requiredText,
+  password: z.string().min(1),
+});
+const userSchema = z.object({
+  fullName: requiredText,
+  login: requiredText,
+  password: z.string().optional(),
+  profile: z.nativeEnum(Profile),
+});
+const clinicSchema = z.object({
+  legalName: requiredText,
+  tradeName: requiredText,
+  cnpj: requiredText,
+  cnae: requiredText,
+  address: requiredText,
+});
+const doctorSchema = z.object({
+  fullName: requiredText,
+  crm: requiredText,
+  rqe: requiredText,
+  specialty: requiredText,
+});
+const financialSchema = z.object({
+  name: requiredText,
+  value: z.coerce.number().nonnegative(),
+  active: z.boolean().default(true),
+});
 const insuranceSchema = financialSchema.extend({ ans: requiredText });
-const attendanceSchema = financialSchema.extend({ insuranceId: z.coerce.number().int().positive() });
+const attendanceSchema = financialSchema.extend({
+  insuranceId: z.coerce.number().int().positive(),
+});
 const injectableSchema = z.object({
   name: requiredText,
   type: z.nativeEnum(InjectableType),
@@ -123,40 +259,62 @@ const injectableSchema = z.object({
   invoiceValue: z.coerce.number().nonnegative(),
   value: z.coerce.number().nonnegative(),
   quantity: z.coerce.number().int().nonnegative(),
-  minimum: z.coerce.number().int().nonnegative()
+  minimum: z.coerce.number().int().nonnegative(),
 });
 const supplierSchema = z.object({
   name: requiredText,
   cnpj: requiredText,
   legalName: requiredText,
-  email: z.string().trim().email('E-mail inválido.'),
+  email: z.string().trim().email("E-mail inválido."),
   contact: requiredText,
-  address: requiredText
+  address: requiredText,
 });
 const examTypeSchema = z.object({
   code: requiredText,
   name: requiredText,
   invoiceValue: z.coerce.number().nonnegative(),
   value: z.coerce.number().nonnegative(),
-  active: z.boolean().default(true)
+  active: z.boolean().default(true),
 });
 const examGroupSchema = z.object({
   name: requiredText,
-  examTypeIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um exame.').transform(ids => [...new Set(ids)])
+  examTypeIds: z
+    .array(z.coerce.number().int().positive())
+    .min(1, "Selecione pelo menos um exame.")
+    .transform((ids) => [...new Set(ids)]),
 });
 const examRequestSchema = z.object({
-  groups: z.array(z.object({
-    examGroupId: z.coerce.number().int().positive(),
-    examTypeIds: z.array(z.coerce.number().int().positive()).min(1, 'Selecione pelo menos um exame.')
-  })).min(1, 'Selecione pelo menos um grupo.')
+  groups: z
+    .array(
+      z.object({
+        examGroupId: z.coerce.number().int().positive(),
+        examTypeIds: z
+          .array(z.coerce.number().int().positive())
+          .min(1, "Selecione pelo menos um exame."),
+      }),
+    )
+    .min(1, "Selecione pelo menos um grupo."),
 });
 const injectableRequestSchema = z.object({
-  items: z.array(z.object({ injectableId: z.coerce.number().int().positive(), route: z.enum(['IM', 'EV', 'SC']), sessions: z.coerce.number().int().min(1).max(99) })).min(1, 'Selecione pelo menos um injetável.')
+  items: z
+    .array(
+      z.object({
+        injectableId: z.coerce.number().int().positive(),
+        route: z.enum(["IM", "EV", "SC"]),
+        sessions: z.coerce.number().int().min(1).max(99),
+      }),
+    )
+    .min(1, "Selecione pelo menos um injetável."),
 });
 
 const appointmentSchema = z.object({
-  appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
-  scheduledTime: z.string().regex(/^(20:00|(?:08|09|10|11|12|13|14|15|16|17|18|19):(00|15|30|45))$/, 'Horário inválido.'),
+  appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
+  scheduledTime: z
+    .string()
+    .regex(
+      /^(20:00|(?:08|09|10|11|12|13|14|15|16|17|18|19):(00|15|30|45))$/,
+      "Horário inválido.",
+    ),
   patientId: z.coerce.number().int().positive(),
   doctorId: z.coerce.number().int().positive(),
   insuranceId: z.coerce.number().int().positive(),
@@ -164,7 +322,7 @@ const appointmentSchema = z.object({
   attendanceId: z.coerce.number().int().positive().nullable().optional(),
   procedureId: z.coerce.number().int().positive().nullable().optional(),
   status: z.nativeEnum(AppointmentStatus).default(AppointmentStatus.AGENDADO),
-  notes: z.string().optional().nullable()
+  notes: z.string().optional().nullable(),
 });
 
 const appointmentInclude = {
@@ -172,58 +330,148 @@ const appointmentInclude = {
   doctor: { select: { id: true, fullName: true, specialty: true } },
   insurance: { select: { id: true, name: true } },
   attendance: { select: { id: true, name: true } },
-  procedure: { select: { id: true, name: true } }
+  procedure: { select: { id: true, name: true } },
 };
 
 const medicalRecordSchema = z.object({
   patientId: z.coerce.number().int().positive(),
   appointmentId: z.coerce.number().int().positive().nullable().optional(),
-  recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.'),
+  recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
   title: requiredText,
-  conduct: z.string().optional().nullable()
+  conduct: z.string().optional().nullable(),
 });
 
-const injectableRequestInclude = { injectable: { select: { id: true, name: true, type: true } }, requestedBy: { select: { id: true, fullName: true } } };
-const examRequestInclude = { examGroup: { select: { id: true, name: true, items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true } } } } } }, requestedBy: { select: { id: true, fullName: true } } };
-const procedureRequestInclude = { procedure: { select: { id: true, name: true, value: true } }, requestedBy: { select: { id: true, fullName: true } } };
+const injectableRequestInclude = {
+  injectable: { select: { id: true, name: true, type: true } },
+  requestedBy: { select: { id: true, fullName: true } },
+};
+const examRequestInclude = {
+  examGroup: {
+    select: {
+      id: true,
+      name: true,
+      items: {
+        orderBy: { id: "asc" as const },
+        include: { examType: { select: { id: true, code: true, name: true } } },
+      },
+    },
+  },
+  requestedBy: { select: { id: true, fullName: true } },
+};
+const procedureRequestInclude = {
+  procedure: { select: { id: true, name: true, value: true } },
+  requestedBy: { select: { id: true, fullName: true } },
+};
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
-  appointment: { select: { id: true, scheduledTime: true, appointmentDate: true } },
-  attachments: { orderBy: { uploadedAt: 'asc' as const }, include: { uploadedBy: { select: { id: true, fullName: true } } } },
-  examRequests: { orderBy: { requestedAt: 'asc' as const }, include: examRequestInclude },
-  injectableRequests: { orderBy: { requestedAt: 'asc' as const }, include: injectableRequestInclude },
-  procedureRequests: { orderBy: { requestedAt: 'asc' as const }, include: procedureRequestInclude }
+  appointment: {
+    select: { id: true, scheduledTime: true, appointmentDate: true },
+  },
+  attachments: {
+    orderBy: { uploadedAt: "asc" as const },
+    include: { uploadedBy: { select: { id: true, fullName: true } } },
+  },
+  examRequests: {
+    orderBy: { requestedAt: "asc" as const },
+    include: examRequestInclude,
+  },
+  injectableRequests: {
+    orderBy: { requestedAt: "asc" as const },
+    include: injectableRequestInclude,
+  },
+  procedureRequests: {
+    orderBy: { requestedAt: "asc" as const },
+    include: procedureRequestInclude,
+  },
 };
-const examGroupInclude = { items: { orderBy: { id: 'asc' as const }, include: { examType: { select: { id: true, code: true, name: true, value: true, active: true } } } } };
+const examGroupInclude = {
+  items: {
+    orderBy: { id: "asc" as const },
+    include: {
+      examType: {
+        select: { id: true, code: true, name: true, value: true, active: true },
+      },
+    },
+  },
+};
 
-function pdfDate(value: Date | string) { return new Date(value).toLocaleDateString('pt-BR', { timeZone: clinicTimeZone }); }
-function pdfDateTime(value: Date) { return value.toLocaleString('pt-BR', { timeZone: clinicTimeZone, dateStyle: 'short', timeStyle: 'medium' }); }
-function pdfMoney(value: unknown) { return `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`; }
+function pdfDate(value: Date | string) {
+  return new Date(value).toLocaleDateString("pt-BR", {
+    timeZone: clinicTimeZone,
+  });
+}
+function pdfDateTime(value: Date) {
+  return value.toLocaleString("pt-BR", {
+    timeZone: clinicTimeZone,
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
+}
+function pdfMoney(value: unknown) {
+  return `R$ ${Number(value || 0)
+    .toFixed(2)
+    .replace(".", ",")}`;
+}
 function certificateAttributes(pfx: Buffer, password: string) {
-  const asn1 = forge.asn1.fromDer(pfx.toString('binary'));
+  const asn1 = forge.asn1.fromDer(pfx.toString("binary"));
   const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, false, password);
   const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
   const cert = bags[forge.pki.oids.certBag]?.[0]?.cert;
-  if (!cert) throw new Error('Não foi possível ler o certificado digital.');
+  if (!cert) throw new Error("Não foi possível ler o certificado digital.");
   const subject = cert.subject.attributes;
-  const commonName = String(subject.find((item: any) => item.shortName === 'CN')?.value || 'Titular do certificado');
+  const commonName = String(
+    subject.find((item: any) => item.shortName === "CN")?.value ||
+      "Titular do certificado",
+  );
   const cpfMatch = commonName.match(/(?:^|:)\s*(\d{11})(?:$|:)/);
-  const name = commonName.replace(/:\s*\d{11}\s*$/, '').trim();
-  return { name, cpf: cpfMatch?.[1] || 'Não identificado', subject: subject.map((item: any) => `${item.shortName}=${item.value}`).join(', '), issuer: cert.issuer.attributes.map((item: any) => `${item.shortName}=${item.value}`).join(', '), serialNumber: cert.serialNumber, validFrom: cert.validity.notBefore, validTo: cert.validity.notAfter };
+  const name = commonName.replace(/:\s*\d{11}\s*$/, "").trim();
+  return {
+    name,
+    cpf: cpfMatch?.[1] || "Não identificado",
+    subject: subject
+      .map((item: any) => `${item.shortName}=${item.value}`)
+      .join(", "),
+    issuer: cert.issuer.attributes
+      .map((item: any) => `${item.shortName}=${item.value}`)
+      .join(", "),
+    serialNumber: cert.serialNumber,
+    validFrom: cert.validity.notBefore,
+    validTo: cert.validity.notAfter,
+  };
 }
 async function getActiveCertificateDetails() {
-  const certificate = await prisma.digitalCertificate.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } });
+  const certificate = await prisma.digitalCertificate.findFirst({
+    where: { active: true },
+    orderBy: { createdAt: "desc" },
+  });
   if (!certificate) return null;
-  const pfx = decryptSecret(certificate.pfxEncrypted); const password = decryptSecret(certificate.passwordEncrypted).toString('utf8');
-  return { ...certificateAttributes(pfx, password), certificate, pfx, password };
+  const pfx = decryptSecret(certificate.pfxEncrypted);
+  const password = decryptSecret(certificate.passwordEncrypted).toString(
+    "utf8",
+  );
+  return {
+    ...certificateAttributes(pfx, password),
+    certificate,
+    pfx,
+    password,
+  };
 }
 async function signPdfWithActiveCertificate(pdfPath: string) {
   const details = await getActiveCertificateDetails();
   if (!details) return false;
   const pdfBuffer = fs.readFileSync(pdfPath);
-  const placeholder = plainAddPlaceholder({ pdfBuffer, reason: 'Assinatura digital de pedido de exames laboratoriais', name: details.name, contactInfo: 'MedClinic', location: 'Brasil' });
-  const signedPdf = await new SignPdf().sign(placeholder, new P12Signer(details.pfx, { passphrase: details.password }));
+  const placeholder = plainAddPlaceholder({
+    pdfBuffer,
+    reason: "Assinatura digital de pedido de exames laboratoriais",
+    name: details.name,
+    contactInfo: "MedClinic",
+    location: "Brasil",
+  });
+  const signedPdf = await new SignPdf().sign(
+    placeholder,
+    new P12Signer(details.pfx, { passphrase: details.password }),
+  );
   fs.writeFileSync(pdfPath, signedPdf);
   return true;
 }
@@ -232,458 +480,1568 @@ async function generateExamRequestPdf(data: any) {
   const signedAt = new Date();
   const certificate = await getActiveCertificateDetails();
   const doctor = data.medicalRecord?.appointment?.doctor;
-  const qrBuffer = await QRCode.toBuffer(`https://validar.iti.gov.br/?documento=${encodeURIComponent(data.code || `RX-${String(data.id).padStart(6, '0')}`)}`, { errorCorrectionLevel: 'M', margin: 1, width: 82 });
-  const selectedExamTypeIds: number[] | null = Array.isArray(data.examTypeIds) ? data.examTypeIds.map((id: unknown) => Number(id)) : null;
+  const qrBuffer = await QRCode.toBuffer(
+    `https://validar.iti.gov.br/?documento=${encodeURIComponent(data.code || `RX-${String(data.id).padStart(6, "0")}`)}`,
+    { errorCorrectionLevel: "M", margin: 1, width: 82 },
+  );
+  const selectedExamTypeIds: number[] | null = Array.isArray(data.examTypeIds)
+    ? data.examTypeIds.map((id: unknown) => Number(id))
+    : null;
   const groupItems = data.examGroup?.items || [];
-  const groupItemsById = new Map(groupItems.map((item: any) => [Number(item.examType?.id), item]));
-  const missingIds = selectedExamTypeIds?.filter((id) => !groupItemsById.has(id)) || [];
-  const missingExams = missingIds.length ? await prisma.examType.findMany({ where: { id: { in: missingIds }, active: true }, select: { id: true, code: true, name: true, value: true } }) : [];
-  const items = selectedExamTypeIds ? selectedExamTypeIds.map((id) => groupItemsById.get(id) || { examType: missingExams.find((exam) => exam.id === id) }).filter((item: any) => item?.examType) : groupItems;
+  const groupItemsById = new Map(
+    groupItems.map((item: any) => [Number(item.examType?.id), item]),
+  );
+  const missingIds =
+    selectedExamTypeIds?.filter((id) => !groupItemsById.has(id)) || [];
+  const missingExams = missingIds.length
+    ? await prisma.examType.findMany({
+        where: { id: { in: missingIds }, active: true },
+        select: { id: true, code: true, name: true, value: true },
+      })
+    : [];
+  const items = selectedExamTypeIds
+    ? selectedExamTypeIds
+        .map(
+          (id) =>
+            groupItemsById.get(id) || {
+              examType: missingExams.find((exam) => exam.id === id),
+            },
+        )
+        .filter((item: any) => item?.examType)
+    : groupItems;
   await new Promise<void>((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 48, autoFirstPage: true });
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 48,
+      autoFirstPage: true,
+    });
     const stream = fs.createWriteStream(pdfPath);
-    stream.on('finish', resolve); stream.on('error', reject); doc.on('error', reject); doc.pipe(stream);
-    const wine = '#741447'; const pale = '#f8edf3'; const ink = '#29242a'; const gray = '#706970'; const pageWidth = 499; const bottomLimit = 610;
-    const drawBrand = (continuation = false) => { doc.rect(0, 0, 595, 96).fill(pale); doc.rect(0, 0, 595, 5).fill(wine); doc.fillColor(wine).font('Helvetica-Bold').fontSize(23).text('intimavie', 48, 30); doc.fillColor('#76566b').font('Helvetica').fontSize(9).text('MEDICINA ÍNTIMA', 51, 59); doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('EXAMES & RECEITAS', 418, 39, { width: 128, align: 'right' }); if (continuation) doc.fillColor(gray).font('Helvetica').fontSize(8).text(`PEDIDO ${data.code || ''} — continuação`, 48, 78); };
-    const drawTableHeader = (top: number) => { doc.rect(48, top, pageWidth, 25).fill(wine); doc.fillColor('#fff').font('Helvetica-Bold').fontSize(8).text('CÓDIGO', 64, top + 8).text('EXAME', 142, top + 8).text('VALOR', 480, top + 8, { width: 50, align: 'right' }); return top + 25; };
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    doc.on("error", reject);
+    doc.pipe(stream);
+    const wine = "#741447";
+    const pale = "#f8edf3";
+    const ink = "#29242a";
+    const gray = "#706970";
+    const pageWidth = 499;
+    const bottomLimit = 710;
+    const drawBrand = (continuation = false) => {
+      doc.rect(0, 0, 595, 70).fill(pale);
+      doc.rect(0, 0, 595, 5).fill(wine);
+      doc
+        .fillColor(wine)
+        .font("Helvetica-Bold")
+        .fontSize(23)
+        .text("intimavie", 48, 25);
+      doc
+        .fillColor("#76566b")
+        .font("Helvetica")
+        .fontSize(9)
+        .text("MEDICINA ÍNTIMA", 51, 50);
+      doc
+        .fillColor(wine)
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text(
+          "PEDIDO DE EXAMES " +
+            `Código: ${data.code || `RX-${String(data.id).padStart(6, "0")}`}`,
+          418,
+          29,
+          { width: 90, align: "right" },
+        );
+    };
+    const drawTableHeader = (top: number) => {
+      doc.rect(48, top, pageWidth, 25).fill(wine);
+      doc
+        .fillColor("#fff")
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text("CÓDIGO", 64, top + 8)
+        .text("EXAME", 142, top + 8)
+        .text("VALOR", 480, top + 8, { width: 50, align: "right" });
+      return top + 25;
+    };
     drawBrand();
-    doc.fillColor(wine).font('Helvetica-Bold').fontSize(10).text('PEDIDO DE EXAMES', 48, 121); doc.fillColor(gray).font('Helvetica').fontSize(9).text(`Código: ${data.code || `RX-${String(data.id).padStart(6, '0')}`}`, 410, 121, { width: 137, align: 'right' });
-    doc.roundedRect(48, 147, pageWidth, 92, 8).fillAndStroke('#fff9fc', '#e5d3df'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text('PACIENTE', 65, 166); doc.fillColor(ink).font('Helvetica-Bold').fontSize(16).text(String(data.patient?.fullName || '').toUpperCase(), 65, 184, { width: 465 }); doc.fillColor(gray).font('Helvetica').fontSize(8).text(`CPF: ${data.patient?.cpf || 'Não informado'}`, 65, 218); doc.text(`Nascimento: ${data.patient?.birthDate ? pdfDate(data.patient.birthDate) : 'Não informado'}`, 235, 218); doc.text(`Telefone: ${data.patient?.phone || 'Não informado'}`, 410, 218, { width: 120, align: 'right' });
-    let y = drawTableHeader(273); let total = 0;
-    items.forEach((item: any, index: number) => { const exam = item.examType || {}; const value = Number(exam.value || 0); total += value; const rowHeight = 27; if (y + rowHeight > bottomLimit) { doc.addPage(); drawBrand(true); y = drawTableHeader(112); } if (index % 2 === 0) doc.rect(48, y, pageWidth, rowHeight).fill('#fff8fc'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text(String(exam.code || '—'), 64, y + 9, { width: 68 }); doc.fillColor(ink).font('Helvetica').fontSize(8).text(String(exam.name || 'Exame'), 142, y + 9, { width: 315, ellipsis: true }); doc.text(pdfMoney(value), 480, y + 9, { width: 50, align: 'right' }); doc.strokeColor('#eadde2').moveTo(48, y + rowHeight).lineTo(547, y + rowHeight).stroke(); y += rowHeight; });
-    if (y + 96 > bottomLimit) { doc.addPage(); drawBrand(true); y = 112; }
-    doc.roundedRect(336, y + 18, 211, 58, 8).fillAndStroke(pale, '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(8).text('VALOR TOTAL', 355, y + 35); doc.fontSize(18).text(pdfMoney(total), 355, y + 50, { width: 172, align: 'right' });
-    const stampY = y + 92; const requiredHeight = certificate ? 132 : 88; if (stampY + requiredHeight > 785) { doc.addPage(); drawBrand(true); }
-    const finalStampY = stampY + requiredHeight > 785 ? 125 : stampY; doc.roundedRect(48, finalStampY, pageWidth, requiredHeight, 8).fillAndStroke('#fff9fc', '#d9b2c7'); doc.fillColor(wine).font('Helvetica-Bold').fontSize(9).text('ASSINATURA DIGITAL', 65, finalStampY + 15); doc.fillColor(ink).font('Helvetica-Bold').fontSize(9).text(`Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || 'Médico'}`, 65, finalStampY + 34); doc.fillColor(gray).font('Helvetica').fontSize(8).text(`CPF: ${certificate?.cpf || 'Não disponível'}`, 65, finalStampY + 49); doc.text(`CRM/UF: ${doctor?.crm || 'Não informado'}`, 65, finalStampY + 63); doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, finalStampY + 77); doc.text('Padrão: PAdES — certificado ICP-Brasil', 65, finalStampY + 91); doc.image(qrBuffer, 455, finalStampY + 10, { width: 70, height: 70 }); doc.fillColor(wine).font('Helvetica-Bold').fontSize(7).text('Documento assinado digitalmente conforme MP 2.200-2/2001', 65, finalStampY + requiredHeight - 27); doc.fillColor(gray).font('Helvetica').fontSize(7).text('Validação: validar.iti.gov.br', 65, finalStampY + requiredHeight - 15); doc.fillColor('#8d8189').fontSize(7).text('QR code direciona ao validador do ITI.', 455, finalStampY + 83, { width: 70, align: 'center' });
-    doc.fillColor('#8d8189').font('Helvetica').fontSize(7).text('Documento gerado pelo sistema Clínica Intimavie.', 195, 812, { width: 250, align: 'center' });
+
+    doc
+      .fillColor(wine)
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .text("PACIENTE", 65, 90);
+    doc
+      .fillColor(ink)
+      .font("Helvetica-Bold")
+      .fontSize(16)
+      .text(String(data.patient?.fullName || "").toUpperCase(), 65, 103, {
+        width: 465,
+      });
+
+    let y = drawTableHeader(140);
+    let total = 0;
+    items.forEach((item: any, index: number) => {
+      const exam = item.examType || {};
+      const value = Number(exam.value || 0);
+      total += value;
+      const rowHeight = 20;
+      if (y + rowHeight > bottomLimit) {
+        doc.addPage();
+        drawBrand(true);
+        y = drawTableHeader(112);
+      }
+      if (index % 2 === 0)
+        doc.rect(48, y, pageWidth, rowHeight).fill("#fff8fc");
+      doc
+        .fillColor(wine)
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text(String(exam.code || "—"), 64, y + 7, { width: 68 });
+      doc
+        .fillColor(ink)
+        .font("Helvetica")
+        .fontSize(8)
+        .text(String(exam.name || "Exame"), 142, y + 7, {
+          width: 315,
+          ellipsis: true,
+        });
+      doc.text(pdfMoney(value), 480, y + 7, { width: 50, align: "right" });
+      doc
+        .strokeColor("#eadde2")
+        .moveTo(48, y + rowHeight)
+        .lineTo(547, y + rowHeight)
+        .stroke();
+      y += rowHeight;
+    });
+    if (y + 96 > bottomLimit) {
+      doc.addPage();
+      drawBrand(true);
+      y = 112;
+    }
+    doc.roundedRect(336, y + 18, 211, 45, 8).fillAndStroke(pale, "#d9b2c7");
+    doc
+      .fillColor(wine)
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .text("VALOR TOTAL", 355, y + 30);
+    doc
+      .fontSize(18)
+      .text(pdfMoney(total), 355, y + 40, { width: 172, align: "right" });
+    const stampY = y + 92;
+    const requiredHeight = certificate ? 132 : 88;
+    if (stampY + requiredHeight > 785) {
+      doc.addPage();
+      drawBrand(true);
+    }
+    const finalStampY = stampY + requiredHeight > 785 ? 125 : stampY;
+    doc
+      .roundedRect(48, finalStampY, pageWidth, requiredHeight, 8)
+      .fillAndStroke("#fff9fc", "#d9b2c7");
+    doc
+      .fillColor(wine)
+      .font("Helvetica-Bold")
+      .fontSize(9)
+      .text("ASSINATURA DIGITAL", 65, finalStampY + 15);
+    doc
+      .fillColor(ink)
+      .font("Helvetica-Bold")
+      .fontSize(9)
+      .text(
+        `Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || "Médico"}`,
+        65,
+        finalStampY + 34,
+      );
+    doc
+      .fillColor(gray)
+      .font("Helvetica")
+      .fontSize(8)
+      .text(
+        `CPF: ${certificate?.cpf || "Não disponível"}`,
+        65,
+        finalStampY + 49,
+      );
+    doc.text(`CRM/UF: ${doctor?.crm || "Não informado"}`, 65, finalStampY + 63);
+    doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, finalStampY + 77);
+    doc.text("Padrão: PAdES — certificado ICP-Brasil", 65, finalStampY + 91);
+    doc.image(qrBuffer, 455, finalStampY + 10, { width: 70, height: 70 });
+    doc
+      .fillColor(wine)
+      .font("Helvetica-Bold")
+      .fontSize(7)
+      .text(
+        "Documento assinado digitalmente conforme MP 2.200-2/2001",
+        65,
+        finalStampY + requiredHeight - 27,
+      );
+    doc
+      .fillColor(gray)
+      .font("Helvetica")
+      .fontSize(7)
+      .text(
+        "Validação: validar.iti.gov.br",
+        65,
+        finalStampY + requiredHeight - 15,
+      );
+    doc
+      .fillColor("#8d8189")
+      .fontSize(7)
+      .text("QR code direciona ao validador do ITI.", 455, finalStampY + 83, {
+        width: 70,
+        align: "center",
+      });
+    doc
+      .fillColor("#8d8189")
+      .font("Helvetica")
+      .fontSize(7)
+      .text("Documento gerado pelo sistema Clínica Intimavie.", 195, 812, {
+        width: 250,
+        align: "center",
+      });
     doc.end();
   });
   await signPdfWithActiveCertificate(pdfPath);
   return pdfPath;
 }
 
-async function validateAppointmentInsurance(data: z.infer<typeof appointmentSchema>) {
+async function validateAppointmentInsurance(
+  data: z.infer<typeof appointmentSchema>,
+) {
   if (data.itemType === AppointmentItemType.ATENDIMENTO && data.attendanceId) {
-    const attendance = await prisma.attendance.findUnique({ where: { id: data.attendanceId }, select: { insuranceId: true } });
-    if (!attendance || attendance.insuranceId !== data.insuranceId) throw new Error('O atendimento selecionado não pertence ao convênio informado.');
+    const attendance = await prisma.attendance.findUnique({
+      where: { id: data.attendanceId },
+      select: { insuranceId: true },
+    });
+    if (!attendance || attendance.insuranceId !== data.insuranceId)
+      throw new Error(
+        "O atendimento selecionado não pertence ao convênio informado.",
+      );
   }
 }
 
 function appointmentData(data: z.infer<typeof appointmentSchema>) {
   const isAttendance = data.itemType === AppointmentItemType.ATENDIMENTO;
-  if (isAttendance && !data.attendanceId) throw new Error('Selecione um atendimento.');
-  if (!isAttendance && !data.procedureId) throw new Error('Selecione um procedimento.');
-  return { ...data, appointmentDate: new Date(`${data.appointmentDate}T00:00:00.000Z`), attendanceId: isAttendance ? data.attendanceId : null, procedureId: isAttendance ? null : data.procedureId };
+  if (isAttendance && !data.attendanceId)
+    throw new Error("Selecione um atendimento.");
+  if (!isAttendance && !data.procedureId)
+    throw new Error("Selecione um procedimento.");
+  return {
+    ...data,
+    appointmentDate: new Date(`${data.appointmentDate}T00:00:00.000Z`),
+    attendanceId: isAttendance ? data.attendanceId : null,
+    procedureId: isAttendance ? null : data.procedureId,
+  };
 }
 async function clinicalRequestRecord(id: number) {
-  const record = await prisma.medicalRecord.findUnique({ where: { id }, select: { id: true, patientId: true, appointmentId: true, recordDate: true } });
+  const record = await prisma.medicalRecord.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      patientId: true,
+      appointmentId: true,
+      recordDate: true,
+    },
+  });
   const todayDate = clinicTodayDate();
-  if (!record || !record.appointmentId || record.recordDate.toISOString().slice(0, 10) !== todayDate) return null;
-  const appointment = await prisma.appointment.findFirst({ where: { id: record.appointmentId, patientId: record.patientId, appointmentDate: new Date(`${todayDate}T00:00:00.000Z`), status: AppointmentStatus.EM_ATENDIMENTO }, select: { id: true } });
+  if (
+    !record ||
+    !record.appointmentId ||
+    record.recordDate.toISOString().slice(0, 10) !== todayDate
+  )
+    return null;
+  const appointment = await prisma.appointment.findFirst({
+    where: {
+      id: record.appointmentId,
+      patientId: record.patientId,
+      appointmentDate: new Date(`${todayDate}T00:00:00.000Z`),
+      status: AppointmentStatus.EM_ATENDIMENTO,
+    },
+    select: { id: true },
+  });
   return appointment ? record : null;
 }
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'MedClinic API' }));
-app.post('/api/auth/login', async (req, res) => {
+app.get("/api/health", (_req, res) =>
+  res.json({ status: "ok", service: "MedClinic API" }),
+);
+app.post("/api/auth/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Informe login e senha.' });
-  const user = await prisma.user.findUnique({ where: { login: parsed.data.login } });
-  if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) return res.status(401).json({ message: 'Login ou senha inválidos.' });
-  const token = signToken({ id: user.id, profile: user.profile, login: user.login });
-  res.json({ token, user: { id: user.id, fullName: user.fullName, login: user.login, profile: user.profile } });
+  if (!parsed.success)
+    return res.status(400).json({ message: "Informe login e senha." });
+  const user = await prisma.user.findUnique({
+    where: { login: parsed.data.login },
+  });
+  if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash)))
+    return res.status(401).json({ message: "Login ou senha inválidos." });
+  const token = signToken({
+    id: user.id,
+    profile: user.profile,
+    login: user.login,
+  });
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      fullName: user.fullName,
+      login: user.login,
+      profile: user.profile,
+    },
+  });
 });
-app.get('/api/auth/me', auth, async (req: AuthRequest, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, fullName: true, login: true, profile: true } });
+app.get("/api/auth/me", auth, async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, fullName: true, login: true, profile: true },
+  });
   res.json(user);
 });
 
 const patientSchema = z.object({
-  sourceCode: z.preprocess(value => value === '' || value === null || value === undefined ? null : value, z.coerce.number().int().positive().nullable().optional()),
-  recordNumber: z.preprocess(value => value === '' ? null : value, z.string().trim().optional().nullable()),
+  sourceCode: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined ? null : value,
+    z.coerce.number().int().positive().nullable().optional(),
+  ),
+  recordNumber: z.preprocess(
+    (value) => (value === "" ? null : value),
+    z.string().trim().optional().nullable(),
+  ),
   fullName: requiredText,
   sex: z.coerce.number().int().optional().nullable(),
   maritalStatus: z.coerce.number().int().optional().nullable(),
   cpf: z.string().trim().optional().nullable(),
-  email: z.string().trim().email().optional().nullable().or(z.literal('')),
+  email: z.string().trim().email().optional().nullable().or(z.literal("")),
   phone: z.string().trim().optional().nullable(),
   birthDate: z.coerce.date().optional().nullable(),
   insuranceCode: z.coerce.number().int().optional().nullable(),
-  notes: z.string().optional().nullable()
+  notes: z.string().optional().nullable(),
 });
 
 // Pacientes são acessíveis a qualquer perfil autenticado.
-app.get('/api/patients', auth, async (_req, res) => {
+app.get("/api/patients", auth, async (_req, res) => {
   const [patients, insurances] = await Promise.all([
-    prisma.patient.findMany({ orderBy: { fullName: 'asc' } }),
-    prisma.insurance.findMany({ select: { id: true, name: true } })
+    prisma.patient.findMany({ orderBy: { fullName: "asc" } }),
+    prisma.insurance.findMany({ select: { id: true, name: true } }),
   ]);
-  const insuranceNames = new Map(insurances.map(insurance => [insurance.id, insurance.name]));
-  res.json(patients.map(patient => ({ ...patient, insuranceName: patient.insuranceCode ? insuranceNames.get(patient.insuranceCode) || null : null })));
+  const insuranceNames = new Map(
+    insurances.map((insurance) => [insurance.id, insurance.name]),
+  );
+  res.json(
+    patients.map((patient) => ({
+      ...patient,
+      insuranceName: patient.insuranceCode
+        ? insuranceNames.get(patient.insuranceCode) || null
+        : null,
+    })),
+  );
 });
-app.get('/api/insurances', auth, async (_req, res) => {
-  res.json(await prisma.insurance.findMany({ where: { active: true }, select: { id: true, name: true, active: true }, orderBy: { name: 'asc' } }));
+app.get("/api/insurances", auth, async (_req, res) => {
+  res.json(
+    await prisma.insurance.findMany({
+      where: { active: true },
+      select: { id: true, name: true, active: true },
+      orderBy: { name: "asc" },
+    }),
+  );
 });
-app.post('/api/patients', auth, async (req, res) => {
+app.post("/api/patients", auth, async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha nome e código do paciente corretamente.' });
-  if (parsed.data.insuranceCode !== null && parsed.data.insuranceCode !== undefined) {
-    const insurance = await prisma.insurance.findUnique({ where: { id: parsed.data.insuranceCode }, select: { id: true } });
-    if (!insurance) return res.status(400).json({ message: 'O convênio selecionado não está cadastrado no sistema.' });
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha nome e código do paciente corretamente." });
+  if (
+    parsed.data.insuranceCode !== null &&
+    parsed.data.insuranceCode !== undefined
+  ) {
+    const insurance = await prisma.insurance.findUnique({
+      where: { id: parsed.data.insuranceCode },
+      select: { id: true },
+    });
+    if (!insurance)
+      return res.status(400).json({
+        message: "O convênio selecionado não está cadastrado no sistema.",
+      });
   }
   res.status(201).json(await prisma.patient.create({ data: parsed.data }));
 });
-app.put('/api/patients/:id', auth, async (req, res) => {
+app.put("/api/patients/:id", auth, async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Dados do paciente inválidos.' });
+  if (!parsed.success)
+    return res.status(400).json({ message: "Dados do paciente inválidos." });
   const id = routeId(req, res, req.body?.id);
   if (id === null) return;
-  if (parsed.data.insuranceCode !== null && parsed.data.insuranceCode !== undefined) {
-    const insurance = await prisma.insurance.findUnique({ where: { id: parsed.data.insuranceCode }, select: { id: true } });
-    if (!insurance) return res.status(400).json({ message: 'O convênio selecionado não está cadastrado no sistema.' });
+  if (
+    parsed.data.insuranceCode !== null &&
+    parsed.data.insuranceCode !== undefined
+  ) {
+    const insurance = await prisma.insurance.findUnique({
+      where: { id: parsed.data.insuranceCode },
+      select: { id: true },
+    });
+    if (!insurance)
+      return res.status(400).json({
+        message: "O convênio selecionado não está cadastrado no sistema.",
+      });
   }
   res.json(await prisma.patient.update({ where: { id }, data: parsed.data }));
 });
-app.delete('/api/patients/:id', auth, async (req, res) => {
+app.delete("/api/patients/:id", auth, async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;
   await prisma.patient.delete({ where: { id } });
   res.status(204).send();
 });
 
-app.get('/api/medical-records', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const rawPatientId = req.query.patientId;
-  const patientId = rawPatientId ? Number(rawPatientId) : undefined;
-  if (patientId !== undefined && (!Number.isInteger(patientId) || patientId <= 0)) return res.status(400).json({ message: 'Paciente inválido.' });
-  res.json(await prisma.medicalRecord.findMany({ where: patientId ? { patientId } : undefined, orderBy: [{ recordDate: 'desc' }, { createdAt: 'desc' }], include: medicalRecordInclude }));
-});
-app.post('/api/medical-records', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = medicalRecordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha a data, o título e o paciente do prontuário.' });
-  const data = { ...parsed.data, recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`), authorId: req.user!.id };
-  res.status(201).json(await prisma.medicalRecord.create({ data, include: medicalRecordInclude }));
-});
-app.put('/api/medical-records/:id', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = medicalRecordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha a data, o título e o paciente do prontuário.' });
-  const id = routeId(req, res, req.body?.id); if (id === null) return;
-  const data = { ...parsed.data, recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`) };
-  res.json(await prisma.medicalRecord.update({ where: { id }, data, include: medicalRecordInclude }));
-});
-app.delete('/api/medical-records/:id', auth, doctorOnly, async (req, res) => {
-  const id = routeId(req, res); if (id === null) return;
+app.get(
+  "/api/medical-records",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const rawPatientId = req.query.patientId;
+    const patientId = rawPatientId ? Number(rawPatientId) : undefined;
+    if (
+      patientId !== undefined &&
+      (!Number.isInteger(patientId) || patientId <= 0)
+    )
+      return res.status(400).json({ message: "Paciente inválido." });
+    res.json(
+      await prisma.medicalRecord.findMany({
+        where: patientId ? { patientId } : undefined,
+        orderBy: [{ recordDate: "desc" }, { createdAt: "desc" }],
+        include: medicalRecordInclude,
+      }),
+    );
+  },
+);
+app.post(
+  "/api/medical-records",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = medicalRecordSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({
+        message: "Preencha a data, o título e o paciente do prontuário.",
+      });
+    const data = {
+      ...parsed.data,
+      recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`),
+      authorId: req.user!.id,
+    };
+    res.status(201).json(
+      await prisma.medicalRecord.create({
+        data,
+        include: medicalRecordInclude,
+      }),
+    );
+  },
+);
+app.put(
+  "/api/medical-records/:id",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = medicalRecordSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({
+        message: "Preencha a data, o título e o paciente do prontuário.",
+      });
+    const id = routeId(req, res, req.body?.id);
+    if (id === null) return;
+    const data = {
+      ...parsed.data,
+      recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`),
+    };
+    res.json(
+      await prisma.medicalRecord.update({
+        where: { id },
+        data,
+        include: medicalRecordInclude,
+      }),
+    );
+  },
+);
+app.delete("/api/medical-records/:id", auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
   await prisma.medicalRecord.delete({ where: { id } });
   res.status(204).send();
 });
 
-app.post('/api/medical-records/:id/attachments', auth, doctorOnly, attachmentUpload.single('file'), async (req: AuthRequest, res) => {
-  const id = routeId(req, res);
-  if (id === null) return;
-  if (!req.file) return res.status(400).json({ message: 'Selecione um arquivo PDF, JPG ou PNG.' });
-  const record = await prisma.medicalRecord.findUnique({ where: { id }, select: { id: true, patientId: true } });
-  if (!record) {
-    return res.status(404).json({ message: 'Prontuário não encontrado.' });
-  }
-  const patientDirectory = path.join(attachmentRoot, String(record.patientId));
-  await fs.promises.mkdir(patientDirectory, { recursive: true });
-  const storageKey = `${record.patientId}/${crypto.randomUUID()}${allowedAttachments[req.file.mimetype]}`;
-  const filePath = path.resolve(attachmentRoot, storageKey);
-  await fs.promises.writeFile(filePath, req.file.buffer);
-  const attachment = await prisma.medicalRecordAttachment.create({
-    data: {
-      medicalRecordId: record.id,
-      patientId: record.patientId,
-      fileName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      sizeBytes: req.file.size,
-      storageKey,
-      url: `/medical-record-attachments/file?key=${encodeURIComponent(storageKey)}`,
-      uploadedById: req.user!.id
-    },
-    include: { uploadedBy: { select: { id: true, fullName: true } } }
-  });
-  res.status(201).json(attachment);
-});
-
-app.get('/api/medical-record-attachments/file', auth, doctorOnly, async (req, res) => {
-  const storageKey = String(req.query.key || '');
-  const attachment = await prisma.medicalRecordAttachment.findFirst({ where: { storageKey }, select: { storageKey: true, fileName: true, mimeType: true } });
-  if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
-  const filePath = path.resolve(attachmentRoot, attachment.storageKey);
-  if (!filePath.startsWith(`${attachmentRoot}${path.sep}`)) return res.status(400).json({ message: 'Arquivo inválido.' });
-  res.type(attachment.mimeType).download(filePath, attachment.fileName);
-});
-
-app.get('/api/medical-record-attachments/:storageKey/file', auth, doctorOnly, async (req, res) => {
-  const attachment = await prisma.medicalRecordAttachment.findFirst({ where: { storageKey: String(req.params.storageKey) }, select: { storageKey: true, fileName: true, mimeType: true } });
-  if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
-  const filePath = path.resolve(attachmentRoot, attachment.storageKey);
-  if (!filePath.startsWith(`${attachmentRoot}${path.sep}`)) return res.status(400).json({ message: 'Arquivo inválido.' });
-  res.type(attachment.mimeType).download(filePath, attachment.fileName);
-});
-
-app.delete('/api/medical-record-attachments/:id', auth, doctorOnly, async (req, res) => {
-  const id = routeId(req, res);
-  if (id === null) return;
-  const attachment = await prisma.medicalRecordAttachment.findUnique({ where: { id }, select: { storageKey: true } });
-  if (!attachment) return res.status(404).json({ message: 'Anexo não encontrado.' });
-  await prisma.medicalRecordAttachment.delete({ where: { id } });
-  await fs.promises.unlink(path.resolve(attachmentRoot, attachment.storageKey)).catch(() => undefined);
-  res.status(204).send();
-});
-
-app.get('/api/exam-types/catalog', auth, doctorOnly, async (_req, res) => {
-  res.json(await prisma.examType.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { code: 'asc' }], select: { id: true, code: true, name: true, value: true, active: true } }));
-});
-app.get('/api/injectables/catalog', auth, doctorOnly, async (_req, res) => {
-  res.json(await prisma.injectable.findMany({ orderBy: [{ type: 'asc' }, { name: 'asc' }], select: { id: true, name: true, type: true } }));
-});
-app.get('/api/procedures/catalog', auth, doctorOnly, async (_req, res) => {
-  res.json(await prisma.procedure.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, value: true } }));
-});
-app.get('/api/exam-groups', auth, doctorOnly, async (req: AuthRequest, res) => {
-  res.json(await prisma.examGroup.findMany({ where: { createdById: req.user!.id }, orderBy: { name: 'asc' }, include: examGroupInclude }));
-});
-app.post('/api/exam-groups', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = examGroupSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Informe o nome e selecione pelo menos um exame.' });
-  const exams = await prisma.examType.findMany({ where: { id: { in: parsed.data.examTypeIds }, active: true }, select: { id: true } });
-  if (exams.length !== parsed.data.examTypeIds.length) return res.status(400).json({ message: 'Um ou mais exames selecionados não estão disponíveis.' });
-  const group = await prisma.examGroup.create({ data: { name: parsed.data.name, createdById: req.user!.id, items: { create: parsed.data.examTypeIds.map(examTypeId => ({ examTypeId })) } }, include: examGroupInclude });
-  res.status(201).json(group);
-});
-app.put('/api/exam-groups/:id', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = examGroupSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Informe o nome e selecione pelo menos um exame.' });
-  const id = routeId(req, res); if (id === null) return;
-  const existing = await prisma.examGroup.findFirst({ where: { id, createdById: req.user!.id } });
-  if (!existing) return res.status(404).json({ message: 'Grupo de exames não encontrado.' });
-  const exams = await prisma.examType.findMany({ where: { id: { in: parsed.data.examTypeIds }, active: true }, select: { id: true } });
-  if (exams.length !== parsed.data.examTypeIds.length) return res.status(400).json({ message: 'Um ou mais exames selecionados não estão disponíveis.' });
-  const group = await prisma.$transaction(async tx => { await tx.examGroupItem.deleteMany({ where: { groupId: id } }); return tx.examGroup.update({ where: { id }, data: { name: parsed.data.name, items: { create: parsed.data.examTypeIds.map(examTypeId => ({ examTypeId })) } }, include: examGroupInclude }); });
-  res.json(group);
-});
-app.delete('/api/exam-groups/:id', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const id = routeId(req, res); if (id === null) return;
-  const existing = await prisma.examGroup.findFirst({ where: { id, createdById: req.user!.id }, select: { id: true } });
-  if (!existing) return res.status(404).json({ message: 'Grupo de exames não encontrado.' });
-  await prisma.examGroup.delete({ where: { id } });
-  res.status(204).send();
-});
-
-app.post('/api/medical-records/:id/exam-requests', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = examRequestSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um grupo de exames.' });
-  const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await clinicalRequestRecord(medicalRecordId);
-  if (!record) return res.status(404).json({ message: 'Prontuário não encontrado.' });
-  const requestedGroups = parsed.data.groups.map(group => ({ examGroupId: group.examGroupId, examTypeIds: [...new Set(group.examTypeIds)] }));
-  const groupIds = [...new Set(requestedGroups.map(group => group.examGroupId))];
-  const groups = await prisma.examGroup.findMany({ where: { id: { in: groupIds }, createdById: req.user!.id }, select: { id: true, name: true } });
-  if (groups.length !== groupIds.length) return res.status(400).json({ message: 'Um ou mais grupos não estão disponíveis para este médico.' });
-  const groupMap = new Map(groups.map(group => [group.id, group]));
-  const selectedExamTypeIds = [...new Set(requestedGroups.flatMap(group => group.examTypeIds))];
-  const activeExams = await prisma.examType.findMany({ where: { id: { in: selectedExamTypeIds }, active: true }, select: { id: true } });
-  if (activeExams.length !== selectedExamTypeIds.length) return res.status(400).json({ message: 'Um ou mais exames selecionados não estão ativos ou disponíveis.' });
-  const existing = await prisma.examRequest.findMany({ where: { medicalRecordId, examGroupId: { in: groupIds } }, select: { examGroupId: true } });
-  const existingIds = new Set(existing.map(item => item.examGroupId));
-  const pending = requestedGroups.filter(group => !existingIds.has(group.examGroupId));
-  const createdIds: number[] = [];
-  if (pending.length > 0) {
-    await prisma.$transaction(async tx => {
-      for (const group of pending) {
-        const created = await tx.examRequest.create({ data: { medicalRecordId, patientId: record.patientId, examGroupId: group.examGroupId, examTypeIds: group.examTypeIds, groupName: groupMap.get(group.examGroupId)!.name, code: `TMP-${crypto.randomBytes(6).toString('hex')}`, requestedById: req.user!.id } });
-        const code = `RX-${String(created.id).padStart(6, '0')}`;
-        await tx.examRequest.update({ where: { id: created.id }, data: { code, pdfUrl: `/medical-record-exam-requests/${created.id}/pdf` } });
-        createdIds.push(created.id);
-      }
+app.post(
+  "/api/medical-records/:id/attachments",
+  auth,
+  doctorOnly,
+  attachmentUpload.single("file"),
+  async (req: AuthRequest, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    if (!req.file)
+      return res
+        .status(400)
+        .json({ message: "Selecione um arquivo PDF, JPG ou PNG." });
+    const record = await prisma.medicalRecord.findUnique({
+      where: { id },
+      select: { id: true, patientId: true },
     });
-    for (const id of createdIds) {
-      const created = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { id: true, code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
-      if (created) await generateExamRequestPdf(created);
+    if (!record) {
+      return res.status(404).json({ message: "Prontuário não encontrado." });
     }
-  }
-  res.status(201).json(await prisma.examRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: examRequestInclude }));
-});
+    const patientDirectory = path.join(
+      attachmentRoot,
+      String(record.patientId),
+    );
+    await fs.promises.mkdir(patientDirectory, { recursive: true });
+    const storageKey = `${record.patientId}/${crypto.randomUUID()}${allowedAttachments[req.file.mimetype]}`;
+    const filePath = path.resolve(attachmentRoot, storageKey);
+    await fs.promises.writeFile(filePath, req.file.buffer);
+    const attachment = await prisma.medicalRecordAttachment.create({
+      data: {
+        medicalRecordId: record.id,
+        patientId: record.patientId,
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeBytes: req.file.size,
+        storageKey,
+        url: `/medical-record-attachments/file?key=${encodeURIComponent(storageKey)}`,
+        uploadedById: req.user!.id,
+      },
+      include: { uploadedBy: { select: { id: true, fullName: true } } },
+    });
+    res.status(201).json(attachment);
+  },
+);
 
-app.get('/api/medical-record-exam-requests/:id/pdf', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const id = routeId(req, res); if (id === null) return;
-  const examRequest = await prisma.examRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, phone: true, birthDate: true } }, examGroup: { select: { name: true, items: { orderBy: { id: 'asc' }, include: { examType: { select: { id: true, code: true, name: true, value: true } } } } } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
-  if (!examRequest) return res.status(404).json({ message: 'Pedido de exames não encontrado.' });
-  const pdfPath = path.join(examRequestPdfRoot, `${examRequest.id}.pdf`);
-  await generateExamRequestPdf(examRequest);
-  res.type('application/pdf').sendFile(pdfPath, { headers: { 'Content-Disposition': `inline; filename="${examRequest.code || `RX-${String(examRequest.id).padStart(6, '0')}`}.pdf"` } });
-});
+app.get(
+  "/api/medical-record-attachments/file",
+  auth,
+  doctorOnly,
+  async (req, res) => {
+    const storageKey = String(req.query.key || "");
+    const attachment = await prisma.medicalRecordAttachment.findFirst({
+      where: { storageKey },
+      select: { storageKey: true, fileName: true, mimeType: true },
+    });
+    if (!attachment)
+      return res.status(404).json({ message: "Anexo não encontrado." });
+    const filePath = path.resolve(attachmentRoot, attachment.storageKey);
+    if (!filePath.startsWith(`${attachmentRoot}${path.sep}`))
+      return res.status(400).json({ message: "Arquivo inválido." });
+    res.type(attachment.mimeType).download(filePath, attachment.fileName);
+  },
+);
 
-app.post('/api/medical-records/:id/injectable-requests', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = injectableRequestSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Selecione pelo menos um injetável e informe via e sessões.' });
-  const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await clinicalRequestRecord(medicalRecordId);
-  if (!record) return res.status(403).json({ message: 'As solicitações de injetáveis estão disponíveis somente no novo registro do atendimento iniciado hoje.' });
-  const items = parsed.data.items.filter((item, index, all) => all.findIndex(other => other.injectableId === item.injectableId) === index);
-  const ids = items.map(item => item.injectableId);
-  const injectables = await prisma.injectable.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, type: true } });
-  if (injectables.length !== ids.length) return res.status(400).json({ message: 'Um ou mais injetáveis não estão cadastrados.' });
-  const existing = await prisma.injectableRequest.findMany({ where: { medicalRecordId, injectableId: { in: ids } }, select: { injectableId: true } });
-  const existingIds = new Set(existing.map(item => item.injectableId));
-  const data = items.filter(item => !existingIds.has(item.injectableId)).map(item => { const injectable = injectables.find(row => row.id === item.injectableId)!; return { medicalRecordId, patientId: record.patientId, injectableId: item.injectableId, name: injectable.name, category: injectable.type, route: item.route as any, sessions: item.sessions, requestedById: req.user!.id }; });
-  if (data.length) await prisma.injectableRequest.createMany({ data });
-  res.status(201).json(await prisma.injectableRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: injectableRequestInclude }));
-});
+app.get(
+  "/api/medical-record-attachments/:storageKey/file",
+  auth,
+  doctorOnly,
+  async (req, res) => {
+    const attachment = await prisma.medicalRecordAttachment.findFirst({
+      where: { storageKey: String(req.params.storageKey) },
+      select: { storageKey: true, fileName: true, mimeType: true },
+    });
+    if (!attachment)
+      return res.status(404).json({ message: "Anexo não encontrado." });
+    const filePath = path.resolve(attachmentRoot, attachment.storageKey);
+    if (!filePath.startsWith(`${attachmentRoot}${path.sep}`))
+      return res.status(400).json({ message: "Arquivo inválido." });
+    res.type(attachment.mimeType).download(filePath, attachment.fileName);
+  },
+);
 
-app.post('/api/medical-records/:id/procedure-requests', auth, doctorOnly, async (req: AuthRequest, res) => {
-  const rawIds = Array.isArray(req.body?.procedureIds) ? req.body.procedureIds : [];
-  const procedureIds = Array.from(new Set(rawIds.map((raw: unknown) => Number(raw)).filter((id: unknown): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0))) as number[];
-  if (!procedureIds.length) return res.status(400).json({ message: 'Selecione pelo menos um procedimento.' });
-  const medicalRecordId = routeId(req, res); if (medicalRecordId === null) return;
-  const record = await clinicalRequestRecord(medicalRecordId);
-  if (!record) return res.status(403).json({ message: 'As solicitações de procedimentos estão disponíveis somente no novo registro do atendimento iniciado hoje.' });
-  const procedures = await prisma.procedure.findMany({ where: { id: { in: procedureIds }, active: true }, select: { id: true, name: true, value: true } });
-  if (procedures.length !== procedureIds.length) return res.status(400).json({ message: 'Um ou mais procedimentos não estão disponíveis.' });
-  const existing = await prisma.procedureRequest.findMany({ where: { medicalRecordId, procedureId: { in: procedureIds } }, select: { procedureId: true } });
-  const existingIds = new Set(existing.map(item => item.procedureId));
-  const data = procedures.filter(item => !existingIds.has(item.id)).map(item => ({ medicalRecordId, patientId: record.patientId, procedureId: item.id, name: item.name, value: item.value, requestedById: req.user!.id }));
-  if (data.length) await prisma.procedureRequest.createMany({ data });
-  res.status(201).json(await prisma.procedureRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: 'asc' }, include: procedureRequestInclude }));
-});
+app.delete(
+  "/api/medical-record-attachments/:id",
+  auth,
+  doctorOnly,
+  async (req, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    const attachment = await prisma.medicalRecordAttachment.findUnique({
+      where: { id },
+      select: { storageKey: true },
+    });
+    if (!attachment)
+      return res.status(404).json({ message: "Anexo não encontrado." });
+    await prisma.medicalRecordAttachment.delete({ where: { id } });
+    await fs.promises
+      .unlink(path.resolve(attachmentRoot, attachment.storageKey))
+      .catch(() => undefined);
+    res.status(204).send();
+  },
+);
 
-app.get('/api/appointments/meta', auth, appointmentAccess, async (_req, res) => {
-  const [patients, doctors, insurances, attendances, procedures] = await Promise.all([
-    prisma.patient.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, phone: true } }),
-    prisma.doctor.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, specialty: true } }),
-    prisma.insurance.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    prisma.attendance.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, insuranceId: true, insurance: { select: { name: true } } } }),
-    prisma.procedure.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, value: true } })
-  ]);
-  res.json({ patients, doctors, insurances, attendances, procedures });
+app.get("/api/exam-types/catalog", auth, doctorOnly, async (_req, res) => {
+  res.json(
+    await prisma.examType.findMany({
+      where: { active: true },
+      orderBy: [{ name: "asc" }, { code: "asc" }],
+      select: { id: true, code: true, name: true, value: true, active: true },
+    }),
+  );
 });
-app.get('/api/appointments', auth, appointmentAccess, async (req, res) => {
-  const date = String(req.query.date || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Informe a data no formato AAAA-MM-DD.' });
-  res.json(await prisma.appointment.findMany({ where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) }, orderBy: [{ scheduledTime: 'asc' }, { doctor: { fullName: 'asc' } }], include: appointmentInclude }));
+app.get("/api/injectables/catalog", auth, doctorOnly, async (_req, res) => {
+  res.json(
+    await prisma.injectable.findMany({
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true },
+    }),
+  );
 });
-app.patch('/api/appointments/:id/start', auth, doctorOnly, async (req, res) => {
-  const id = routeId(req, res); if (id === null) return;
-  const appointment = await prisma.appointment.findUnique({ where: { id }, select: { id: true, appointmentDate: true } });
-  if (!appointment) return res.status(404).json({ message: 'Agendamento não encontrado.' });
-  if (appointment.appointmentDate.toISOString().slice(0, 10) !== clinicTodayDate()) return res.status(400).json({ message: 'Só é possível iniciar atendimentos agendados para hoje.' });
-  res.json(await prisma.appointment.update({ where: { id }, data: { status: AppointmentStatus.EM_ATENDIMENTO }, include: appointmentInclude }));
+app.get("/api/procedures/catalog", auth, doctorOnly, async (_req, res) => {
+  res.json(
+    await prisma.procedure.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, value: true },
+    }),
+  );
 });
-app.post('/api/appointments', auth, appointmentManage, async (req, res) => {
+app.get("/api/exam-groups", auth, doctorOnly, async (req: AuthRequest, res) => {
+  res.json(
+    await prisma.examGroup.findMany({
+      where: { createdById: req.user!.id },
+      orderBy: { name: "asc" },
+      include: examGroupInclude,
+    }),
+  );
+});
+app.post(
+  "/api/exam-groups",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = examGroupSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ message: "Informe o nome e selecione pelo menos um exame." });
+    const exams = await prisma.examType.findMany({
+      where: { id: { in: parsed.data.examTypeIds }, active: true },
+      select: { id: true },
+    });
+    if (exams.length !== parsed.data.examTypeIds.length)
+      return res.status(400).json({
+        message: "Um ou mais exames selecionados não estão disponíveis.",
+      });
+    const group = await prisma.examGroup.create({
+      data: {
+        name: parsed.data.name,
+        createdById: req.user!.id,
+        items: {
+          create: parsed.data.examTypeIds.map((examTypeId) => ({ examTypeId })),
+        },
+      },
+      include: examGroupInclude,
+    });
+    res.status(201).json(group);
+  },
+);
+app.put(
+  "/api/exam-groups/:id",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = examGroupSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ message: "Informe o nome e selecione pelo menos um exame." });
+    const id = routeId(req, res);
+    if (id === null) return;
+    const existing = await prisma.examGroup.findFirst({
+      where: { id, createdById: req.user!.id },
+    });
+    if (!existing)
+      return res
+        .status(404)
+        .json({ message: "Grupo de exames não encontrado." });
+    const exams = await prisma.examType.findMany({
+      where: { id: { in: parsed.data.examTypeIds }, active: true },
+      select: { id: true },
+    });
+    if (exams.length !== parsed.data.examTypeIds.length)
+      return res.status(400).json({
+        message: "Um ou mais exames selecionados não estão disponíveis.",
+      });
+    const group = await prisma.$transaction(async (tx) => {
+      await tx.examGroupItem.deleteMany({ where: { groupId: id } });
+      return tx.examGroup.update({
+        where: { id },
+        data: {
+          name: parsed.data.name,
+          items: {
+            create: parsed.data.examTypeIds.map((examTypeId) => ({
+              examTypeId,
+            })),
+          },
+        },
+        include: examGroupInclude,
+      });
+    });
+    res.json(group);
+  },
+);
+app.delete(
+  "/api/exam-groups/:id",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    const existing = await prisma.examGroup.findFirst({
+      where: { id, createdById: req.user!.id },
+      select: { id: true },
+    });
+    if (!existing)
+      return res
+        .status(404)
+        .json({ message: "Grupo de exames não encontrado." });
+    await prisma.examGroup.delete({ where: { id } });
+    res.status(204).send();
+  },
+);
+
+app.post(
+  "/api/medical-records/:id/exam-requests",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = examRequestSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ message: "Selecione pelo menos um grupo de exames." });
+    const medicalRecordId = routeId(req, res);
+    if (medicalRecordId === null) return;
+    const record = await clinicalRequestRecord(medicalRecordId);
+    if (!record)
+      return res.status(404).json({ message: "Prontuário não encontrado." });
+    const requestedGroups = parsed.data.groups.map((group) => ({
+      examGroupId: group.examGroupId,
+      examTypeIds: [...new Set(group.examTypeIds)],
+    }));
+    const groupIds = [
+      ...new Set(requestedGroups.map((group) => group.examGroupId)),
+    ];
+    const groups = await prisma.examGroup.findMany({
+      where: { id: { in: groupIds }, createdById: req.user!.id },
+      select: { id: true, name: true },
+    });
+    if (groups.length !== groupIds.length)
+      return res.status(400).json({
+        message: "Um ou mais grupos não estão disponíveis para este médico.",
+      });
+    const groupMap = new Map(groups.map((group) => [group.id, group]));
+    const selectedExamTypeIds = [
+      ...new Set(requestedGroups.flatMap((group) => group.examTypeIds)),
+    ];
+    const activeExams = await prisma.examType.findMany({
+      where: { id: { in: selectedExamTypeIds }, active: true },
+      select: { id: true },
+    });
+    if (activeExams.length !== selectedExamTypeIds.length)
+      return res.status(400).json({
+        message:
+          "Um ou mais exames selecionados não estão ativos ou disponíveis.",
+      });
+    const existing = await prisma.examRequest.findMany({
+      where: { medicalRecordId, examGroupId: { in: groupIds } },
+      select: { examGroupId: true },
+    });
+    const existingIds = new Set(existing.map((item) => item.examGroupId));
+    const pending = requestedGroups.filter(
+      (group) => !existingIds.has(group.examGroupId),
+    );
+    const createdIds: number[] = [];
+    if (pending.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        for (const group of pending) {
+          const created = await tx.examRequest.create({
+            data: {
+              medicalRecordId,
+              patientId: record.patientId,
+              examGroupId: group.examGroupId,
+              examTypeIds: group.examTypeIds,
+              groupName: groupMap.get(group.examGroupId)!.name,
+              code: `TMP-${crypto.randomBytes(6).toString("hex")}`,
+              requestedById: req.user!.id,
+            },
+          });
+          const code = `RX-${String(created.id).padStart(6, "0")}`;
+          await tx.examRequest.update({
+            where: { id: created.id },
+            data: {
+              code,
+              pdfUrl: `/medical-record-exam-requests/${created.id}/pdf`,
+            },
+          });
+          createdIds.push(created.id);
+        }
+      });
+      for (const id of createdIds) {
+        const created = await prisma.examRequest.findUnique({
+          where: { id },
+          include: {
+            patient: {
+              select: {
+                fullName: true,
+                cpf: true,
+                phone: true,
+                birthDate: true,
+              },
+            },
+            examGroup: {
+              select: {
+                name: true,
+                items: {
+                  orderBy: { id: "asc" },
+                  include: {
+                    examType: {
+                      select: { id: true, code: true, name: true, value: true },
+                    },
+                  },
+                },
+              },
+            },
+            requestedBy: { select: { fullName: true } },
+            medicalRecord: {
+              select: {
+                appointment: {
+                  select: { doctor: { select: { fullName: true, crm: true } } },
+                },
+              },
+            },
+          },
+        });
+        if (created) await generateExamRequestPdf(created);
+      }
+    }
+    res.status(201).json(
+      await prisma.examRequest.findMany({
+        where: { medicalRecordId },
+        orderBy: { requestedAt: "asc" },
+        include: examRequestInclude,
+      }),
+    );
+  },
+);
+
+app.get(
+  "/api/medical-record-exam-requests/:id/pdf",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    const examRequest = await prisma.examRequest.findUnique({
+      where: { id },
+      include: {
+        patient: {
+          select: { fullName: true, cpf: true, phone: true, birthDate: true },
+        },
+        examGroup: {
+          select: {
+            name: true,
+            items: {
+              orderBy: { id: "asc" },
+              include: {
+                examType: {
+                  select: { id: true, code: true, name: true, value: true },
+                },
+              },
+            },
+          },
+        },
+        requestedBy: { select: { fullName: true } },
+        medicalRecord: {
+          select: {
+            appointment: {
+              select: { doctor: { select: { fullName: true, crm: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!examRequest)
+      return res
+        .status(404)
+        .json({ message: "Pedido de exames não encontrado." });
+    const pdfPath = path.join(examRequestPdfRoot, `${examRequest.id}.pdf`);
+    await generateExamRequestPdf(examRequest);
+    res.type("application/pdf").sendFile(pdfPath, {
+      headers: {
+        "Content-Disposition": `inline; filename="${examRequest.code || `RX-${String(examRequest.id).padStart(6, "0")}`}.pdf"`,
+      },
+    });
+  },
+);
+
+app.post(
+  "/api/medical-records/:id/injectable-requests",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = injectableRequestSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({
+        message: "Selecione pelo menos um injetável e informe via e sessões.",
+      });
+    const medicalRecordId = routeId(req, res);
+    if (medicalRecordId === null) return;
+    const record = await clinicalRequestRecord(medicalRecordId);
+    if (!record)
+      return res.status(403).json({
+        message:
+          "As solicitações de injetáveis estão disponíveis somente no novo registro do atendimento iniciado hoje.",
+      });
+    const items = parsed.data.items.filter(
+      (item, index, all) =>
+        all.findIndex((other) => other.injectableId === item.injectableId) ===
+        index,
+    );
+    const ids = items.map((item) => item.injectableId);
+    const injectables = await prisma.injectable.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, type: true },
+    });
+    if (injectables.length !== ids.length)
+      return res
+        .status(400)
+        .json({ message: "Um ou mais injetáveis não estão cadastrados." });
+    const existing = await prisma.injectableRequest.findMany({
+      where: { medicalRecordId, injectableId: { in: ids } },
+      select: { injectableId: true },
+    });
+    const existingIds = new Set(existing.map((item) => item.injectableId));
+    const data = items
+      .filter((item) => !existingIds.has(item.injectableId))
+      .map((item) => {
+        const injectable = injectables.find(
+          (row) => row.id === item.injectableId,
+        )!;
+        return {
+          medicalRecordId,
+          patientId: record.patientId,
+          injectableId: item.injectableId,
+          name: injectable.name,
+          category: injectable.type,
+          route: item.route as any,
+          sessions: item.sessions,
+          requestedById: req.user!.id,
+        };
+      });
+    if (data.length) await prisma.injectableRequest.createMany({ data });
+    res.status(201).json(
+      await prisma.injectableRequest.findMany({
+        where: { medicalRecordId },
+        orderBy: { requestedAt: "asc" },
+        include: injectableRequestInclude,
+      }),
+    );
+  },
+);
+
+app.post(
+  "/api/medical-records/:id/procedure-requests",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const rawIds = Array.isArray(req.body?.procedureIds)
+      ? req.body.procedureIds
+      : [];
+    const procedureIds = Array.from(
+      new Set(
+        rawIds
+          .map((raw: unknown) => Number(raw))
+          .filter(
+            (id: unknown): id is number =>
+              typeof id === "number" && Number.isInteger(id) && id > 0,
+          ),
+      ),
+    ) as number[];
+    if (!procedureIds.length)
+      return res
+        .status(400)
+        .json({ message: "Selecione pelo menos um procedimento." });
+    const medicalRecordId = routeId(req, res);
+    if (medicalRecordId === null) return;
+    const record = await clinicalRequestRecord(medicalRecordId);
+    if (!record)
+      return res.status(403).json({
+        message:
+          "As solicitações de procedimentos estão disponíveis somente no novo registro do atendimento iniciado hoje.",
+      });
+    const procedures = await prisma.procedure.findMany({
+      where: { id: { in: procedureIds }, active: true },
+      select: { id: true, name: true, value: true },
+    });
+    if (procedures.length !== procedureIds.length)
+      return res
+        .status(400)
+        .json({ message: "Um ou mais procedimentos não estão disponíveis." });
+    const existing = await prisma.procedureRequest.findMany({
+      where: { medicalRecordId, procedureId: { in: procedureIds } },
+      select: { procedureId: true },
+    });
+    const existingIds = new Set(existing.map((item) => item.procedureId));
+    const data = procedures
+      .filter((item) => !existingIds.has(item.id))
+      .map((item) => ({
+        medicalRecordId,
+        patientId: record.patientId,
+        procedureId: item.id,
+        name: item.name,
+        value: item.value,
+        requestedById: req.user!.id,
+      }));
+    if (data.length) await prisma.procedureRequest.createMany({ data });
+    res.status(201).json(
+      await prisma.procedureRequest.findMany({
+        where: { medicalRecordId },
+        orderBy: { requestedAt: "asc" },
+        include: procedureRequestInclude,
+      }),
+    );
+  },
+);
+
+app.get(
+  "/api/appointments/meta",
+  auth,
+  appointmentAccess,
+  async (_req, res) => {
+    const [patients, doctors, insurances, attendances, procedures] =
+      await Promise.all([
+        prisma.patient.findMany({
+          orderBy: { fullName: "asc" },
+          select: { id: true, fullName: true, phone: true },
+        }),
+        prisma.doctor.findMany({
+          orderBy: { fullName: "asc" },
+          select: { id: true, fullName: true, specialty: true },
+        }),
+        prisma.insurance.findMany({
+          where: { active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        prisma.attendance.findMany({
+          where: { active: true },
+          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+            insuranceId: true,
+            insurance: { select: { name: true } },
+          },
+        }),
+        prisma.procedure.findMany({
+          where: { active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, value: true },
+        }),
+      ]);
+    res.json({ patients, doctors, insurances, attendances, procedures });
+  },
+);
+app.get("/api/appointments", auth, appointmentAccess, async (req, res) => {
+  const date = String(req.query.date || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    return res
+      .status(400)
+      .json({ message: "Informe a data no formato AAAA-MM-DD." });
+  res.json(
+    await prisma.appointment.findMany({
+      where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) },
+      orderBy: [{ scheduledTime: "asc" }, { doctor: { fullName: "asc" } }],
+      include: appointmentInclude,
+    }),
+  );
+});
+app.patch("/api/appointments/:id/start", auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const appointment = await prisma.appointment.findUnique({
+    where: { id },
+    select: { id: true, appointmentDate: true },
+  });
+  if (!appointment)
+    return res.status(404).json({ message: "Agendamento não encontrado." });
+  if (
+    appointment.appointmentDate.toISOString().slice(0, 10) !== clinicTodayDate()
+  )
+    return res.status(400).json({
+      message: "Só é possível iniciar atendimentos agendados para hoje.",
+    });
+  res.json(
+    await prisma.appointment.update({
+      where: { id },
+      data: { status: AppointmentStatus.EM_ATENDIMENTO },
+      include: appointmentInclude,
+    }),
+  );
+});
+app.post("/api/appointments", auth, appointmentManage, async (req, res) => {
   const parsed = appointmentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha corretamente os dados do agendamento.' });
-  try { await validateAppointmentInsurance(parsed.data); const data = appointmentData(parsed.data); res.status(201).json(await prisma.appointment.create({ data, include: appointmentInclude })); }
-  catch (err: any) { if (err?.code === 'P2002') return res.status(409).json({ message: 'Este médico já possui agendamento nesse horário.' }); if (err?.message) return res.status(400).json({ message: err.message }); throw err; }
-});
-app.put('/api/appointments/:id', auth, appointmentManage, async (req, res) => {
-  const parsed = appointmentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha corretamente os dados do agendamento.' });
-  const id = routeId(req, res, req.body?.id); if (id === null) return;
-  try { await validateAppointmentInsurance(parsed.data); const data = appointmentData(parsed.data); res.json(await prisma.appointment.update({ where: { id }, data, include: appointmentInclude })); }
-  catch (err: any) { if (err?.code === 'P2002') return res.status(409).json({ message: 'Este médico já possui agendamento nesse horário.' }); if (err?.message) return res.status(400).json({ message: err.message }); throw err; }
-});
-app.delete('/api/appointments/:id', auth, appointmentManage, async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.appointment.delete({ where: { id } }); res.status(204).send(); });
-
-app.use('/api/admin', auth, adminOnly);
-
-app.get('/api/admin/digital-certificates', async (_req, res) => {
-  res.json(await prisma.digitalCertificate.findMany({ orderBy: { createdAt: 'desc' }, select: { id: true, name: true, fileName: true, subject: true, issuer: true, serialNumber: true, validFrom: true, validTo: true, active: true, createdAt: true, uploadedBy: { select: { fullName: true } } } }));
-});
-app.post('/api/admin/digital-certificates', certificateUpload.single('certificate'), async (req: AuthRequest, res) => {
-  const name = String(req.body?.name || '').trim(); const password = String(req.body?.password || '');
-  if (!req.file || !name || !password) return res.status(400).json({ message: 'Informe o nome, a senha e o arquivo PFX/P12 do certificado.' });
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do agendamento." });
   try {
-    new P12Signer(req.file.buffer, { passphrase: password });
-    await prisma.digitalCertificate.updateMany({ data: { active: false } });
-    const certificate = await prisma.digitalCertificate.create({ data: { name, fileName: req.file.originalname, pfxEncrypted: encryptSecret(req.file.buffer), passwordEncrypted: encryptSecret(password), active: true, uploadedById: req.user!.id }, select: { id: true, name: true, fileName: true, active: true, createdAt: true } });
-    res.status(201).json(certificate);
-  } catch (error: any) { res.status(400).json({ message: error?.message || 'Não foi possível salvar o certificado.' }); }
+    await validateAppointmentInsurance(parsed.data);
+    const data = appointmentData(parsed.data);
+    res
+      .status(201)
+      .json(
+        await prisma.appointment.create({ data, include: appointmentInclude }),
+      );
+  } catch (err: any) {
+    if (err?.code === "P2002")
+      return res
+        .status(409)
+        .json({ message: "Este médico já possui agendamento nesse horário." });
+    if (err?.message) return res.status(400).json({ message: err.message });
+    throw err;
+  }
 });
-app.delete('/api/admin/digital-certificates/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.digitalCertificate.update({ where: { id }, data: { active: false } }); res.status(204).send(); });
+app.put("/api/appointments/:id", auth, appointmentManage, async (req, res) => {
+  const parsed = appointmentSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do agendamento." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  try {
+    await validateAppointmentInsurance(parsed.data);
+    const data = appointmentData(parsed.data);
+    res.json(
+      await prisma.appointment.update({
+        where: { id },
+        data,
+        include: appointmentInclude,
+      }),
+    );
+  } catch (err: any) {
+    if (err?.code === "P2002")
+      return res
+        .status(409)
+        .json({ message: "Este médico já possui agendamento nesse horário." });
+    if (err?.message) return res.status(400).json({ message: err.message });
+    throw err;
+  }
+});
+app.delete(
+  "/api/appointments/:id",
+  auth,
+  appointmentManage,
+  async (req, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    await prisma.appointment.delete({ where: { id } });
+    res.status(204).send();
+  },
+);
 
-app.get('/api/admin/users', async (_req, res) => res.json(await prisma.user.findMany({ orderBy: { id: 'desc' }, select: { id: true, fullName: true, login: true, profile: true, createdAt: true } })));
-app.post('/api/admin/users', async (req, res) => {
+app.use("/api/admin", auth, adminOnly);
+
+app.get("/api/admin/digital-certificates", async (_req, res) => {
+  res.json(
+    await prisma.digitalCertificate.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        fileName: true,
+        subject: true,
+        issuer: true,
+        serialNumber: true,
+        validFrom: true,
+        validTo: true,
+        active: true,
+        createdAt: true,
+        uploadedBy: { select: { fullName: true } },
+      },
+    }),
+  );
+});
+app.post(
+  "/api/admin/digital-certificates",
+  certificateUpload.single("certificate"),
+  async (req: AuthRequest, res) => {
+    const name = String(req.body?.name || "").trim();
+    const password = String(req.body?.password || "");
+    if (!req.file || !name || !password)
+      return res.status(400).json({
+        message: "Informe o nome, a senha e o arquivo PFX/P12 do certificado.",
+      });
+    try {
+      new P12Signer(req.file.buffer, { passphrase: password });
+      await prisma.digitalCertificate.updateMany({ data: { active: false } });
+      const certificate = await prisma.digitalCertificate.create({
+        data: {
+          name,
+          fileName: req.file.originalname,
+          pfxEncrypted: encryptSecret(req.file.buffer),
+          passwordEncrypted: encryptSecret(password),
+          active: true,
+          uploadedById: req.user!.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          fileName: true,
+          active: true,
+          createdAt: true,
+        },
+      });
+      res.status(201).json(certificate);
+    } catch (error: any) {
+      res.status(400).json({
+        message: error?.message || "Não foi possível salvar o certificado.",
+      });
+    }
+  },
+);
+app.delete("/api/admin/digital-certificates/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.digitalCertificate.update({
+    where: { id },
+    data: { active: false },
+  });
+  res.status(204).send();
+});
+
+app.get("/api/admin/users", async (_req, res) =>
+  res.json(
+    await prisma.user.findMany({
+      orderBy: { id: "desc" },
+      select: {
+        id: true,
+        fullName: true,
+        login: true,
+        profile: true,
+        createdAt: true,
+      },
+    }),
+  ),
+);
+app.post("/api/admin/users", async (req, res) => {
   const parsed = userSchema.safeParse(req.body);
-  if (!parsed.success || !parsed.data.password) return res.status(400).json({ message: 'Nome, login, senha e perfil são obrigatórios.' });
+  if (!parsed.success || !parsed.data.password)
+    return res
+      .status(400)
+      .json({ message: "Nome, login, senha e perfil são obrigatórios." });
   const data = parsed.data;
   const password = data.password as string;
-  const user = await prisma.user.create({ data: { fullName: data.fullName, login: data.login, passwordHash: await bcrypt.hash(password, 10), profile: data.profile }, select: { id: true, fullName: true, login: true, profile: true } });
+  const user = await prisma.user.create({
+    data: {
+      fullName: data.fullName,
+      login: data.login,
+      passwordHash: await bcrypt.hash(password, 10),
+      profile: data.profile,
+    },
+    select: { id: true, fullName: true, login: true, profile: true },
+  });
   res.status(201).json(user);
 });
-app.put('/api/admin/users/:id', async (req, res) => {
+app.put("/api/admin/users/:id", async (req, res) => {
   const parsed = userSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Dados de usuário inválidos.' });
+  if (!parsed.success)
+    return res.status(400).json({ message: "Dados de usuário inválidos." });
   const data = parsed.data;
   let id = routeId(req, res, req.body?.id, false);
   if (id === null) {
-    const existing = await prisma.user.findUnique({ where: { login: data.login }, select: { id: true } });
-    if (!existing) return res.status(400).json({ message: 'ID do cadastro inválido e login não localizado. Atualize a lista e tente novamente.' });
+    const existing = await prisma.user.findUnique({
+      where: { login: data.login },
+      select: { id: true },
+    });
+    if (!existing)
+      return res.status(400).json({
+        message:
+          "ID do cadastro inválido e login não localizado. Atualize a lista e tente novamente.",
+      });
     id = existing.id;
   }
-  const user = await prisma.user.update({ where: { id }, data: { fullName: data.fullName, login: data.login, profile: data.profile, ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}) }, select: { id: true, fullName: true, login: true, profile: true } });
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      fullName: data.fullName,
+      login: data.login,
+      profile: data.profile,
+      ...(data.password
+        ? { passwordHash: await bcrypt.hash(data.password, 10) }
+        : {}),
+    },
+    select: { id: true, fullName: true, login: true, profile: true },
+  });
   res.json(user);
 });
-app.delete('/api/admin/users/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.user.delete({ where: { id } }); res.status(204).send(); });
+app.delete("/api/admin/users/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.user.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/clinic', async (_req, res) => res.json(await prisma.clinic.findMany({ orderBy: { id: 'desc' } })));
-app.post('/api/admin/clinic', async (req, res) => {
+app.get("/api/admin/clinic", async (_req, res) =>
+  res.json(await prisma.clinic.findMany({ orderBy: { id: "desc" } })),
+);
+app.post("/api/admin/clinic", async (req, res) => {
   const parsed = clinicSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha todos os campos da clínica.' });
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha todos os campos da clínica." });
   res.status(201).json(await prisma.clinic.create({ data: parsed.data }));
 });
-app.put('/api/admin/clinic/:id', async (req, res) => {
+app.put("/api/admin/clinic/:id", async (req, res) => {
   const parsed = clinicSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Preencha todos os campos da clínica.' });
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha todos os campos da clínica." });
   const id = routeId(req, res, req.body?.id);
   if (id === null) return;
   res.json(await prisma.clinic.update({ where: { id }, data: parsed.data }));
 });
-app.delete('/api/admin/clinic/:id', async (req, res) => {
+app.delete("/api/admin/clinic/:id", async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;
   await prisma.clinic.delete({ where: { id } });
   res.status(204).send();
 });
 
-async function crud<T extends { id: number }>(res: Response, model: any, method: 'findMany' | 'create' | 'update' | 'delete', args?: any) { return res.json(await model[method](args)); }
-app.get('/api/admin/doctors', async (_req, res) => crud(res, prisma.doctor, 'findMany', { orderBy: { id: 'desc' } }));
-app.post('/api/admin/doctors', async (req, res) => { const p = doctorSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do médico.' }); res.status(201).json(await prisma.doctor.create({ data: p.data })); });
-app.put('/api/admin/doctors/:id', async (req, res) => { const p = doctorSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do médico.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.doctor.update({ where: { id }, data: p.data })); });
-app.delete('/api/admin/doctors/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.doctor.delete({ where: { id } }); res.status(204).send(); });
+async function crud<T extends { id: number }>(
+  res: Response,
+  model: any,
+  method: "findMany" | "create" | "update" | "delete",
+  args?: any,
+) {
+  return res.json(await model[method](args));
+}
+app.get("/api/admin/doctors", async (_req, res) =>
+  crud(res, prisma.doctor, "findMany", { orderBy: { id: "desc" } }),
+);
+app.post("/api/admin/doctors", async (req, res) => {
+  const p = doctorSchema.safeParse(req.body);
+  if (!p.success)
+    return res.status(400).json({ message: "Preencha os dados do médico." });
+  res.status(201).json(await prisma.doctor.create({ data: p.data }));
+});
+app.put("/api/admin/doctors/:id", async (req, res) => {
+  const p = doctorSchema.safeParse(req.body);
+  if (!p.success)
+    return res.status(400).json({ message: "Preencha os dados do médico." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.doctor.update({ where: { id }, data: p.data }));
+});
+app.delete("/api/admin/doctors/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.doctor.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/insurances', async (_req, res) => crud(res, prisma.insurance, 'findMany', { orderBy: { id: 'desc' } }));
-app.post('/api/admin/insurances', async (req, res) => { const p = insuranceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do convênio.' }); res.status(201).json(await prisma.insurance.create({ data: p.data })); });
-app.put('/api/admin/insurances/:id', async (req, res) => { const p = insuranceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do convênio.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.insurance.update({ where: { id }, data: p.data })); });
-app.delete('/api/admin/insurances/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.insurance.delete({ where: { id } }); res.status(204).send(); });
+app.get("/api/admin/insurances", async (_req, res) =>
+  crud(res, prisma.insurance, "findMany", { orderBy: { id: "desc" } }),
+);
+app.post("/api/admin/insurances", async (req, res) => {
+  const p = insuranceSchema.safeParse(req.body);
+  if (!p.success)
+    return res.status(400).json({ message: "Preencha os dados do convênio." });
+  res.status(201).json(await prisma.insurance.create({ data: p.data }));
+});
+app.put("/api/admin/insurances/:id", async (req, res) => {
+  const p = insuranceSchema.safeParse(req.body);
+  if (!p.success)
+    return res.status(400).json({ message: "Preencha os dados do convênio." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.insurance.update({ where: { id }, data: p.data }));
+});
+app.delete("/api/admin/insurances/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.insurance.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/attendances', async (_req, res) => res.json(await prisma.attendance.findMany({ orderBy: { id: 'desc' }, include: { insurance: { select: { id: true, name: true } } } })));
-app.post('/api/admin/attendances', async (req, res) => { const p = attendanceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha nome, valor e convênio do atendimento.' }); res.status(201).json(await prisma.attendance.create({ data: p.data, include: { insurance: { select: { id: true, name: true } } } })); });
-app.put('/api/admin/attendances/:id', async (req, res) => { const p = attendanceSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha nome, valor e convênio do atendimento.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.attendance.update({ where: { id }, data: p.data, include: { insurance: { select: { id: true, name: true } } } })); });
-app.delete('/api/admin/attendances/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.attendance.delete({ where: { id } }); res.status(204).send(); });
+app.get("/api/admin/attendances", async (_req, res) =>
+  res.json(
+    await prisma.attendance.findMany({
+      orderBy: { id: "desc" },
+      include: { insurance: { select: { id: true, name: true } } },
+    }),
+  ),
+);
+app.post("/api/admin/attendances", async (req, res) => {
+  const p = attendanceSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha nome, valor e convênio do atendimento." });
+  res.status(201).json(
+    await prisma.attendance.create({
+      data: p.data,
+      include: { insurance: { select: { id: true, name: true } } },
+    }),
+  );
+});
+app.put("/api/admin/attendances/:id", async (req, res) => {
+  const p = attendanceSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha nome, valor e convênio do atendimento." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(
+    await prisma.attendance.update({
+      where: { id },
+      data: p.data,
+      include: { insurance: { select: { id: true, name: true } } },
+    }),
+  );
+});
+app.delete("/api/admin/attendances/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.attendance.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/procedures', async (_req, res) => crud(res, prisma.procedure, 'findMany', { orderBy: { id: 'desc' } }));
-app.post('/api/admin/procedures', async (req, res) => { const p = financialSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do procedimento.' }); res.status(201).json(await prisma.procedure.create({ data: p.data })); });
-app.put('/api/admin/procedures/:id', async (req, res) => { const p = financialSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha os dados do procedimento.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.procedure.update({ where: { id }, data: p.data })); });
-app.delete('/api/admin/procedures/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.procedure.delete({ where: { id } }); res.status(204).send(); });
+app.get("/api/admin/procedures", async (_req, res) =>
+  crud(res, prisma.procedure, "findMany", { orderBy: { id: "desc" } }),
+);
+app.post("/api/admin/procedures", async (req, res) => {
+  const p = financialSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha os dados do procedimento." });
+  res.status(201).json(await prisma.procedure.create({ data: p.data }));
+});
+app.put("/api/admin/procedures/:id", async (req, res) => {
+  const p = financialSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha os dados do procedimento." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.procedure.update({ where: { id }, data: p.data }));
+});
+app.delete("/api/admin/procedures/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.procedure.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/injectables', async (_req, res) => crud(res, prisma.injectable, 'findMany', { orderBy: { id: 'desc' } }));
-app.post('/api/admin/injectables', async (req, res) => { const p = injectableSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do injetável.' }); res.status(201).json(await prisma.injectable.create({ data: p.data })); });
-app.put('/api/admin/injectables/:id', async (req, res) => { const p = injectableSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do injetável.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.injectable.update({ where: { id }, data: p.data })); });
-app.delete('/api/admin/injectables/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.injectable.delete({ where: { id } }); res.status(204).send(); });
+app.get("/api/admin/injectables", async (_req, res) =>
+  crud(res, prisma.injectable, "findMany", { orderBy: { id: "desc" } }),
+);
+app.post("/api/admin/injectables", async (req, res) => {
+  const p = injectableSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do injetável." });
+  res.status(201).json(await prisma.injectable.create({ data: p.data }));
+});
+app.put("/api/admin/injectables/:id", async (req, res) => {
+  const p = injectableSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do injetável." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.injectable.update({ where: { id }, data: p.data }));
+});
+app.delete("/api/admin/injectables/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.injectable.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/suppliers', async (_req, res) => crud(res, prisma.supplier, 'findMany', { orderBy: { name: 'asc' } }));
-app.post('/api/admin/suppliers', async (req, res) => { const p = supplierSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do fornecedor.' }); res.status(201).json(await prisma.supplier.create({ data: p.data })); });
-app.put('/api/admin/suppliers/:id', async (req, res) => { const p = supplierSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do fornecedor.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.supplier.update({ where: { id }, data: p.data })); });
-app.delete('/api/admin/suppliers/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.supplier.delete({ where: { id } }); res.status(204).send(); });
+app.get("/api/admin/suppliers", async (_req, res) =>
+  crud(res, prisma.supplier, "findMany", { orderBy: { name: "asc" } }),
+);
+app.post("/api/admin/suppliers", async (req, res) => {
+  const p = supplierSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do fornecedor." });
+  res.status(201).json(await prisma.supplier.create({ data: p.data }));
+});
+app.put("/api/admin/suppliers/:id", async (req, res) => {
+  const p = supplierSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do fornecedor." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.supplier.update({ where: { id }, data: p.data }));
+});
+app.delete("/api/admin/suppliers/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.supplier.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.get('/api/admin/exam-types', async (_req, res) => crud(res, prisma.examType, 'findMany', { orderBy: { id: 'desc' } }));
-app.post('/api/admin/exam-types', async (req, res) => { const p = examTypeSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do tipo de exame.' }); res.status(201).json(await prisma.examType.create({ data: p.data })); });
-app.put('/api/admin/exam-types/:id', async (req, res) => { const p = examTypeSchema.safeParse(req.body); if (!p.success) return res.status(400).json({ message: 'Preencha corretamente os dados do tipo de exame.' }); const id = routeId(req, res, req.body?.id); if (id === null) return; res.json(await prisma.examType.update({ where: { id }, data: p.data })); });
-app.delete('/api/admin/exam-types/:id', async (req, res) => { const id = routeId(req, res); if (id === null) return; await prisma.examType.delete({ where: { id } }); res.status(204).send(); });
+app.get("/api/admin/exam-types", async (_req, res) =>
+  crud(res, prisma.examType, "findMany", { orderBy: { id: "desc" } }),
+);
+app.post("/api/admin/exam-types", async (req, res) => {
+  const p = examTypeSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do tipo de exame." });
+  res.status(201).json(await prisma.examType.create({ data: p.data }));
+});
+app.put("/api/admin/exam-types/:id", async (req, res) => {
+  const p = examTypeSchema.safeParse(req.body);
+  if (!p.success)
+    return res
+      .status(400)
+      .json({ message: "Preencha corretamente os dados do tipo de exame." });
+  const id = routeId(req, res, req.body?.id);
+  if (id === null) return;
+  res.json(await prisma.examType.update({ where: { id }, data: p.data }));
+});
+app.delete("/api/admin/exam-types/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.examType.delete({ where: { id } });
+  res.status(204).send();
+});
 
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => { console.error(err); const message = err?.code === 'LIMIT_FILE_SIZE' ? 'O arquivo excede o limite de 10 MB.' : err?.message || 'Erro interno do servidor.'; res.status(err?.code === 'LIMIT_FILE_SIZE' || err?.status === 400 || message.startsWith('Tipo de arquivo') ? 400 : 500).json({ message }); });
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
+  const message =
+    err?.code === "LIMIT_FILE_SIZE"
+      ? "O arquivo excede o limite de 10 MB."
+      : err?.message || "Erro interno do servidor.";
+  res
+    .status(
+      err?.code === "LIMIT_FILE_SIZE" ||
+        err?.status === 400 ||
+        message.startsWith("Tipo de arquivo")
+        ? 400
+        : 500,
+    )
+    .json({ message });
+});
 
-app.listen(port, '0.0.0.0', () => {
-  console.log('MedClinic API iniciada com sucesso!');
+app.listen(port, "0.0.0.0", () => {
+  console.log("MedClinic API iniciada com sucesso!");
   console.log(`Localhost: http://localhost:${port}`);
   console.log(`IP fixo:   http://192.168.0.200:${port}`);
   console.log(`API Local: http://localhost:${port}/api`);
