@@ -27,6 +27,7 @@ model User {
   examRequests        ExamRequest[]             @relation("ExamRequestAuthor")
   injectableRequests  InjectableRequest[]      @relation("InjectableRequestAuthor")
   procedureRequests   ProcedureRequest[]       @relation("ProcedureRequestAuthor")
+  ultrasoundRequests  UltrasoundRequest[]      @relation("UltrasoundRequestAuthor")
   uploadedCertificates DigitalCertificate[]    @relation("DigitalCertificateUploader")
 
   @@map("users")
@@ -192,6 +193,7 @@ model Patient {
   examRequests          ExamRequest[]
   injectableRequests    InjectableRequest[]
   procedureRequests     ProcedureRequest[]
+  ultrasoundRequests    UltrasoundRequest[]
 
   @@index([fullName])
   @@index([cpf])
@@ -270,6 +272,7 @@ model MedicalRecord {
   examRequests   ExamRequest[]
   injectableRequests InjectableRequest[]
   procedureRequests ProcedureRequest[]
+  ultrasoundRequests UltrasoundRequest[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
@@ -302,6 +305,37 @@ model ExamRequest {
   @@index([patientId])
   @@index([requestedById])
   @@map("exam_requests")
+}
+
+enum UltrasoundRequestType {
+  MAMAS
+  TRANSVAGINAL_ROTINA
+  TRANSVAGINAL_PREPARO
+}
+
+enum UltrasoundRequestStatus {
+  AGUARDANDO_RESULTADO
+}
+
+model UltrasoundRequest {
+  id              Int                     @id @default(autoincrement())
+  medicalRecordId Int                     @map("medical_record_id")
+  patientId       Int                     @map("patient_id")
+  type            UltrasoundRequestType
+  description     String?                 @db.Text
+  code            String                  @unique @db.VarChar(20)
+  status          UltrasoundRequestStatus @default(AGUARDANDO_RESULTADO)
+  pdfUrl          String?                 @map("pdf_url") @db.VarChar(255)
+  requestedById   Int                     @map("requested_by_id")
+  requestedAt     DateTime                @default(now()) @map("requested_at")
+  medicalRecord   MedicalRecord           @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  patient         Patient                 @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  requestedBy     User                    @relation("UltrasoundRequestAuthor", fields: [requestedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([medicalRecordId, type])
+  @@index([patientId])
+  @@index([requestedById])
+  @@map("ultrasound_requests")
 }
 
 enum InjectableRequestRoute {

@@ -238,6 +238,69 @@ function AttachmentsArea({
   );
 }
 
+const ultrasoundOptions = [
+  { type: "MAMAS", title: "USG de mamas", subtitle: "Mamas / axilas" },
+  { type: "TRANSVAGINAL_ROTINA", title: "USG transvaginal", subtitle: "Rotina ginecológica" },
+  { type: "TRANSVAGINAL_PREPARO", title: "USG transvaginal", subtitle: "Com preparo intestinal" },
+] as const;
+
+function UltrasoundRequestsArea({
+  recordId,
+  requests = [],
+  onChanged,
+  canCompose,
+}: {
+  recordId: number;
+  requests?: Row[];
+  onChanged: () => Promise<void>;
+  canCompose: boolean;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [descriptions, setDescriptions] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const requestedTypes = new Set(requests.map((item) => String(item.type)));
+  function toggle(type: string) {
+    setSelected((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
+    setMessage("");
+  }
+  async function generate() {
+    if (!selected.length) return setMessage("Selecione pelo menos um exame de USG.");
+    setSaving(true); setMessage("");
+    try {
+      await request(`/medical-records/${recordId}/ultrasound-requests`, { method: "POST", body: JSON.stringify({ requests: selected.map((type) => ({ type, description: descriptions[type] || "" })) }) });
+      setSelected([]); setDescriptions({}); await onChanged();
+    } catch (error: any) { setMessage(error.message); } finally { setSaving(false); }
+  }
+  async function viewRequest(item: Row) {
+    try {
+      const token = localStorage.getItem("medclinic_token");
+      const response = await fetch(`${API}/medical-record-ultrasound-requests/${item.id}/pdf`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!response.ok) throw new Error("Não foi possível abrir a solicitação de USG.");
+      const blobUrl = URL.createObjectURL(await response.blob()); window.open(blobUrl, "_blank", "noopener,noreferrer");
+    } catch (error: any) { setMessage(error.message); }
+  }
+  if (!canCompose && requests.length === 0) return null;
+  return <section className="ultrasound-requests-area">
+    <div className="ultrasound-heading"><strong>Ultrassonografia (USG) <span>{requests.length + selected.length}</span></strong></div>
+    {canCompose && <>
+      <div className="ultrasound-options">
+        {ultrasoundOptions.map((option) => {
+          const checked = selected.includes(option.type);
+          const requested = requestedTypes.has(option.type);
+          return <button type="button" key={option.type} className={`ultrasound-option ${checked ? "selected" : ""} ${requested ? "requested" : ""}`} onClick={() => !requested && toggle(option.type)} disabled={requested}>
+            <span className="ultrasound-check">{checked || requested ? "✓" : ""}</span><span><strong>{option.title}</strong><small>{option.subtitle}{requested ? " · já solicitado" : ""}</small></span>
+          </button>;
+        })}
+      </div>
+      {selected.map((type) => { const option = ultrasoundOptions.find((item) => item.type === type)!; return <div className="ultrasound-description" key={type}><strong>{option.title} · {option.subtitle}</strong><textarea value={descriptions[type] || ""} onChange={(event) => setDescriptions((current) => ({ ...current, [type]: event.target.value }))} placeholder="Descrição / indicação clínica (ex.: dor pélvica, mioma subseroso em controle)" rows={3} /></div>; })}
+      <div className="ultrasound-actions"><button type="button" className="primary" disabled={!selected.length || saving} onClick={() => void generate()}>{saving ? "Gerando…" : "Gerar PDF do pedido"}</button><button type="button" className="secondary" onClick={() => { setSelected([]); setDescriptions({}); }}>Limpar</button></div>
+    </>}
+    {requests.length > 0 && <div className="ultrasound-generated">{requests.map((item) => <div className="ultrasound-generated-item" key={item.id}><span><strong>{ultrasoundOptions.find((option) => option.type === item.type)?.title || item.type}</strong><small>{ultrasoundOptions.find((option) => option.type === item.type)?.subtitle} · {item.code}</small></span><span className="exam-request-status">Aguardando resultado</span><button type="button" className="exam-request-view" onClick={() => void viewRequest(item)} title="Visualizar pedido em PDF"><Eye size={16} /></button></div>)}</div>}
+    {message && <span className="attachment-error">{message}</span>}
+  </section>;
+}
+
 function ExamRequestsArea({
   recordId,
   requests = [],
@@ -1140,6 +1203,12 @@ export function MedicalRecordsPage({
                 <ExamRequestsArea
                   recordId={record.id}
                   requests={record.examRequests}
+                  canCompose={enableExamRequests && composingRecordId === record.id}
+                  onChanged={() => reload(selectedPatientId)}
+                />
+                <UltrasoundRequestsArea
+                  recordId={record.id}
+                  requests={record.ultrasoundRequests}
                   canCompose={enableExamRequests && composingRecordId === record.id}
                   onChanged={() => reload(selectedPatientId)}
                 />

@@ -1,0 +1,20 @@
+CREATE TABLE `ultrasound_requests` (
+  `id` INTEGER NOT NULL AUTO_INCREMENT,
+  `medical_record_id` INTEGER NOT NULL,
+  `patient_id` INTEGER NOT NULL,
+  `type` ENUM('MAMAS', 'TRANSVAGINAL_ROTINA', 'TRANSVAGINAL_PREPARO') NOT NULL,
+  `description` TEXT NULL,
+  `code` VARCHAR(20) NOT NULL,
+  `status` ENUM('AGUARDANDO_RESULTADO') NOT NULL DEFAULT 'AGUARDANDO_RESULTADO',
+  `pdf_url` VARCHAR(255) NULL,
+  `requested_by_id` INTEGER NOT NULL,
+  `requested_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `ultrasound_requests_code_key` (`code`),
+  UNIQUE INDEX `ultrasound_requests_medical_record_id_type_key` (`medical_record_id`, `type`),
+  INDEX `ultrasound_requests_patient_id_idx` (`patient_id`),
+  INDEX `ultrasound_requests_requested_by_id_idx` (`requested_by_id`),
+  CONSTRAINT `ultrasound_requests_medical_record_id_fkey` FOREIGN KEY (`medical_record_id`) REFERENCES `medical_records` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `ultrasound_requests_patient_id_fkey` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `ultrasound_requests_requested_by_id_fkey` FOREIGN KEY (`requested_by_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

@@ -295,6 +295,12 @@ const examRequestSchema = z.object({
     )
     .min(1, "Selecione pelo menos um grupo."),
 });
+const ultrasoundRequestSchema = z.object({
+  requests: z.array(z.object({
+    type: z.enum(["MAMAS", "TRANSVAGINAL_ROTINA", "TRANSVAGINAL_PREPARO"]),
+    description: z.string().trim().max(4000).optional().default(""),
+  })).min(1, "Selecione pelo menos um exame de ultrassonografia."),
+});
 const injectableRequestSchema = z.object({
   items: z
     .array(
@@ -362,6 +368,9 @@ const procedureRequestInclude = {
   procedure: { select: { id: true, name: true, value: true } },
   requestedBy: { select: { id: true, fullName: true } },
 };
+const ultrasoundRequestInclude = {
+  requestedBy: { select: { id: true, fullName: true } },
+};
 const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
@@ -383,6 +392,10 @@ const medicalRecordInclude = {
   procedureRequests: {
     orderBy: { requestedAt: "asc" as const },
     include: procedureRequestInclude,
+  },
+  ultrasoundRequests: {
+    orderBy: { requestedAt: "asc" as const },
+    include: ultrasoundRequestInclude,
   },
 };
 const examGroupInclude = {
@@ -475,6 +488,52 @@ async function signPdfWithActiveCertificate(pdfPath: string) {
   fs.writeFileSync(pdfPath, signedPdf);
   return true;
 }
+const ultrasoundTypeLabels: Record<string, string> = {
+  MAMAS: "USG de mamas — Mamas / axilas",
+  TRANSVAGINAL_ROTINA: "USG transvaginal — Rotina ginecológica",
+  TRANSVAGINAL_PREPARO: "USG transvaginal — Com preparo intestinal",
+};
+
+async function generateUltrasoundRequestPdf(data: any) {
+  const pdfPath = path.join(examRequestPdfRoot, `usg-${data.id}.pdf`);
+  const certificate = await getActiveCertificateDetails();
+  const doctor = data.medicalRecord?.appointment?.doctor;
+  const signedAt = new Date();
+  const qrBuffer = await QRCode.toBuffer(`https://validar.iti.gov.br/?documento=${encodeURIComponent(data.code)}`, { errorCorrectionLevel: "M", margin: 1, width: 70 });
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    const stream = fs.createWriteStream(pdfPath);
+    stream.on("finish", resolve); stream.on("error", reject); doc.on("error", reject); doc.pipe(stream);
+    const wine = "#741447"; const pale = "#f8edf3"; const ink = "#29242a"; const gray = "#706970";
+    doc.rect(0, 0, 595, 70).fill(pale); doc.rect(0, 0, 595, 5).fill(wine);
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(23).text("intimavie", 48, 25);
+    doc.fillColor("#76566b").font("Helvetica").fontSize(9).text("MEDICINA ÍNTIMA", 51, 50);
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(8).text(`SOLICITAÇÃO DE USG  ${data.code}`, 365, 29, { width: 182, align: "right" });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(10).text("SOLICITAÇÃO DE ULTRASSONOGRAFIA", 48, 105);
+    doc.fillColor(gray).font("Helvetica").fontSize(8).text("PACIENTE", 65, 135);
+    doc.fillColor(ink).font("Helvetica-Bold").fontSize(15).text(String(data.patient?.fullName || "").toUpperCase(), 65, 149, { width: 465 });
+    doc.roundedRect(48, 205, 499, 82, 8).fillAndStroke("#fff9fc", "#d9b2c7");
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(11).text(ultrasoundTypeLabels[data.type] || "Ultrassonografia", 65, 224, { width: 465 });
+    doc.fillColor(gray).font("Helvetica").fontSize(9).text("Descrição / indicação clínica", 65, 250);
+    doc.fillColor(ink).font("Helvetica").fontSize(10).text(data.description || "Não informada", 65, 270, { width: 465, height: 70, ellipsis: true });
+    doc.roundedRect(48, 620, 499, 142, 8).fillAndStroke("#fff9fc", "#d9b2c7");
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(8).text("ASSINATURA DIGITAL", 65, 633);
+    doc.fillColor(ink).font("Helvetica-Bold").fontSize(8).text(`Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || "Médico"}`, 65, 651, { width: 350, ellipsis: true });
+    doc.fillColor(gray).font("Helvetica").fontSize(7).text(`CPF: ${certificate?.cpf || "Não disponível"}`, 65, 667);
+    doc.text(`CRM/UF: ${doctor?.crm || "Não informado"}`, 65, 681);
+    doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, 695);
+    doc.text("Padrão: PAdES — certificado ICP-Brasil", 65, 709);
+    doc.image(qrBuffer, 465, 633, { width: 60, height: 60 });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(6.5).text("Documento assinado digitalmente conforme MP 2.200-2/2001", 65, 730);
+    doc.fillColor(gray).font("Helvetica").fontSize(6.5).text("Validação: validar.iti.gov.br", 65, 744);
+    doc.fillColor("#8d8189").fontSize(6.5).text("QR code direciona ao validador do ITI.", 447, 699, { width: 92, align: "center" });
+    doc.fillColor("#8d8189").font("Helvetica").fontSize(7).text("Documento gerado pelo sistema Clínica Intimavie.", 195, 785, { width: 250, align: "center" });
+    doc.end();
+  });
+  await signPdfWithActiveCertificate(pdfPath);
+  return pdfPath;
+}
+
 async function generateExamRequestPdf(data: any) {
   const pdfPath = path.join(examRequestPdfRoot, `${data.id}.pdf`);
   const signedAt = new Date();
@@ -1371,6 +1430,52 @@ app.get(
         "Content-Disposition": `inline; filename="${examRequest.code || `RX-${String(examRequest.id).padStart(6, "0")}`}.pdf"`,
       },
     });
+  },
+);
+
+app.post(
+  "/api/medical-records/:id/ultrasound-requests",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const parsed = ultrasoundRequestSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Selecione pelo menos um exame de ultrassonografia." });
+    const medicalRecordId = routeId(req, res);
+    if (medicalRecordId === null) return;
+    const record = await clinicalRequestRecord(medicalRecordId);
+    if (!record) return res.status(404).json({ message: "Prontuário não encontrado ou atendimento não iniciado hoje." });
+    const uniqueRequests = [...new Map(parsed.data.requests.map((item) => [item.type, item])).values()];
+    const existing = await prisma.ultrasoundRequest.findMany({ where: { medicalRecordId, type: { in: uniqueRequests.map((item) => item.type) } }, select: { type: true } });
+    const existingTypes = new Set(existing.map((item) => item.type));
+    const pending = uniqueRequests.filter((item) => !existingTypes.has(item.type));
+    const createdIds: number[] = [];
+    await prisma.$transaction(async (tx) => {
+      for (const item of pending) {
+        const created = await tx.ultrasoundRequest.create({ data: { medicalRecordId, patientId: record.patientId, type: item.type, description: item.description || null, code: `TMP-USG-${crypto.randomBytes(4).toString("hex")}`, requestedById: req.user!.id } });
+        const code = `USG-${String(created.id).padStart(6, "0")}`;
+        await tx.ultrasoundRequest.update({ where: { id: created.id }, data: { code, pdfUrl: `/medical-record-ultrasound-requests/${created.id}/pdf` } });
+        createdIds.push(created.id);
+      }
+    });
+    for (const id of createdIds) {
+      const created = await prisma.ultrasoundRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, birthDate: true } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
+      if (created) await generateUltrasoundRequestPdf(created);
+    }
+    res.status(201).json(await prisma.ultrasoundRequest.findMany({ where: { medicalRecordId }, orderBy: { requestedAt: "asc" }, include: ultrasoundRequestInclude }));
+  },
+);
+
+app.get(
+  "/api/medical-record-ultrasound-requests/:id/pdf",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    const ultrasoundRequest = await prisma.ultrasoundRequest.findUnique({ where: { id }, include: { patient: { select: { fullName: true, cpf: true, birthDate: true } }, requestedBy: { select: { fullName: true } }, medicalRecord: { select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } } } } });
+    if (!ultrasoundRequest) return res.status(404).json({ message: "Solicitação de USG não encontrada." });
+    const pdfPath = await generateUltrasoundRequestPdf(ultrasoundRequest);
+    res.type("application/pdf").sendFile(pdfPath, { headers: { "Content-Disposition": `inline; filename="${ultrasoundRequest.code}.pdf"` } });
   },
 );
 
