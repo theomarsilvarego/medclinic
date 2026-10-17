@@ -10,6 +10,7 @@ import {
   AppointmentItemType,
   AppointmentStatus,
   InjectableType,
+  ProcedureType,
   PrismaClient,
   Profile,
 } from "@prisma/client";
@@ -247,6 +248,9 @@ const financialSchema = z.object({
   name: requiredText,
   value: z.coerce.number().nonnegative(),
   active: z.boolean().default(true),
+});
+const procedureSchema = financialSchema.extend({
+  type: z.nativeEnum(ProcedureType),
 });
 const insuranceSchema = financialSchema.extend({ ans: requiredText });
 const attendanceSchema = financialSchema.extend({
@@ -2020,7 +2024,7 @@ app.get("/api/admin/procedures", async (_req, res) =>
   crud(res, prisma.procedure, "findMany", { orderBy: { id: "desc" } }),
 );
 app.post("/api/admin/procedures", async (req, res) => {
-  const p = financialSchema.safeParse(req.body);
+  const p = procedureSchema.safeParse(req.body);
   if (!p.success)
     return res
       .status(400)
@@ -2028,7 +2032,7 @@ app.post("/api/admin/procedures", async (req, res) => {
   res.status(201).json(await prisma.procedure.create({ data: p.data }));
 });
 app.put("/api/admin/procedures/:id", async (req, res) => {
-  const p = financialSchema.safeParse(req.body);
+  const p = procedureSchema.safeParse(req.body);
   if (!p.success)
     return res
       .status(400)

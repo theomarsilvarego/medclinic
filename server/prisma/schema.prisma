@@ -78,6 +78,7 @@ model Insurance {
 model Procedure {
   id        Int      @id @default(autoincrement())
   name      String   @db.VarChar(160)
+  type      ProcedureType?
   value     Decimal  @db.Decimal(10, 2)
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
@@ -87,6 +88,13 @@ model Procedure {
   requests    ProcedureRequest[]
 
   @@map("procedures")
+}
+
+enum ProcedureType {
+  DIAGNOSTICO_POR_IMAGEM
+  ESTETICO
+  CIRURGICO
+  CONTRACEPTIVO
 }
 
 enum InjectableType {
