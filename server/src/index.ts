@@ -626,8 +626,8 @@ async function generateExamRequestPdf(data: any) {
     doc
       .fontSize(18)
       .text(pdfMoney(total), 355, y + 40, { width: 172, align: "right" });
-    const requiredHeight = 165;
-    const finalStampY = 610;
+    const requiredHeight = 145;
+    const finalStampY = 620;
     if (y + 96 > finalStampY) {
       doc.addPage();
       drawBrand(true);
@@ -638,31 +638,31 @@ async function generateExamRequestPdf(data: any) {
     doc
       .fillColor(wine)
       .font("Helvetica-Bold")
-      .fontSize(9)
-      .text("ASSINATURA DIGITAL", 65, finalStampY + 16, { width: 330 });
+      .fontSize(8)
+      .text("ASSINATURA DIGITAL", 65, finalStampY + 12, { width: 330 });
     doc
       .fillColor(ink)
       .font("Helvetica-Bold")
-      .fontSize(9)
+      .fontSize(8)
       .text(
         `Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || "Médico"}`,
         65,
-        finalStampY + 39,
+        finalStampY + 30,
         { width: 350, ellipsis: true },
       );
     doc
       .fillColor(gray)
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(7)
       .text(
         `CPF: ${certificate?.cpf || "Não disponível"}`,
         65,
-        finalStampY + 57,
+        finalStampY + 46,
       );
-    doc.text(`CRM/UF: ${doctor?.crm || "Não informado"}`, 65, finalStampY + 75);
-    doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, finalStampY + 93);
-    doc.text("Padrão: PAdES — certificado ICP-Brasil", 65, finalStampY + 111);
-    doc.image(qrBuffer, 455, finalStampY + 14, { width: 76, height: 76 });
+    doc.text(`CRM/UF: ${doctor?.crm || "Não informado"}`, 65, finalStampY + 60);
+    doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, finalStampY + 74);
+    doc.text("Padrão: PAdES — certificado ICP-Brasil", 65, finalStampY + 88);
+    doc.image(qrBuffer, 463, finalStampY + 12, { width: 64, height: 64 });
     doc
       .fillColor(wine)
       .font("Helvetica-Bold")
@@ -670,7 +670,7 @@ async function generateExamRequestPdf(data: any) {
       .text(
         "Documento assinado digitalmente conforme MP 2.200-2/2001",
         65,
-        finalStampY + 137,
+        finalStampY + 111,
       );
     doc
       .fillColor(gray)
@@ -679,12 +679,12 @@ async function generateExamRequestPdf(data: any) {
       .text(
         "Validação: validar.iti.gov.br",
         65,
-        finalStampY + 151,
+        finalStampY + 126,
       );
     doc
       .fillColor("#8d8189")
       .fontSize(7)
-      .text("QR code direciona ao validador do ITI.", 447, finalStampY + 96, {
+      .text("QR code direciona ao validador do ITI.", 447, finalStampY + 80, {
         width: 92,
         align: "center",
       });
@@ -692,7 +692,7 @@ async function generateExamRequestPdf(data: any) {
       .fillColor("#8d8189")
       .font("Helvetica")
       .fontSize(7)
-      .text("Documento gerado pelo sistema Clínica Intimavie.", 195, 812, {
+      .text("Documento gerado pelo sistema Clínica Intimavie.", 195, 785, {
         width: 250,
         align: "center",
       });
