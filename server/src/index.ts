@@ -626,13 +626,12 @@ async function generateExamRequestPdf(data: any) {
     doc
       .fontSize(18)
       .text(pdfMoney(total), 355, y + 40, { width: 172, align: "right" });
-    const stampY = y + 92;
     const requiredHeight = 165;
-    if (stampY + requiredHeight > 785) {
+    const finalStampY = 610;
+    if (y + 96 > finalStampY) {
       doc.addPage();
       drawBrand(true);
     }
-    const finalStampY = stampY + requiredHeight > 785 ? 125 : stampY;
     doc
       .roundedRect(48, finalStampY, pageWidth, requiredHeight, 8)
       .fillAndStroke("#fff9fc", "#d9b2c7");
@@ -640,7 +639,7 @@ async function generateExamRequestPdf(data: any) {
       .fillColor(wine)
       .font("Helvetica-Bold")
       .fontSize(9)
-      .text("ASSINATURA DIGITAL", 65, finalStampY + 16);
+      .text("ASSINATURA DIGITAL", 65, finalStampY + 16, { width: 330 });
     doc
       .fillColor(ink)
       .font("Helvetica-Bold")
@@ -649,6 +648,7 @@ async function generateExamRequestPdf(data: any) {
         `Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || "Médico"}`,
         65,
         finalStampY + 39,
+        { width: 350, ellipsis: true },
       );
     doc
       .fillColor(gray)
