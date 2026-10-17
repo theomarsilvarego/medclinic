@@ -238,12 +238,6 @@ function AttachmentsArea({
   );
 }
 
-const ultrasoundOptions = [
-  { type: "MAMAS", title: "USG de mamas", subtitle: "Mamas / axilas" },
-  { type: "TRANSVAGINAL_ROTINA", title: "USG transvaginal", subtitle: "Rotina ginecológica" },
-  { type: "TRANSVAGINAL_PREPARO", title: "USG transvaginal", subtitle: "Com preparo intestinal" },
-] as const;
-
 function UltrasoundRequestsArea({
   recordId,
   requests = [],
@@ -257,13 +251,10 @@ function UltrasoundRequestsArea({
   onChanged: () => Promise<void>;
   canCompose: boolean;
 }) {
-  const [selected, setSelected] = useState<string[]>([]);
   const [catalog, setCatalog] = useState<Row[]>([]);
   const [selectedProcedures, setSelectedProcedures] = useState<Row[]>([]);
-  const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const requestedTypes = new Set(requests.map((item) => String(item.type)));
   const requestedProcedureIds = new Set(procedureRequests.map((item) => Number(item.procedureId || item.procedure?.id)));
   const imagingProcedures = catalog.filter((item) => item.type === "DIAGNOSTICO_POR_IMAGEM");
   useEffect(() => {
@@ -272,18 +263,6 @@ function UltrasoundRequestsArea({
         .then(setCatalog)
         .catch((error: any) => setMessage(error.message));
   }, [canCompose]);
-  function toggle(type: string) {
-    setSelected((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
-    setMessage("");
-  }
-  async function generate() {
-    if (!selected.length) return setMessage("Selecione pelo menos um exame de USG.");
-    setSaving(true); setMessage("");
-    try {
-      await request(`/medical-records/${recordId}/ultrasound-requests`, { method: "POST", body: JSON.stringify({ requests: selected.map((type) => ({ type, description: descriptions[type] || "" })) }) });
-      setSelected([]); setDescriptions({}); await onChanged();
-    } catch (error: any) { setMessage(error.message); } finally { setSaving(false); }
-  }
   async function submitCatalogProcedures() {
     if (!selectedProcedures.length) return;
     setSaving(true); setMessage("");
@@ -302,9 +281,9 @@ function UltrasoundRequestsArea({
   }
   if (!canCompose && requests.length === 0 && procedureRequests.length === 0) return null;
   return <section className="ultrasound-requests-area">
-    <div className="ultrasound-heading"><strong>Ultrassonografia (USG) <span>{requests.length + procedureRequests.length + selected.length + selectedProcedures.length}</span></strong></div>
+    <div className="ultrasound-heading"><strong>Ultrassonografia (USG) <span>{requests.length + procedureRequests.length + selectedProcedures.length}</span></strong></div>
     {canCompose && <>
-      <div className="procedure-heading"><strong>Procedimentos cadastrados · Diagnóstico por Imagem</strong></div>
+      <div className="procedure-heading"><strong>Exames cadastrados · Diagnóstico por Imagem</strong></div>
       <div className="ultrasound-options">
         {imagingProcedures.length === 0 ? <p className="exam-request-empty">Nenhum procedimento ativo cadastrado como Diagnóstico por Imagem.</p> : imagingProcedures.map((item) => {
           const checked = selectedProcedures.some((selectedItem) => Number(selectedItem.id) === Number(item.id));
@@ -315,19 +294,8 @@ function UltrasoundRequestsArea({
         })}
       </div>
       {selectedProcedures.length > 0 && <div className="ultrasound-actions"><button type="button" className="primary" disabled={saving} onClick={() => void submitCatalogProcedures()}>{saving ? "Solicitando…" : "Solicitar USG cadastrada"}</button><button type="button" className="secondary" onClick={() => setSelectedProcedures([])}>Limpar seleção</button></div>}
-      <div className="ultrasound-options">
-        {ultrasoundOptions.map((option) => {
-          const checked = selected.includes(option.type);
-          const requested = requestedTypes.has(option.type);
-          return <button type="button" key={option.type} className={`ultrasound-option ${checked ? "selected" : ""} ${requested ? "requested" : ""}`} onClick={() => !requested && toggle(option.type)} disabled={requested}>
-            <span className="ultrasound-check">{checked || requested ? "✓" : ""}</span><span><strong>{option.title}</strong><small>{option.subtitle}{requested ? " · já solicitado" : ""}</small></span>
-          </button>;
-        })}
-      </div>
-      {selected.map((type) => { const option = ultrasoundOptions.find((item) => item.type === type)!; return <div className="ultrasound-description" key={type}><strong>{option.title} · {option.subtitle}</strong><textarea value={descriptions[type] || ""} onChange={(event) => setDescriptions((current) => ({ ...current, [type]: event.target.value }))} placeholder="Descrição / indicação clínica (ex.: dor pélvica, mioma subseroso em controle)" rows={3} /></div>; })}
-      <div className="ultrasound-actions"><button type="button" className="primary" disabled={!selected.length || saving} onClick={() => void generate()}>{saving ? "Gerando…" : "Gerar PDF do pedido"}</button><button type="button" className="secondary" onClick={() => { setSelected([]); setDescriptions({}); }}>Limpar</button></div>
     </>}
-    {requests.length > 0 && <div className="ultrasound-generated">{requests.map((item) => <div className="ultrasound-generated-item" key={item.id}><span><strong>{ultrasoundOptions.find((option) => option.type === item.type)?.title || item.type}</strong><small>{ultrasoundOptions.find((option) => option.type === item.type)?.subtitle} · {item.code}</small></span><span className="exam-request-status">Aguardando resultado</span><button type="button" className="exam-request-view" onClick={() => void viewRequest(item)} title="Visualizar pedido em PDF"><Eye size={16} /></button></div>)}</div>}
+    {requests.length > 0 && <div className="ultrasound-generated">{requests.map((item) => <div className="ultrasound-generated-item" key={item.id}><span><strong>{String(item.type || "USG").split("_").join(" ")}</strong><small>{item.description || "Pedido anterior"} · {item.code}</small></span><span className="exam-request-status">Aguardando resultado</span><button type="button" className="exam-request-view" onClick={() => void viewRequest(item)} title="Visualizar pedido em PDF"><Eye size={16} /></button></div>)}</div>}
     {procedureRequests.length > 0 && <div className="ultrasound-generated">{procedureRequests.map((item) => <div className="ultrasound-generated-item" key={item.id}><span><strong>{item.name || item.procedure?.name}</strong><small>Diagnóstico por Imagem · {Number(item.value || item.procedure?.value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</small></span><span className="procedure-status">Aguardando agendamento</span></div>)}</div>}
     {message && <span className="attachment-error">{message}</span>}
   </section>;
