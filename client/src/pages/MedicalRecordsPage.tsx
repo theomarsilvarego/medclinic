@@ -247,19 +247,31 @@ const ultrasoundOptions = [
 function UltrasoundRequestsArea({
   recordId,
   requests = [],
+  procedureRequests = [],
   onChanged,
   canCompose,
 }: {
   recordId: number;
   requests?: Row[];
+  procedureRequests?: Row[];
   onChanged: () => Promise<void>;
   canCompose: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<Row[]>([]);
+  const [selectedProcedures, setSelectedProcedures] = useState<Row[]>([]);
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const requestedTypes = new Set(requests.map((item) => String(item.type)));
+  const requestedProcedureIds = new Set(procedureRequests.map((item) => Number(item.procedureId || item.procedure?.id)));
+  const imagingProcedures = catalog.filter((item) => item.type === "DIAGNOSTICO_POR_IMAGEM");
+  useEffect(() => {
+    if (canCompose)
+      request("/procedures/catalog")
+        .then(setCatalog)
+        .catch((error: any) => setMessage(error.message));
+  }, [canCompose]);
   function toggle(type: string) {
     setSelected((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
     setMessage("");
@@ -272,6 +284,14 @@ function UltrasoundRequestsArea({
       setSelected([]); setDescriptions({}); await onChanged();
     } catch (error: any) { setMessage(error.message); } finally { setSaving(false); }
   }
+  async function submitCatalogProcedures() {
+    if (!selectedProcedures.length) return;
+    setSaving(true); setMessage("");
+    try {
+      await request(`/medical-records/${recordId}/procedure-requests`, { method: "POST", body: JSON.stringify({ procedureIds: selectedProcedures.map((item) => Number(item.id)) }) });
+      setSelectedProcedures([]); await onChanged();
+    } catch (error: any) { setMessage(error.message); } finally { setSaving(false); }
+  }
   async function viewRequest(item: Row) {
     try {
       const token = localStorage.getItem("medclinic_token");
@@ -280,10 +300,21 @@ function UltrasoundRequestsArea({
       const blobUrl = URL.createObjectURL(await response.blob()); window.open(blobUrl, "_blank", "noopener,noreferrer");
     } catch (error: any) { setMessage(error.message); }
   }
-  if (!canCompose && requests.length === 0) return null;
+  if (!canCompose && requests.length === 0 && procedureRequests.length === 0) return null;
   return <section className="ultrasound-requests-area">
-    <div className="ultrasound-heading"><strong>Ultrassonografia (USG) <span>{requests.length + selected.length}</span></strong></div>
+    <div className="ultrasound-heading"><strong>Ultrassonografia (USG) <span>{requests.length + procedureRequests.length + selected.length + selectedProcedures.length}</span></strong></div>
     {canCompose && <>
+      <div className="procedure-heading"><strong>Procedimentos cadastrados · Diagnóstico por Imagem</strong></div>
+      <div className="ultrasound-options">
+        {imagingProcedures.length === 0 ? <p className="exam-request-empty">Nenhum procedimento ativo cadastrado como Diagnóstico por Imagem.</p> : imagingProcedures.map((item) => {
+          const checked = selectedProcedures.some((selectedItem) => Number(selectedItem.id) === Number(item.id));
+          const requested = requestedProcedureIds.has(Number(item.id));
+          return <button type="button" key={item.id} className={`ultrasound-option ${checked ? "selected" : ""} ${requested ? "requested" : ""}`} onClick={() => { if (!requested) setSelectedProcedures((current) => checked ? current.filter((selectedItem) => Number(selectedItem.id) !== Number(item.id)) : [...current, item]); setMessage(""); }} disabled={requested}>
+            <span className="ultrasound-check">{checked || requested ? "✓" : ""}</span><span><strong>{item.name}</strong><small>{requested ? "Já solicitado neste prontuário" : Number(item.value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</small></span>
+          </button>;
+        })}
+      </div>
+      {selectedProcedures.length > 0 && <div className="ultrasound-actions"><button type="button" className="primary" disabled={saving} onClick={() => void submitCatalogProcedures()}>{saving ? "Solicitando…" : "Solicitar USG cadastrada"}</button><button type="button" className="secondary" onClick={() => setSelectedProcedures([])}>Limpar seleção</button></div>}
       <div className="ultrasound-options">
         {ultrasoundOptions.map((option) => {
           const checked = selected.includes(option.type);
@@ -297,6 +328,7 @@ function UltrasoundRequestsArea({
       <div className="ultrasound-actions"><button type="button" className="primary" disabled={!selected.length || saving} onClick={() => void generate()}>{saving ? "Gerando…" : "Gerar PDF do pedido"}</button><button type="button" className="secondary" onClick={() => { setSelected([]); setDescriptions({}); }}>Limpar</button></div>
     </>}
     {requests.length > 0 && <div className="ultrasound-generated">{requests.map((item) => <div className="ultrasound-generated-item" key={item.id}><span><strong>{ultrasoundOptions.find((option) => option.type === item.type)?.title || item.type}</strong><small>{ultrasoundOptions.find((option) => option.type === item.type)?.subtitle} · {item.code}</small></span><span className="exam-request-status">Aguardando resultado</span><button type="button" className="exam-request-view" onClick={() => void viewRequest(item)} title="Visualizar pedido em PDF"><Eye size={16} /></button></div>)}</div>}
+    {procedureRequests.length > 0 && <div className="ultrasound-generated">{procedureRequests.map((item) => <div className="ultrasound-generated-item" key={item.id}><span><strong>{item.name || item.procedure?.name}</strong><small>Diagnóstico por Imagem · {Number(item.value || item.procedure?.value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</small></span><span className="procedure-status">Aguardando agendamento</span></div>)}</div>}
     {message && <span className="attachment-error">{message}</span>}
   </section>;
 }
@@ -815,12 +847,16 @@ function ProcedureRequestsArea({
         .then(setCatalog)
         .catch((error: any) => setMessage(error.message));
   }, [canCompose]);
+  const standardRequests = requests.filter(
+    (item) => (item.procedure?.type || item.type) !== "DIAGNOSTICO_POR_IMAGEM",
+  );
   const requestedIds = new Set(
-    requests.map((item) => Number(item.procedureId || item.procedure?.id)),
+    standardRequests.map((item) => Number(item.procedureId || item.procedure?.id)),
   );
   const filtered = catalog
     .filter(
       (item) =>
+        item.type !== "DIAGNOSTICO_POR_IMAGEM" &&
         !requestedIds.has(Number(item.id)) &&
         !selected.some((row) => Number(row.id) === Number(item.id)) &&
         String(item.name)
@@ -852,12 +888,12 @@ function ProcedureRequestsArea({
       setSaving(false);
     }
   }
-  if (!canCompose && requests.length === 0) return null;
+  if (!canCompose && standardRequests.length === 0) return null;
   return (
     <section className="procedure-requests-area">
       <div className="procedure-heading">
         <strong>
-          Procedimentos <span>{requests.length}</span>
+          Procedimentos <span>{standardRequests.length}</span>
         </strong>
       </div>
       {canCompose && (
@@ -950,9 +986,9 @@ function ProcedureRequestsArea({
           </div>
         </>
       )}
-      {requests.length > 0 && (
+      {standardRequests.length > 0 && (
         <div className="procedure-requested-list">
-          {requests.map((item) => (
+          {standardRequests.map((item) => (
             <div className="procedure-row requested" key={item.id}>
               <div className="procedure-row-name">
                 <ClipboardCheck size={17} />
@@ -1209,6 +1245,7 @@ export function MedicalRecordsPage({
                 <UltrasoundRequestsArea
                   recordId={record.id}
                   requests={record.ultrasoundRequests}
+                  procedureRequests={record.procedureRequests}
                   canCompose={enableExamRequests && composingRecordId === record.id}
                   onChanged={() => reload(selectedPatientId)}
                 />

@@ -369,7 +369,7 @@ const examRequestInclude = {
   requestedBy: { select: { id: true, fullName: true } },
 };
 const procedureRequestInclude = {
-  procedure: { select: { id: true, name: true, value: true } },
+  procedure: { select: { id: true, name: true, type: true, value: true } },
   requestedBy: { select: { id: true, fullName: true } },
 };
 const ultrasoundRequestInclude = {
@@ -1153,7 +1153,7 @@ app.get("/api/procedures/catalog", auth, doctorOnly, async (_req, res) => {
     await prisma.procedure.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, value: true },
+      select: { id: true, name: true, type: true, value: true },
     }),
   );
 });
