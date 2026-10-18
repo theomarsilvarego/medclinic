@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ClipboardList, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { ModuleKey, Profile, Row } from '../lib/app';
 import { getRowId, request } from '../lib/app';
+import { getStateFromPhone } from '../lib/brazilian-ddd';
 import { configs } from '../lib/configs';
 import { Modal } from './Modal';
 
@@ -44,6 +45,17 @@ export function CrudPage({ module, profile, onOpenPatientRecords }: CrudPageProp
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const visibleRows = isPatients ? filteredRows.slice((page - 1) * pageSize, page * pageSize) : rows;
   const doctorCanOpenRecords = isPatients && profile === 'MEDICO' && onOpenPatientRecords;
+  const renderCell = (row: Row, column: (typeof config.columns)[number]) => {
+    if (isPatients && column.key === 'state') {
+      const state = getStateFromPhone(row.phone);
+      return state ? <span className="state-badge" style={{ backgroundColor: state.color }} title={`Identificado pelo DDD (${state.ddd})`}>{state.name} ({state.uf})</span> : <span className="state-badge state-badge-unknown" title="O celular não contém um DDD reconhecido entre parênteses.">Não identificado</span>;
+    }
+    if (column.key === 'fullName' && doctorCanOpenRecords)
+      return <button className="patient-name-link" onClick={() => onOpenPatientRecords?.(Number(row.id))}>{row.fullName}</button>;
+    if (column.key === 'active')
+      return <span className={row[column.key] ? 'status active' : 'status'}>{column.format?.(row[column.key])}</span>;
+    return column.format ? column.format(row[column.key]) : row[column.key];
+  };
 
   async function save(data: Row) {
     try {
@@ -67,7 +79,7 @@ export function CrudPage({ module, profile, onOpenPatientRecords }: CrudPageProp
     <div className="table-card">
       {isPatients && <div className="patient-list-toolbar"><label><Search size={16}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pesquisar por nome ou CPF…"/></label><span>{filteredRows.length} paciente{filteredRows.length === 1 ? '' : 's'}</span></div>}
       <div className="table-head"><strong>{isPatients ? `${visibleRows.length} de ${filteredRows.length} paciente${filteredRows.length === 1 ? '' : 's'}` : `${rows.length} cadastro${rows.length === 1 ? '' : 's'}`}</strong><span className="muted">Última atualização agora</span></div>
-      {loading ? <div className="empty">Carregando…</div> : visibleRows.length === 0 ? <div className="empty"><ClipboardList size={28}/><strong>{search ? 'Nenhum paciente encontrado' : 'Nenhum cadastro ainda'}</strong><span>{search ? 'Tente pesquisar por outro nome ou CPF.' : 'Adicione o primeiro registro usando o botão acima.'}</span></div> : <div className="table-scroll"><table><thead><tr>{config.columns.map(c => <th key={c.key}>{c.key === 'fullName' && doctorCanOpenRecords ? 'Nome / prontuário' : c.label}</th>)}<th>Ações</th></tr></thead><tbody>{visibleRows.map(row => <tr key={row.id}>{config.columns.map(c => <td key={c.key}>{c.key === 'fullName' && doctorCanOpenRecords ? <button className="patient-name-link" onClick={() => onOpenPatientRecords?.(Number(row.id))}>{row.fullName}</button> : c.key === 'active' ? <span className={row[c.key] ? 'status active' : 'status'}>{c.format?.(row[c.key])}</span> : c.format ? c.format(row[c.key]) : row[c.key]}</td>)}<td className="row-actions">{doctorCanOpenRecords && <button className="record-link-button" onClick={() => onOpenPatientRecords?.(Number(row.id))} title="Abrir prontuário"><FileText size={16}/></button>}<button onClick={() => { setEditing(row); setModalOpen(true); }} title="Editar"><Pencil size={16}/></button><button onClick={() => remove(row.id)} title="Excluir"><Trash2 size={16}/></button></td></tr>)}</tbody></table></div>}
+      {loading ? <div className="empty">Carregando…</div> : visibleRows.length === 0 ? <div className="empty"><ClipboardList size={28}/><strong>{search ? 'Nenhum paciente encontrado' : 'Nenhum cadastro ainda'}</strong><span>{search ? 'Tente pesquisar por outro nome ou CPF.' : 'Adicione o primeiro registro usando o botão acima.'}</span></div> : <div className="table-scroll"><table><thead><tr>{config.columns.map(c => <th key={c.key}>{c.key === 'fullName' && doctorCanOpenRecords ? 'Nome / prontuário' : c.label}</th>)}<th>Ações</th></tr></thead><tbody>{visibleRows.map(row => <tr key={row.id}>{config.columns.map(c => <td key={c.key}>{renderCell(row, c)}</td>)}<td className="row-actions">{doctorCanOpenRecords && <button className="record-link-button" onClick={() => onOpenPatientRecords?.(Number(row.id))} title="Abrir prontuário"><FileText size={16}/></button>}<button onClick={() => { setEditing(row); setModalOpen(true); }} title="Editar"><Pencil size={16}/></button><button onClick={() => remove(row.id)} title="Excluir"><Trash2 size={16}/></button></td></tr>)}</tbody></table></div>}
       {isPatients && !loading && filteredRows.length > 0 && <div className="pagination-bar"><span>Linhas por página</span><select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{pageSizes.map(size => <option value={size} key={size}>{size}</option>)}</select><span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredRows.length)} de {filteredRows.length}</span><button disabled={page <= 1} onClick={() => setPage(current => current - 1)}>Anterior</button><button disabled={page >= totalPages} onClick={() => setPage(current => current + 1)}>Próxima</button></div>}
     </div>
     {modalOpen && <Modal title={`${editing?.id ? 'Editar' : 'Novo'} ${config.title === 'Clínica' ? 'cadastro' : config.title.slice(0, -1)}`} fields={fields} initial={editing || { active: true }} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={save}/>}

@@ -703,6 +703,22 @@ th {
 td {
   color: #55494e;
 }
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 220px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+}
+.state-badge-unknown {
+  background: #e8e4e5;
+  color: #62585b;
+}
 tr:hover td {
   background: #fffafb;
 }
