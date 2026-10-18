@@ -2114,31 +2114,30 @@ tr:last-child td {
 .row-actions .whatsapp-link-button {
   position: relative;
   display: inline-grid;
-  width: 29px;
-  height: 29px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   margin: 0 2px;
   padding: 0;
-  border-radius: 8px;
-  background: #25d366;
-  color: #fff;
+  border-radius: 7px;
+  background: transparent;
   vertical-align: middle;
 }
 .row-actions .whatsapp-link-button:hover {
-  background: #1eae54;
-  color: #fff;
+  background: transparent;
+  transform: scale(1.06);
 }
-.whatsapp-phone-icon {
-  position: absolute;
-  right: 5px;
-  bottom: 6px;
-  fill: #25d366;
-  stroke-width: 3px;
+.whatsapp-link-button img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 .row-actions .whatsapp-disabled,
 .row-actions .whatsapp-disabled:hover {
-  background: #ded9db;
-  color: #91878a;
+  background: transparent;
+  filter: grayscale(1);
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .pagination-bar {
