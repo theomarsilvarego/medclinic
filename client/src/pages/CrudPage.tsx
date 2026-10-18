@@ -45,7 +45,20 @@ export function CrudPage({ module, profile, onOpenPatientRecords }: CrudPageProp
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const visibleRows = isPatients ? filteredRows.slice((page - 1) * pageSize, page * pageSize) : rows;
   const doctorCanOpenRecords = isPatients && profile === 'MEDICO' && onOpenPatientRecords;
+  const insuranceColors = useMemo(() => {
+    const names = Array.from(new Set(rows.map(row => String(row.insuranceName || '').trim()).filter(Boolean)))
+      .sort((left, right) => left.localeCompare(right, 'pt-BR'));
+    return new Map(names.map((name, index) => [
+      name.toLocaleLowerCase('pt-BR'),
+      `hsl(${Math.round((index * 360) / names.length)} 68% 34%)`,
+    ]));
+  }, [rows]);
   const renderCell = (row: Row, column: (typeof config.columns)[number]) => {
+    if (isPatients && column.key === 'insuranceName') {
+      const insuranceName = String(row.insuranceName || '').trim();
+      const color = insuranceName ? insuranceColors.get(insuranceName.toLocaleLowerCase('pt-BR')) : undefined;
+      return insuranceName ? <span className="insurance-badge" style={{ backgroundColor: color }} title={`Convênio: ${insuranceName}`}>{insuranceName}</span> : <span className="insurance-badge insurance-badge-unknown">Sem convênio</span>;
+    }
     if (isPatients && column.key === 'state') {
       const state = getStateFromPhone(row.phone);
       return state ? <span className="state-badge" style={{ backgroundColor: state.color }} title={`Identificado pelo DDD (${state.ddd})`}>{state.name} ({state.uf})</span> : <span className="state-badge state-badge-unknown" title="O celular não contém um DDD reconhecido entre parênteses.">Não identificado</span>;

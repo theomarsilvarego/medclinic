@@ -703,7 +703,8 @@ th {
 td {
   color: #55494e;
 }
-.state-badge {
+.state-badge,
+.insurance-badge {
   display: inline-flex;
   align-items: center;
   max-width: 220px;
@@ -715,7 +716,8 @@ td {
   line-height: 1.35;
   white-space: normal;
 }
-.state-badge-unknown {
+.state-badge-unknown,
+.insurance-badge-unknown {
   background: #e8e4e5;
   color: #62585b;
 }
