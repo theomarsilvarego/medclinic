@@ -2033,6 +2033,13 @@ tr:last-child td {
   border-bottom: 1px solid var(--line);
   background: #fffdfc;
 }
+.patient-list-controls {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 .patient-list-toolbar label {
   display: flex;
   align-items: center;
@@ -2043,6 +2050,34 @@ tr:last-child td {
   background: #fff;
   padding: 10px 12px;
   color: #a18f96;
+}
+.patient-list-toolbar .patient-search {
+  flex: 1 1 300px;
+  width: auto;
+  max-width: 430px;
+}
+.patient-list-toolbar .patient-filter {
+  display: flex;
+  flex: 0 1 190px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: auto;
+  min-width: 145px;
+  padding: 6px 9px;
+  color: #8e7c83;
+  font-size: 9px;
+  font-weight: 800;
+}
+.patient-filter select {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  padding: 1px 15px 1px 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
 }
 .patient-list-toolbar input {
   border: 0;
@@ -2075,6 +2110,36 @@ tr:last-child td {
 }
 .record-link-button:hover {
   background: #ead2d9 !important;
+}
+.row-actions .whatsapp-link-button {
+  position: relative;
+  display: inline-grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  margin: 0 2px;
+  padding: 0;
+  border-radius: 8px;
+  background: #25d366;
+  color: #fff;
+  vertical-align: middle;
+}
+.row-actions .whatsapp-link-button:hover {
+  background: #1eae54;
+  color: #fff;
+}
+.whatsapp-phone-icon {
+  position: absolute;
+  right: 5px;
+  bottom: 6px;
+  fill: #25d366;
+  stroke-width: 3px;
+}
+.row-actions .whatsapp-disabled,
+.row-actions .whatsapp-disabled:hover {
+  background: #ded9db;
+  color: #91878a;
+  cursor: not-allowed;
 }
 .pagination-bar {
   display: flex;
@@ -2117,8 +2182,21 @@ tr:last-child td {
     gap: 9px;
     padding: 13px 15px;
   }
+  .patient-list-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .patient-list-toolbar label {
     width: 100%;
+  }
+  .patient-list-toolbar .patient-search,
+  .patient-list-toolbar .patient-filter {
+    flex: 1 1 auto;
+    max-width: none;
+    width: 100%;
+  }
+  .patient-list-toolbar > span {
+    align-self: flex-end;
   }
   .pagination-bar {
     justify-content: space-between;
