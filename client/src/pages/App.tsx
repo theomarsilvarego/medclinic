@@ -25,6 +25,7 @@ import { DoctorAgendaPage } from "./DoctorAgendaPage";
 import { MedicalRecordsPage } from "./MedicalRecordsPage";
 import { ExamGroupsPage } from "./ExamGroupsPage";
 import { CertificateSettingsPage } from "./CertificateSettingsPage";
+import { ReportsPage } from "./ReportsPage";
 
 export function App() {
   const [user, setUser] = useState<any>(null);
@@ -167,6 +168,12 @@ export function App() {
         <main className="main">
           {module === "overview" ? (
             <Dashboard setModule={setModule} user={user} />
+          ) : module === "reports" ? (
+            user.profile === "ADMINISTRADOR" ? (
+              <ReportsPage />
+            ) : (
+              <Dashboard setModule={setModule} user={user} />
+            )
           ) : module === "certificates" ? (
             user.profile === "ADMINISTRADOR" ? (
               <CertificateSettingsPage />

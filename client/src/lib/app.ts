@@ -1,5 +1,5 @@
 export type Profile = 'ADMINISTRADOR' | 'MEDICO' | 'SECRETARIA';
-export type ModuleKey = 'overview' | 'doctor-day' | 'medical-records' | 'exam-groups' | 'patients' | 'users' | 'clinic' | 'doctors' | 'insurances' | 'procedures' | 'attendances' | 'injectables' | 'suppliers' | 'exam-types' | 'certificates' | 'appointments';
+export type ModuleKey = 'overview' | 'doctor-day' | 'medical-records' | 'exam-groups' | 'patients' | 'users' | 'clinic' | 'doctors' | 'insurances' | 'procedures' | 'attendances' | 'injectables' | 'suppliers' | 'exam-types' | 'certificates' | 'appointments' | 'reports';
 export type Row = Record<string, any>;
 const API_HOST = window.location.hostname;
 
