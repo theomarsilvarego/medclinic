@@ -268,6 +268,7 @@ textarea:focus-visible {
     transform 0.25s ease;
   position: relative;
   z-index: 10;
+  overflow-y: auto;
 }
 .sidebar.collapsed {
   width: 82px;
@@ -278,9 +279,11 @@ textarea:focus-visible {
   padding-right: 0;
 }
 .sidebar.collapsed .brand-copy,
-.sidebar.collapsed .nav-caption,
 .sidebar.collapsed .nav-item {
   font-size: 0;
+}
+.sidebar.collapsed .nav-caption {
+  display: none;
 }
 .sidebar.collapsed .nav-item {
   justify-content: center;
@@ -319,13 +322,20 @@ textarea:focus-visible {
   margin-bottom: 27px;
 }
 .nav-caption {
-  font-size: 10px;
-  letter-spacing: 0.13em;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
   color: #b98694;
   font-weight: 800;
-  padding: 0 13px 10px;
-  display: block;
-  white-space: nowrap;
+  padding: 0 10px 11px;
+  line-height: 1.35;
+  white-space: normal;
+}
+.nav-caption svg {
+  flex: none;
+  margin-top: 1px;
 }
 .nav-item {
   display: flex;
@@ -346,6 +356,12 @@ textarea:focus-visible {
 .nav-item:hover {
   background: #5b2539;
   color: #fff;
+}
+.nav-item-disabled,
+.nav-item-disabled:hover {
+  color: #b18c99;
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .nav-item.active {
   background: #f3e4e8;

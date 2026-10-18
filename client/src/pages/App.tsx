@@ -15,7 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import type { ModuleKey } from "../lib/app";
-import { canAccessModule, modules } from "../lib/modules";
+import { canAccessModule, menuGroups, modules } from "../lib/modules";
 import { profileLabel, request } from "../lib/app";
 import { Login } from "./Login";
 import { Dashboard } from "./Dashboard";
@@ -77,35 +77,47 @@ export function App() {
             <Activity size={18} /> Dashboard
           </button>
         </div>
-        <div className="nav-group">
-          <span className="nav-caption">
-            {user.profile === "ADMINISTRADOR"
-              ? "GESTÃO CLÍNICA"
-              : user.profile === "MEDICO"
-                ? "ÁREA MÉDICA"
-                : "ATENDIMENTO"}
-          </span>
-          {modules
-            .filter((item) => canAccessModule(user.profile, item.key))
-            .map((item) => (
-              <button
-                key={item.key}
-                className={module === item.key ? "nav-item active" : "nav-item"}
-                onClick={() => {
-                  setModule(item.key);
-                  if (item.key === "medical-records") {
-                    setRecordPatientId(null);
-                    setRecordAppointmentId(null);
-                    setAllowNewRecord(false);
-                  }
-                  setMobileMenu(false);
-                }}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
-        </div>
+        {menuGroups.map((group) => {
+          const groupModules = group.keys
+            .map((key) => modules.find((item) => item.key === key))
+            .filter((item) => item && canAccessModule(user.profile, item.key));
+          if (!groupModules.length) return null;
+          return (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-caption">{group.icon}{group.label}</span>
+              {group.plannedItems?.map((item) => (
+                <button
+                  className="nav-item nav-item-disabled"
+                  key={item.label}
+                  type="button"
+                  disabled
+                  title={`${item.label}: módulo ainda não disponível`}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+              {groupModules.map((item) => item && (
+                <button
+                  key={item.key}
+                  className={module === item.key ? "nav-item active" : "nav-item"}
+                  onClick={() => {
+                    setModule(item.key);
+                    if (item.key === "medical-records") {
+                      setRecordPatientId(null);
+                      setRecordAppointmentId(null);
+                      setAllowNewRecord(false);
+                    }
+                    setMobileMenu(false);
+                  }}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          );
+        })}
         <div className="sidebar-footer">
           <button
             className="collapse-button"
