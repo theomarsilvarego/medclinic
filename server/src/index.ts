@@ -400,6 +400,24 @@ async function persistAppointmentAttachments(
     });
   }
 }
+async function ensureAppointmentMedicalRecord(
+  appointmentId: number,
+  patientId: number,
+  appointmentDate: Date,
+  authorId: number,
+) {
+  const recordDate = new Date(`${appointmentDate.toISOString().slice(0, 10)}T00:00:00.000Z`);
+  const existing = await prisma.medicalRecord.findFirst({ where: { appointmentId }, select: { id: true } });
+  if (existing) {
+    await prisma.medicalRecord.update({ where: { id: existing.id }, data: { recordDate } });
+    return existing.id;
+  }
+  const created = await prisma.medicalRecord.create({
+    data: { patientId, authorId, appointmentId, recordDate, title: "Agendamento", conduct: null },
+    select: { id: true },
+  });
+  return created.id;
+}
 
 const medicalRecordSchema = z.object({
   patientId: z.coerce.number().int().positive(),
@@ -1813,6 +1831,12 @@ app.post("/api/appointments", auth, appointmentManage, appointmentAttachmentUplo
     await validateAppointmentInsurance(parsed.data);
     const data = appointmentData(parsed.data);
     const appointment = await prisma.appointment.create({ data, include: appointmentInclude });
+    await ensureAppointmentMedicalRecord(
+      appointment.id,
+      appointment.patientId,
+      appointment.appointmentDate,
+      req.user!.id,
+    );
     await persistAppointmentAttachments(
       appointment.id,
       appointment.patientId,
@@ -1841,6 +1865,12 @@ app.put("/api/appointments/:id", auth, appointmentManage, appointmentAttachmentU
     await validateAppointmentInsurance(parsed.data);
     const data = appointmentData(parsed.data);
     const appointment = await prisma.appointment.update({ where: { id }, data, include: appointmentInclude });
+    await ensureAppointmentMedicalRecord(
+      appointment.id,
+      appointment.patientId,
+      appointment.appointmentDate,
+      req.user!.id,
+    );
     await persistAppointmentAttachments(
       appointment.id,
       appointment.patientId,
