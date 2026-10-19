@@ -46,7 +46,7 @@ export function AppointmentModal({
           </button>
         </div>
         <div className="modal-fields">
-          <label>
+          <label className="appointment-patient-field">
             Paciente
             <div className="appointment-patient-picker">
               <input

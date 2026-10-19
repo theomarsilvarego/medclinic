@@ -962,6 +962,9 @@ tr:last-child td {
 .appointment-patient-search {
   margin-bottom: 8px;
 }
+.appointment-modal .appointment-patient-field {
+  grid-column: 1 / -1;
+}
 .appointment-patient-picker {
   position: relative;
 }
