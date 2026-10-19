@@ -19,6 +19,7 @@ export const configs: Record<
       key: string;
       label: string;
       type?: string;
+      fullWidth?: boolean;
       options?: (string | { value: string; label: string })[];
     }[];
     columns: { key: string; label: string; format?: (v: any) => string }[];
@@ -81,7 +82,7 @@ export const configs: Record<
         type: "select",
         options: [],
       },
-      { key: "notes", label: "Observação", type: "textarea" },
+      { key: "notes", label: "Observação", type: "textarea", fullWidth: true },
     ],
     columns: [
       { key: "sourceCode", label: "Código" },

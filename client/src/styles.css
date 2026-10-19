@@ -952,6 +952,9 @@ tr:last-child td {
 .modal-fields label {
   font-size: 12px;
 }
+.modal-fields label.modal-field-full-width {
+  grid-column: 1 / -1;
+}
 .modal-fields label:has(select),
 .modal-fields label:has(input[type="password"]) {
   grid-column: span 1;
