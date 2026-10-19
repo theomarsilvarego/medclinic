@@ -1863,6 +1863,15 @@ app.get("/api/appointment-attachments/file", auth, appointmentAccess, async (req
     return res.status(404).json({ message: "Anexo não encontrado." });
   res.type(attachment.mimeType).download(filePath, attachment.fileName);
 });
+app.delete("/api/appointment-attachments/:id", auth, appointmentManage, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const attachment = await prisma.appointmentAttachment.findUnique({ where: { id } });
+  if (!attachment) return res.status(404).json({ message: "Anexo não encontrado." });
+  await prisma.appointmentAttachment.delete({ where: { id } });
+  await fs.promises.unlink(path.resolve(attachmentRoot, attachment.storageKey)).catch(() => undefined);
+  res.status(204).send();
+});
 
 app.use("/api/admin", auth, adminOnly);
 

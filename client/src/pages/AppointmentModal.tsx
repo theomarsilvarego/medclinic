@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { FileText, X } from "lucide-react";
+import { Eye, FileImage, FileText, Plus, Upload, X } from "lucide-react";
 import type { Row } from "../lib/app";
-import { money } from "../lib/app";
+import { API, money, request } from "../lib/app";
 export function AppointmentModal({
   initial,
   meta,
@@ -18,6 +18,8 @@ export function AppointmentModal({
   const [patientSearch, setPatientSearch] = useState("");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [savedAttachments, setSavedAttachments] = useState<Row[]>(initial.attachments || []);
+  const [dragging, setDragging] = useState(false);
   const update = (key: string, value: any) =>
     setData({ ...data, [key]: value });
   const itemType = data.itemType || "ATENDIMENTO";
@@ -46,6 +48,25 @@ export function AppointmentModal({
       return;
     }
     setAttachmentFiles(current => [...current, ...incoming].slice(0, 10));
+  };
+  const fileSize = (bytes: number) => bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  const iconFor = (mime: string) => mime.startsWith("image/") ? <FileImage size={18} /> : <FileText size={18} />;
+  const viewAttachment = async (attachment: Row) => {
+    const response = await fetch(`${API}${attachment.url}`, { headers: { Authorization: `Bearer ${localStorage.getItem("medclinic_token") || ""}` } });
+    if (!response.ok) return;
+    const blobUrl = URL.createObjectURL(await response.blob());
+    window.open(blobUrl, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  };
+  const removeSavedAttachment = async (attachment: Row) => {
+    if (!confirm(`Remover o anexo "${attachment.fileName}"?`)) return;
+    try {
+      await request(`/appointment-attachments/${attachment.id}`, { method: "DELETE" });
+      setSavedAttachments(current => current.filter(item => item.id !== attachment.id));
+    } catch (error: any) { alert(error.message); }
+  };
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault(); setDragging(false); addAttachments(event.dataTransfer.files);
   };
   return (
     <div className="modal-backdrop">
@@ -216,10 +237,10 @@ export function AppointmentModal({
             />
           </label>
           <label className="wide appointment-attachments-field">
-            Anexos do agendamento
-            <input type="file" multiple accept="application/pdf,image/jpeg,image/png" onChange={e => addAttachments(e.target.files)} />
-            <small>PDF, JPG ou PNG · até 10 MB por arquivo · máximo de 10 arquivos.</small>
-            {attachmentFiles.length > 0 && <div className="appointment-attachment-list">{attachmentFiles.map((file, index) => <div className="appointment-attachment-chip" key={`${file.name}-${index}`}><FileText size={15} /><span>{file.name}</span><button type="button" onClick={() => setAttachmentFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} aria-label={`Remover ${file.name}`}><X size={14} /></button></div>)}</div>}
+            <span className="appointment-attachments-title">Anexos <b>{savedAttachments.length + attachmentFiles.length}</b></span>
+            {savedAttachments.length + attachmentFiles.length > 0 && <div className="appointment-attachment-list">{savedAttachments.map(attachment => <div className="appointment-attachment-chip" key={`saved-${attachment.id}`}><button type="button" className="appointment-attachment-main" onClick={() => viewAttachment(attachment)}>{iconFor(attachment.mimeType)}<span><strong>{attachment.fileName}</strong><small>{fileSize(attachment.sizeBytes)} · {attachment.uploadedBy?.fullName || "Usuário"} · {new Date(attachment.uploadedAt).toLocaleDateString("pt-BR")}</small></span></button><button type="button" className="appointment-attachment-view" onClick={() => viewAttachment(attachment)} title="Visualizar"><Eye size={16} /></button><button type="button" className="appointment-attachment-remove" onClick={() => removeSavedAttachment(attachment)} title="Remover"><X size={16} /></button></div>)}{attachmentFiles.map((file, index) => <div className="appointment-attachment-chip" key={`new-${file.name}-${index}`}><button type="button" className="appointment-attachment-main"><FileText size={18} /><span><strong>{file.name}</strong><small>Novo anexo · {fileSize(file.size)}</small></span></button><button type="button" className="appointment-attachment-remove" onClick={() => setAttachmentFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} title="Remover"><X size={16} /></button></div>)}</div>}
+            <div className={`appointment-attachment-dropzone ${dragging ? "dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={handleDrop}><span>Arraste arquivos aqui ou</span><button type="button" className="appointment-attachment-upload-button" onClick={event => { event.preventDefault(); (event.currentTarget.nextElementSibling as HTMLInputElement)?.click(); }}><Upload size={16} /> Anexar arquivo</button><input className="appointment-hidden-file-input" type="file" multiple accept="application/pdf,image/jpeg,image/png" onChange={e => addAttachments(e.target.files)} /></div>
+            <small>PDF, JPG ou PNG, até 10 MB por arquivo. Cada anexo registra quem enviou e quando.</small>
           </label>
         </div>
         <div className="modal-footer">
