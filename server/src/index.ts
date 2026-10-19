@@ -176,6 +176,11 @@ function appointmentManage(
     });
   next();
 }
+function appointmentAttachmentManage(req: AuthRequest, res: Response, next: NextFunction) {
+  if (![Profile.ADMINISTRADOR, Profile.SECRETARIA, Profile.MEDICO].includes(req.user?.profile as Profile))
+    return res.status(403).json({ message: "Perfil sem permissão para alterar anexos." });
+  next();
+}
 
 function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
   if (req.user?.profile !== Profile.MEDICO)
@@ -432,7 +437,16 @@ const medicalRecordInclude = {
   patient: { select: { id: true, fullName: true, phone: true, cpf: true } },
   author: { select: { id: true, fullName: true } },
   appointment: {
-    select: { id: true, scheduledTime: true, appointmentDate: true },
+    select: {
+      id: true,
+      scheduledTime: true,
+      appointmentDate: true,
+      notes: true,
+      attachments: {
+        orderBy: { uploadedAt: "asc" as const },
+        include: { uploadedBy: { select: { id: true, fullName: true } } },
+      },
+    },
   },
   attachments: {
     orderBy: { uploadedAt: "asc" as const },
@@ -1863,7 +1877,7 @@ app.get("/api/appointment-attachments/file", auth, appointmentAccess, async (req
     return res.status(404).json({ message: "Anexo não encontrado." });
   res.type(attachment.mimeType).download(filePath, attachment.fileName);
 });
-app.delete("/api/appointment-attachments/:id", auth, appointmentManage, async (req, res) => {
+app.delete("/api/appointment-attachments/:id", auth, appointmentAttachmentManage, async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;
   const attachment = await prisma.appointmentAttachment.findUnique({ where: { id } });
@@ -1871,6 +1885,21 @@ app.delete("/api/appointment-attachments/:id", auth, appointmentManage, async (r
   await prisma.appointmentAttachment.delete({ where: { id } });
   await fs.promises.unlink(path.resolve(attachmentRoot, attachment.storageKey)).catch(() => undefined);
   res.status(204).send();
+});
+app.patch("/api/appointments/:id/clinical", auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const notes = typeof req.body?.notes === "string" ? req.body.notes : null;
+  if (notes === null) return res.status(400).json({ message: "Observação inválida." });
+  res.json(await prisma.appointment.update({ where: { id }, data: { notes }, include: appointmentInclude }));
+});
+app.post("/api/appointments/:id/attachments", auth, doctorOnly, appointmentAttachmentUpload.array("files", 10), async (req: AuthRequest, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const appointment = await prisma.appointment.findUnique({ where: { id }, select: { id: true, patientId: true } });
+  if (!appointment) return res.status(404).json({ message: "Agendamento não encontrado." });
+  await persistAppointmentAttachments(appointment.id, appointment.patientId, (req.files as Express.Multer.File[]) || [], req.user!.id);
+  res.json(await prisma.appointment.findUnique({ where: { id }, include: appointmentInclude }));
 });
 
 app.use("/api/admin", auth, adminOnly);
