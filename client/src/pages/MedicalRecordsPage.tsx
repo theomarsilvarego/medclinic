@@ -238,7 +238,7 @@ function AttachmentsArea({
   );
 }
 
-function AppointmentClinicalArea({ appointment, onChanged }: { appointment?: Row; onChanged: () => Promise<void> }) {
+function AppointmentClinicalArea({ appointment, eventLabel, onChanged }: { appointment?: Row; eventLabel?: string; onChanged: () => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const [notes, setNotes] = useState(String(appointment?.notes || ""));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -263,9 +263,14 @@ function AppointmentClinicalArea({ appointment, onChanged }: { appointment?: Row
     window.open(URL.createObjectURL(await response.blob()), "_blank", "noopener,noreferrer");
   }
   return <section className="appointment-clinical-area">
-    <div className="appointment-clinical-heading"><strong>Dados do agendamento</strong><button onClick={() => setEditing(value => !value)}><Pencil size={14} /> {editing ? "Cancelar" : "Editar"}</button></div>
-    <div className="appointment-observation"><span>Observação do agendamento</span>{editing ? <><textarea value={notes} onChange={event => setNotes(event.target.value)} rows={3} /><button className="primary appointment-save-note" onClick={() => void saveNotes()}>Salvar observação</button></> : <p>{notes.trim() || "Nenhuma observação registrada."}</p>}</div>
-    <div className="appointment-timeline-attachments"><div className="appointment-clinical-subheading"><strong>Anexos <b>{attachments.length}</b></strong></div>{attachments.length > 0 && <div className="attachment-chips">{attachments.map((attachment: Row) => <div className="attachment-chip" key={attachment.id}><button className="attachment-main" onClick={() => void view(attachment)}><span className="attachment-type">{fileIcon(attachment.mimeType)}</span><span className="attachment-info"><strong>{attachment.fileName}</strong><small>{fileSize(attachment.sizeBytes)} · {attachment.uploadedBy?.fullName || "Usuário"} · {new Date(attachment.uploadedAt).toLocaleDateString("pt-BR")}</small></span><Eye size={14} /></button><button className="attachment-remove" onClick={() => void request(`/appointment-attachments/${attachment.id}`, { method: "DELETE" }).then(onChanged)} title="Remover"><X size={13} /></button></div>)}</div>}<button className="appointment-timeline-upload" onClick={() => inputRef.current?.click()}><Upload size={14} /> Anexar arquivo</button><input ref={inputRef} hidden type="file" multiple accept="application/pdf,image/jpeg,image/png" onChange={event => void upload(event.target.files)} /></div>
+    <div className="appointment-clinical-heading">
+      <div><strong>Dados do agendamento</strong><small><CalendarDays size={13} /> {appointment.scheduledTime ? `${appointment.scheduledTime} · ` : ""}{eventLabel || (appointment.itemType === "PROCEDIMENTO" ? "Procedimento" : "Atendimento")}</small></div>
+      <button onClick={() => setEditing(value => !value)}><Pencil size={14} /> {editing ? "Cancelar" : "Editar"}</button>
+    </div>
+    <div className="appointment-clinical-body">
+      <div className="appointment-observation"><span>Observação do agendamento</span>{editing ? <><textarea value={notes} onChange={event => setNotes(event.target.value)} rows={3} /><button className="primary appointment-save-note" onClick={() => void saveNotes()}>Salvar observação</button></> : <p>{notes.trim() || "Nenhuma observação registrada."}</p>}</div>
+      <div className="appointment-timeline-attachments"><div className="appointment-clinical-subheading"><strong>Anexos <b>{attachments.length}</b></strong></div>{attachments.length > 0 && <div className="attachment-chips">{attachments.map((attachment: Row) => <div className="attachment-chip" key={attachment.id}><button className="attachment-main" onClick={() => void view(attachment)}><span className="attachment-type">{fileIcon(attachment.mimeType)}</span><span className="attachment-info"><strong>{attachment.fileName}</strong><small>{fileSize(attachment.sizeBytes)} · {attachment.uploadedBy?.fullName || "Usuário"} · {new Date(attachment.uploadedAt).toLocaleDateString("pt-BR")}</small></span><Eye size={14} /></button><button className="attachment-remove" onClick={() => void request(`/appointment-attachments/${attachment.id}`, { method: "DELETE" }).then(onChanged)} title="Remover"><X size={13} /></button></div>)}</div>}<button className="appointment-timeline-upload" onClick={() => inputRef.current?.click()}><Upload size={14} /> Anexar arquivo</button><input ref={inputRef} hidden type="file" multiple accept="application/pdf,image/jpeg,image/png" onChange={event => void upload(event.target.files)} /></div>
+    </div>
   </section>;
 }
 
@@ -1208,20 +1213,14 @@ export function MedicalRecordsPage({
                 <strong>{dateLabel(record.recordDate)}</strong>
                 <span />
               </div>
+              <div className="medical-timeline-content">
               <div className="medical-record-card">
                 <header>
                   <div>
                     <span>
-                      Por:{" "}
+                      Por: {" "}
                       <strong>{record.author?.fullName || "Médico"}</strong>
                     </span>
-                    <small>
-                      <CalendarDays size={13} />{" "}
-                      {record.appointment?.scheduledTime
-                        ? `${record.appointment.scheduledTime} · `
-                        : ""}
-                      {record.title}
-                    </small>
                   </div>
                   <div className="record-actions">
                     <button
@@ -1254,10 +1253,6 @@ export function MedicalRecordsPage({
                     ) : null,
                   )}
                 </div>
-                <AppointmentClinicalArea
-                  appointment={record.appointment}
-                  onChanged={() => reload(selectedPatientId)}
-                />
                 <ExamRequestsArea
                   recordId={record.id}
                   requests={record.examRequests}
@@ -1288,6 +1283,12 @@ export function MedicalRecordsPage({
                   attachments={record.attachments}
                   onChanged={() => reload(selectedPatientId)}
                 />
+              </div>
+              <AppointmentClinicalArea
+                appointment={record.appointment}
+                eventLabel={record.title}
+                onChanged={() => reload(selectedPatientId)}
+              />
               </div>
             </article>
           ))}
