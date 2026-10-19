@@ -1167,12 +1167,17 @@ tr:last-child td {
 .appointment-modal .modal-fields label:has(textarea) {
   grid-column: 1 / -1;
 }
+.appointment-modal .appointment-attachments-field,
+.appointment-modal .modal-fields label.wide {
+  grid-column: 1 / -1;
+  width: 100%;
+}
 .appointment-attachments-field { margin-top: 3px; }
 .appointment-attachments-title { display: flex; align-items: center; gap: 8px; font-weight: 800; color: #49363c; }
 .appointment-attachments-title b { min-width: 22px; padding: 3px 7px; border-radius: 999px; background: #f3e0e5; color: #93485e; text-align: center; font-size: 11px; }
 .appointment-attachments-field small { display: block; margin-top: 8px; color: #9c8b91; font-size: 11px; }
-.appointment-attachment-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
-.appointment-attachment-chip { display: flex; align-items: stretch; max-width: 360px; min-width: 250px; border: 1px solid #ead5da; border-radius: 10px; background: #fff; color: var(--brand); overflow: hidden; box-shadow: 0 2px 6px rgba(76,40,51,.04); }
+.appointment-attachment-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; margin: 12px 0; }
+.appointment-attachment-chip { display: flex; align-items: stretch; min-width: 0; width: 100%; border: 1px solid #ead5da; border-radius: 10px; background: #fff; color: var(--brand); overflow: hidden; box-shadow: 0 2px 6px rgba(76,40,51,.04); }
 .appointment-attachment-main { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 9px 10px; text-align: left; }
 .appointment-attachment-main > svg { flex: 0 0 auto; padding: 7px; box-sizing: content-box; border-radius: 7px; background: #f5e6e9; color: #963f59; }
 .appointment-attachment-main span { min-width: 0; }
@@ -1186,6 +1191,9 @@ tr:last-child td {
 .appointment-attachment-upload-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid #a85a70; border-radius: 8px; color: #8e3f57; background: #fff; font-weight: 800; }
 .appointment-attachment-upload-button:hover { background: #fff3f5; }
 .appointment-hidden-file-input { display: none !important; }
+@media (max-width: 620px) {
+  .appointment-attachment-list { grid-template-columns: 1fr; }
+}
 .agenda-card {
   overflow: auto;
 }
