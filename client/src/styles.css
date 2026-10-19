@@ -1961,25 +1961,25 @@ tr:last-child td {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 17px;
+  padding: 24px 28px 22px;
   border-bottom: 1px solid var(--line);
   color: var(--brand);
 }
+.clinical-patient-identity { display: flex; align-items: center; min-width: 0; }
 .clinical-patient-avatar {
-  width: 58px;
-  height: 58px;
-  flex: 0 0 58px;
-  margin-right: 15px;
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  margin-right: 22px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   overflow: hidden;
   color: var(--brand);
   background: #f6e7ea;
-  border: 2px solid #ead0d6;
+  border: 3px solid #ead0d6;
 }
 .clinical-patient-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.clinical-patient-heading > div:nth-child(2) { margin-right: auto; }
 .patient-photo-picker { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
 .patient-photo-preview { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; color: var(--brand); background: #f6e7ea; border: 1px solid #ead0d6; cursor: grab; touch-action: none; }
 .patient-photo-preview:active { cursor: grabbing; }
@@ -2002,20 +2002,21 @@ tr:last-child td {
 }
 .clinical-patient-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr 1.1fr 0.8fr;
-  gap: 0;
-  padding: 18px 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 18px 28px 22px;
+  background: #f0e6e7;
 }
 .clinical-patient-grid div {
-  padding: 0 18px;
-  border-right: 1px solid #f0e6e7;
+  min-height: 58px;
+  padding: 13px 18px;
+  background: #fffafa;
 }
 .clinical-patient-grid div:first-child {
-  padding-left: 0;
+  padding-left: 18px;
 }
 .clinical-patient-grid div:last-child {
-  border-right: 0;
-  padding-right: 0;
+  padding-right: 18px;
 }
 .clinical-patient-grid span {
   display: block;
@@ -2035,28 +2036,28 @@ tr:last-child td {
 @media (max-width: 1050px) {
   .clinical-patient-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 18px 0;
-  }
-  .clinical-patient-grid div:nth-child(3) {
-    border-right: 0;
-  }
-  .clinical-patient-grid div:nth-child(4) {
-    padding-left: 0;
+    padding-left: 20px;
+    padding-right: 20px;
   }
 }
 @media (max-width: 560px) {
   .clinical-patient-heading {
     padding: 17px;
   }
+  .clinical-patient-avatar {
+    width: 76px;
+    height: 76px;
+    flex-basis: 76px;
+    margin-right: 14px;
+  }
   .clinical-patient-grid {
     grid-template-columns: 1fr 1fr;
-    padding: 17px;
+    padding: 12px;
   }
   .clinical-patient-grid div,
   .clinical-patient-grid div:first-child,
   .clinical-patient-grid div:last-child {
-    padding: 0;
-    border-right: 0;
+    padding: 12px;
   }
   .clinical-patient-heading h2 {
     font-size: 17px;

@@ -1103,18 +1103,19 @@ export function MedicalRecordsPage({
       {selectedPatient && (
         <section className="clinical-patient-card">
           <div className="clinical-patient-heading">
-            <div className="clinical-patient-avatar">
-              {patientPhoto ? (
-                <img src={patientPhoto} alt={`Foto de ${selectedPatient.fullName}`} />
-              ) : (
-                <UserRound size={25} />
-              )}
+            <div className="clinical-patient-identity">
+              <div className="clinical-patient-avatar">
+                {patientPhoto ? (
+                  <img src={patientPhoto} alt={`Foto de ${selectedPatient.fullName}`} />
+                ) : (
+                  <UserRound size={32} />
+                )}
+              </div>
+              <div>
+                <span>FICHA CLÍNICA</span>
+                <h2>{selectedPatient.fullName}</h2>
+              </div>
             </div>
-            <div>
-              <span>FICHA CLÍNICA</span>
-              <h2>{selectedPatient.fullName}</h2>
-            </div>
-            {!patientPhoto && <UserRound className="clinical-patient-heading-icon" size={25} />}
           </div>
           <div className="clinical-patient-grid">
             <div>
