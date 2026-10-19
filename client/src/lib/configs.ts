@@ -50,6 +50,7 @@ export const configs: Record<
     basePath: "",
     title: "Pacientes",
     fields: [
+      { key: "photo", label: "Foto do paciente", type: "file", fullWidth: true },
       { key: "fullName", label: "Nome completo" },
       {
         key: "sex",
@@ -76,7 +77,6 @@ export const configs: Record<
       { key: "email", label: "E-mail" },
       { key: "phone", label: "Celular" },
       { key: "birthDate", label: "Data de nascimento", type: "date" },
-      { key: "photo", label: "Foto do paciente", type: "file", fullWidth: true },
       {
         key: "insuranceCode",
         label: "Convênio",
