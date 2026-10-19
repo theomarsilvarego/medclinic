@@ -1029,6 +1029,17 @@ export function MedicalRecordsPage({
     () => patients.find((patient) => Number(patient.id) === selectedPatientId),
     [patients, selectedPatientId],
   );
+  const [patientPhoto, setPatientPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    setPatientPhoto(null);
+    if (!selectedPatient?.photoUrl) return;
+    fetch(`${API}${selectedPatient.photoUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("medclinic_token") || ""}` } })
+      .then((response) => response.ok ? response.blob() : null)
+      .then((blob) => { if (blob) { objectUrl = URL.createObjectURL(blob); setPatientPhoto(objectUrl); } })
+      .catch(() => undefined);
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [selectedPatient?.photoUrl]);
   async function save(values: Row) {
     try {
       const payload = {
@@ -1093,8 +1104,8 @@ export function MedicalRecordsPage({
         <section className="clinical-patient-card">
           <div className="clinical-patient-heading">
             <div className="clinical-patient-avatar">
-              {selectedPatient.photoUrl ? (
-                <img src={`${API}${selectedPatient.photoUrl}`} alt={`Foto de ${selectedPatient.fullName}`} />
+              {patientPhoto ? (
+                <img src={patientPhoto} alt={`Foto de ${selectedPatient.fullName}`} />
               ) : (
                 <UserRound size={25} />
               )}
@@ -1103,7 +1114,7 @@ export function MedicalRecordsPage({
               <span>FICHA CLÍNICA</span>
               <h2>{selectedPatient.fullName}</h2>
             </div>
-            {!selectedPatient.photoUrl && <UserRound className="clinical-patient-heading-icon" size={25} />}
+            {!patientPhoto && <UserRound className="clinical-patient-heading-icon" size={25} />}
           </div>
           <div className="clinical-patient-grid">
             <div>

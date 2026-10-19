@@ -957,7 +957,8 @@ app.post("/api/patients", auth, patientPhotoUpload.single("photo"), async (req, 
   const patient = await prisma.patient.create({ data: parsed.data });
   if (req.file) {
     const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
-    const storageKey = `${patient.id}-${crypto.randomUUID()}${extension}`;
+    const storageKey = `${patient.id}/${crypto.randomUUID()}${extension}`;
+    await fs.promises.mkdir(path.join(patientPhotoRoot, String(patient.id)), { recursive: true });
     await fs.promises.writeFile(path.join(patientPhotoRoot, storageKey), req.file.buffer);
     return res.status(201).json(await prisma.patient.update({
       where: { id: patient.id },
@@ -993,8 +994,9 @@ app.put("/api/patients/:id", auth, patientPhotoUpload.single("photo"), async (re
   let oldPhoto: string | null = null;
   if (req.file) {
     const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
-    data.photoStorageKey = `${id}-${crypto.randomUUID()}${extension}`;
+    data.photoStorageKey = `${id}/${crypto.randomUUID()}${extension}`;
     oldPhoto = current?.photoStorageKey || null;
+    await fs.promises.mkdir(path.join(patientPhotoRoot, String(id)), { recursive: true });
     await fs.promises.writeFile(path.join(patientPhotoRoot, data.photoStorageKey), req.file.buffer);
   }
   const patient = await prisma.patient.update({ where: { id }, data });
