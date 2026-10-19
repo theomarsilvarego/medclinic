@@ -74,6 +74,15 @@ const attachmentUpload = multer({
     callback(null, true);
   },
 });
+const appointmentAttachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+  fileFilter: (_req, file, callback) => {
+    if (!allowedAttachments[file.mimetype])
+      return callback(new Error("Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG."));
+    callback(null, true);
+  },
+});
 const patientPhotoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
@@ -355,7 +364,37 @@ const appointmentInclude = {
   insurance: { select: { id: true, name: true } },
   attendance: { select: { id: true, name: true } },
   procedure: { select: { id: true, name: true } },
+  attachments: {
+    orderBy: { uploadedAt: "asc" as const },
+    include: { uploadedBy: { select: { id: true, fullName: true } } },
+  },
 };
+async function persistAppointmentAttachments(
+  appointmentId: number,
+  patientId: number,
+  files: Express.Multer.File[],
+  uploadedById: number,
+) {
+  if (!files.length) return;
+  const patientDirectory = path.join(attachmentRoot, String(patientId));
+  await fs.promises.mkdir(patientDirectory, { recursive: true });
+  for (const file of files) {
+    const storageKey = `${patientId}/${crypto.randomUUID()}${allowedAttachments[file.mimetype]}`;
+    await fs.promises.writeFile(path.resolve(attachmentRoot, storageKey), file.buffer);
+    await prisma.appointmentAttachment.create({
+      data: {
+        appointmentId,
+        patientId,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        storageKey,
+        url: `/appointment-attachments/file?key=${encodeURIComponent(storageKey)}`,
+        uploadedById,
+      },
+    });
+  }
+}
 
 const medicalRecordSchema = z.object({
   patientId: z.coerce.number().int().positive(),
@@ -1750,7 +1789,7 @@ app.patch("/api/appointments/:id/start", auth, doctorOnly, async (req, res) => {
     }),
   );
 });
-app.post("/api/appointments", auth, appointmentManage, async (req, res) => {
+app.post("/api/appointments", auth, appointmentManage, appointmentAttachmentUpload.array("files", 10), async (req: AuthRequest, res) => {
   const parsed = appointmentSchema.safeParse(req.body);
   if (!parsed.success)
     return res
@@ -1759,11 +1798,14 @@ app.post("/api/appointments", auth, appointmentManage, async (req, res) => {
   try {
     await validateAppointmentInsurance(parsed.data);
     const data = appointmentData(parsed.data);
-    res
-      .status(201)
-      .json(
-        await prisma.appointment.create({ data, include: appointmentInclude }),
-      );
+    const appointment = await prisma.appointment.create({ data, include: appointmentInclude });
+    await persistAppointmentAttachments(
+      appointment.id,
+      appointment.patientId,
+      (req.files as Express.Multer.File[]) || [],
+      req.user!.id,
+    );
+    res.status(201).json(await prisma.appointment.findUnique({ where: { id: appointment.id }, include: appointmentInclude }));
   } catch (err: any) {
     if (err?.code === "P2002")
       return res
@@ -1773,7 +1815,7 @@ app.post("/api/appointments", auth, appointmentManage, async (req, res) => {
     throw err;
   }
 });
-app.put("/api/appointments/:id", auth, appointmentManage, async (req, res) => {
+app.put("/api/appointments/:id", auth, appointmentManage, appointmentAttachmentUpload.array("files", 10), async (req: AuthRequest, res) => {
   const parsed = appointmentSchema.safeParse(req.body);
   if (!parsed.success)
     return res
@@ -1784,13 +1826,14 @@ app.put("/api/appointments/:id", auth, appointmentManage, async (req, res) => {
   try {
     await validateAppointmentInsurance(parsed.data);
     const data = appointmentData(parsed.data);
-    res.json(
-      await prisma.appointment.update({
-        where: { id },
-        data,
-        include: appointmentInclude,
-      }),
+    const appointment = await prisma.appointment.update({ where: { id }, data, include: appointmentInclude });
+    await persistAppointmentAttachments(
+      appointment.id,
+      appointment.patientId,
+      (req.files as Express.Multer.File[]) || [],
+      req.user!.id,
     );
+    res.json(await prisma.appointment.findUnique({ where: { id }, include: appointmentInclude }));
   } catch (err: any) {
     if (err?.code === "P2002")
       return res
@@ -1811,6 +1854,15 @@ app.delete(
     res.status(204).send();
   },
 );
+app.get("/api/appointment-attachments/file", auth, appointmentAccess, async (req, res) => {
+  const storageKey = String(req.query.key || "");
+  const attachment = await prisma.appointmentAttachment.findUnique({ where: { storageKey } });
+  if (!attachment) return res.status(404).json({ message: "Anexo não encontrado." });
+  const filePath = path.resolve(attachmentRoot, storageKey);
+  if (!filePath.startsWith(`${attachmentRoot}${path.sep}`) || !fs.existsSync(filePath))
+    return res.status(404).json({ message: "Anexo não encontrado." });
+  res.type(attachment.mimeType).download(filePath, attachment.fileName);
+});
 
 app.use("/api/admin", auth, adminOnly);
 

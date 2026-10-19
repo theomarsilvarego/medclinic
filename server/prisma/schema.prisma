@@ -29,6 +29,7 @@ model User {
   procedureRequests   ProcedureRequest[]       @relation("ProcedureRequestAuthor")
   ultrasoundRequests  UltrasoundRequest[]      @relation("UltrasoundRequestAuthor")
   uploadedCertificates DigitalCertificate[]    @relation("DigitalCertificateUploader")
+  appointmentAttachments AppointmentAttachment[] @relation("AppointmentAttachmentUploader")
 
   @@map("users")
 }
@@ -203,6 +204,7 @@ model Patient {
   injectableRequests    InjectableRequest[]
   procedureRequests     ProcedureRequest[]
   ultrasoundRequests    UltrasoundRequest[]
+  appointmentAttachments AppointmentAttachment[]
 
   @@index([fullName])
   @@index([cpf])
@@ -257,6 +259,7 @@ model Appointment {
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
   medicalRecords  MedicalRecord[]
+  attachments     AppointmentAttachment[]
 
   @@unique([doctorId, appointmentDate, scheduledTime])
   @@index([appointmentDate, scheduledTime])
@@ -399,6 +402,27 @@ model MedicalRecordAttachment {
   @@index([patientId])
   @@index([uploadedById])
   @@map("medical_record_attachments")
+}
+
+model AppointmentAttachment {
+  id              Int          @id @default(autoincrement())
+  appointmentId   Int          @map("appointment_id")
+  patientId       Int          @map("patient_id")
+  fileName        String       @map("file_name") @db.VarChar(255)
+  mimeType        String       @map("mime_type") @db.VarChar(100)
+  sizeBytes       Int          @map("size_bytes")
+  storageKey      String       @unique @map("storage_key") @db.VarChar(255)
+  url             String       @db.VarChar(255)
+  uploadedById    Int          @map("uploaded_by_id")
+  uploadedAt      DateTime     @default(now()) @map("uploaded_at")
+  appointment     Appointment  @relation(fields: [appointmentId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  patient         Patient      @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  uploadedBy      User         @relation("AppointmentAttachmentUploader", fields: [uploadedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([appointmentId])
+  @@index([patientId])
+  @@index([uploadedById])
+  @@map("appointment_attachments")
 }
 
 enum ProcedureRequestStatus {

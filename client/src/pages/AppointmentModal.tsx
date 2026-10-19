@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import type { Row } from "../lib/app";
 import { money } from "../lib/app";
 export function AppointmentModal({
@@ -17,6 +17,7 @@ export function AppointmentModal({
   const [data, setData] = useState<Row>({ ...initial });
   const [patientSearch, setPatientSearch] = useState("");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const update = (key: string, value: any) =>
     setData({ ...data, [key]: value });
   const itemType = data.itemType || "ATENDIMENTO";
@@ -33,6 +34,19 @@ export function AppointmentModal({
   const patientOptions = selectedPatient && !filteredPatients.some((patient: Row) => Number(patient.id) === Number(selectedPatient.id))
     ? [selectedPatient, ...filteredPatients]
     : filteredPatients;
+  const addAttachments = (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files);
+    if (incoming.some(file => !["application/pdf", "image/jpeg", "image/png"].includes(file.type))) {
+      alert("Envie apenas arquivos PDF, JPG ou PNG.");
+      return;
+    }
+    if (incoming.some(file => file.size > 10 * 1024 * 1024)) {
+      alert("Cada arquivo deve ter no máximo 10 MB.");
+      return;
+    }
+    setAttachmentFiles(current => [...current, ...incoming].slice(0, 10));
+  };
   return (
     <div className="modal-backdrop">
       <div className="modal appointment-modal">
@@ -201,12 +215,18 @@ export function AppointmentModal({
               onChange={(e) => update("notes", e.target.value)}
             />
           </label>
+          <label className="wide appointment-attachments-field">
+            Anexos do agendamento
+            <input type="file" multiple accept="application/pdf,image/jpeg,image/png" onChange={e => addAttachments(e.target.files)} />
+            <small>PDF, JPG ou PNG · até 10 MB por arquivo · máximo de 10 arquivos.</small>
+            {attachmentFiles.length > 0 && <div className="appointment-attachment-list">{attachmentFiles.map((file, index) => <div className="appointment-attachment-chip" key={`${file.name}-${index}`}><FileText size={15} /><span>{file.name}</span><button type="button" onClick={() => setAttachmentFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} aria-label={`Remover ${file.name}`}><X size={14} /></button></div>)}</div>}
+          </label>
         </div>
         <div className="modal-footer">
           <button className="secondary" onClick={onClose}>
             Cancelar
           </button>
-          <button className="primary" onClick={() => onSave(data)}>
+          <button className="primary" onClick={() => onSave({ ...data, attachmentFiles })}>
             Salvar agendamento
           </button>
         </div>

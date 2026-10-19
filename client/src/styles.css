@@ -1165,8 +1165,14 @@ tr:last-child td {
   grid-template-columns: 1fr 1fr;
 }
 .appointment-modal .modal-fields label:has(textarea) {
-  grid-column: 1/-1;
+  grid-column: 1 / -1;
 }
+.appointment-attachments-field input[type="file"] { margin-top: 8px; }
+.appointment-attachments-field small { display: block; margin-top: 5px; color: #9c8b91; }
+.appointment-attachment-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.appointment-attachment-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 7px 9px; border: 1px solid #ead5da; border-radius: 9px; background: #fff8f9; color: var(--brand); font-size: 12px; }
+.appointment-attachment-chip span { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appointment-attachment-chip button { display: grid; place-items: center; padding: 0; color: #a65c70; }
 .agenda-card {
   overflow: auto;
 }

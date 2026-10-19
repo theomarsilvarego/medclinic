@@ -1,0 +1,20 @@
+CREATE TABLE `appointment_attachments` (
+  `id` INTEGER NOT NULL AUTO_INCREMENT,
+  `appointment_id` INTEGER NOT NULL,
+  `patient_id` INTEGER NOT NULL,
+  `file_name` VARCHAR(255) NOT NULL,
+  `mime_type` VARCHAR(100) NOT NULL,
+  `size_bytes` INTEGER NOT NULL,
+  `storage_key` VARCHAR(255) NOT NULL,
+  `url` VARCHAR(255) NOT NULL,
+  `uploaded_by_id` INTEGER NOT NULL,
+  `uploaded_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `appointment_attachments_storage_key_key` (`storage_key`),
+  INDEX `appointment_attachments_appointment_id_idx` (`appointment_id`),
+  INDEX `appointment_attachments_patient_id_idx` (`patient_id`),
+  INDEX `appointment_attachments_uploaded_by_id_idx` (`uploaded_by_id`),
+  CONSTRAINT `appointment_attachments_appointment_id_fkey` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `appointment_attachments_patient_id_fkey` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `appointment_attachments_uploaded_by_id_fkey` FOREIGN KEY (`uploaded_by_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
