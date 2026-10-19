@@ -233,9 +233,20 @@ export function CrudPage({
         return;
       }
       const payload = editingId ? { ...data, id: editingId } : data;
+      const body = isPatients
+        ? (() => {
+            const form = new FormData();
+            Object.entries(payload).forEach(([key, value]) => {
+              if (key === "photoUrl" || key === "photo" || value === undefined || value === null) return;
+              form.append(key, String(value));
+            });
+            if (payload.photo instanceof File) form.append("photo", payload.photo);
+            return form;
+          })()
+        : JSON.stringify(payload);
       await request(
         `${config.basePath === "" ? "" : "/admin"}/${config.path}${editingId ? `/${editingId}` : ""}`,
-        { method: editingId ? "PUT" : "POST", body: JSON.stringify(payload) },
+        { method: editingId ? "PUT" : "POST", body },
       );
       setEditing(null);
       setModalOpen(false);

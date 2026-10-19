@@ -46,6 +46,11 @@ const attachmentRoot = path.resolve(
     path.join(process.cwd(), "uploads", "medical-records"),
 );
 fs.mkdirSync(attachmentRoot, { recursive: true });
+const patientPhotoRoot = path.resolve(
+  process.env.PATIENT_PHOTO_UPLOAD_DIR ||
+    path.join(process.cwd(), "uploads", "patient-photos"),
+);
+fs.mkdirSync(patientPhotoRoot, { recursive: true });
 const examRequestPdfRoot = path.resolve(
   process.env.EXAM_REQUEST_PDF_DIR ||
     path.join(process.cwd(), "uploads", "exam-requests"),
@@ -66,6 +71,15 @@ const attachmentUpload = multer({
           "Tipo de arquivo não permitido. Envie apenas PDF, JPG ou PNG.",
         ),
       );
+    callback(null, true);
+  },
+});
+const patientPhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (!["image/jpeg", "image/png"].includes(file.mimetype))
+      return callback(new Error("A foto deve estar no formato JPG ou PNG."));
     callback(null, true);
   },
 });
@@ -892,6 +906,9 @@ app.get("/api/patients", auth, async (_req, res) => {
       insuranceName: patient.insuranceCode
         ? insuranceNames.get(patient.insuranceCode) || null
         : null,
+      photoUrl: patient.photoStorageKey
+        ? `/patients/${patient.id}/photo`
+        : null,
     })),
   );
 });
@@ -904,7 +921,21 @@ app.get("/api/insurances", auth, async (_req, res) => {
     }),
   );
 });
-app.post("/api/patients", auth, async (req, res) => {
+app.get("/api/patients/:id/photo", auth, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const patient = await prisma.patient.findUnique({
+    where: { id },
+    select: { photoStorageKey: true },
+  });
+  if (!patient?.photoStorageKey) return res.status(404).json({ message: "Foto não encontrada." });
+  const filePath = path.resolve(patientPhotoRoot, patient.photoStorageKey);
+  if (!filePath.startsWith(`${patientPhotoRoot}${path.sep}`))
+    return res.status(404).json({ message: "Foto não encontrada." });
+  if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Foto não encontrada." });
+  res.sendFile(filePath);
+});
+app.post("/api/patients", auth, patientPhotoUpload.single("photo"), async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
   if (!parsed.success)
     return res
@@ -923,9 +954,19 @@ app.post("/api/patients", auth, async (req, res) => {
         message: "O convênio selecionado não está cadastrado no sistema.",
       });
   }
-  res.status(201).json(await prisma.patient.create({ data: parsed.data }));
+  const patient = await prisma.patient.create({ data: parsed.data });
+  if (req.file) {
+    const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
+    const storageKey = `${patient.id}-${crypto.randomUUID()}${extension}`;
+    await fs.promises.writeFile(path.join(patientPhotoRoot, storageKey), req.file.buffer);
+    return res.status(201).json(await prisma.patient.update({
+      where: { id: patient.id },
+      data: { photoStorageKey: storageKey },
+    }));
+  }
+  res.status(201).json(patient);
 });
-app.put("/api/patients/:id", auth, async (req, res) => {
+app.put("/api/patients/:id", auth, patientPhotoUpload.single("photo"), async (req, res) => {
   const parsed = patientSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ message: "Dados do paciente inválidos." });
@@ -944,12 +985,31 @@ app.put("/api/patients/:id", auth, async (req, res) => {
         message: "O convênio selecionado não está cadastrado no sistema.",
       });
   }
-  res.json(await prisma.patient.update({ where: { id }, data: parsed.data }));
+  const current = await prisma.patient.findUnique({
+    where: { id },
+    select: { photoStorageKey: true },
+  });
+  const data: typeof parsed.data & { photoStorageKey?: string } = { ...parsed.data };
+  let oldPhoto: string | null = null;
+  if (req.file) {
+    const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
+    data.photoStorageKey = `${id}-${crypto.randomUUID()}${extension}`;
+    oldPhoto = current?.photoStorageKey || null;
+    await fs.promises.writeFile(path.join(patientPhotoRoot, data.photoStorageKey), req.file.buffer);
+  }
+  const patient = await prisma.patient.update({ where: { id }, data });
+  if (oldPhoto) {
+    await fs.promises.unlink(path.resolve(patientPhotoRoot, oldPhoto)).catch(() => undefined);
+  }
+  res.json(patient);
 });
 app.delete("/api/patients/:id", auth, async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;
+  const patient = await prisma.patient.findUnique({ where: { id }, select: { photoStorageKey: true } });
   await prisma.patient.delete({ where: { id } });
+  if (patient?.photoStorageKey)
+    await fs.promises.unlink(path.resolve(patientPhotoRoot, patient.photoStorageKey)).catch(() => undefined);
   res.status(204).send();
 });
 

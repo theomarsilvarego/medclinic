@@ -1092,11 +1092,18 @@ export function MedicalRecordsPage({
       {selectedPatient && (
         <section className="clinical-patient-card">
           <div className="clinical-patient-heading">
+            <div className="clinical-patient-avatar">
+              {selectedPatient.photoUrl ? (
+                <img src={`${API}${selectedPatient.photoUrl}`} alt={`Foto de ${selectedPatient.fullName}`} />
+              ) : (
+                <UserRound size={25} />
+              )}
+            </div>
             <div>
               <span>FICHA CLÍNICA</span>
               <h2>{selectedPatient.fullName}</h2>
             </div>
-            <UserRound size={25} />
+            {!selectedPatient.photoUrl && <UserRound className="clinical-patient-heading-icon" size={25} />}
           </div>
           <div className="clinical-patient-grid">
             <div>

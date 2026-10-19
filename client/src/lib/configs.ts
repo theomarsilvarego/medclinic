@@ -76,6 +76,7 @@ export const configs: Record<
       { key: "email", label: "E-mail" },
       { key: "phone", label: "Celular" },
       { key: "birthDate", label: "Data de nascimento", type: "date" },
+      { key: "photo", label: "Foto do paciente", type: "file", fullWidth: true },
       {
         key: "insuranceCode",
         label: "Convênio",

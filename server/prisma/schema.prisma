@@ -193,6 +193,7 @@ model Patient {
   birthDate      DateTime?       @map("birth_date") @db.Date
   insuranceCode  Int?            @map("insurance_code")
   notes          String?         @db.Text
+  photoStorageKey String?        @map("photo_storage_key") @db.VarChar(255)
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   appointments           Appointment[]
