@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ClipboardCheck,
   Eye,
-  EyeOff,
   FlaskConical,
   Clock3,
   Syringe,
@@ -63,16 +62,6 @@ function parseEvolution(value: unknown): EvolutionFields {
 function serializeEvolution(fields: EvolutionFields) {
   if (!evolutionSections.some((section) => fields[section.key].trim())) return "";
   return `${evolutionMarker}\n${evolutionSections.map((section) => `${section.label}:\n${fields[section.key] || ""}`).join("\n\n")}`;
-}
-function cpfDigits(value: unknown) { return String(value || "").replace(/\D/g, ""); }
-function formattedCpf(value: unknown) {
-  const digits = cpfDigits(value);
-  return digits.length === 11 ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}` : display(value);
-}
-function maskedCpf(value: unknown) {
-  const digits = cpfDigits(value);
-  if (!digits) return "Não informado";
-  return digits.length === 11 ? `${digits.slice(0, 3)}.***.***-${digits.slice(-2)}` : "***.***.***-**";
 }
 function fileTypeLabel(mimeType: string, fileName = "") {
   if (mimeType === "application/pdf" || fileName.toLocaleLowerCase().endsWith(".pdf")) return "PDF";
@@ -1324,7 +1313,6 @@ export function MedicalRecordsPage({
     return exists ? clinicalRecords.map(record => Number(record.id) === Number(editing.id) ? { ...record, ...editing } : record) : [editing, ...clinicalRecords];
   }, [editing, records]);
   const [patientPhoto, setPatientPhoto] = useState<string | null>(null);
-  const [showCpf, setShowCpf] = useState(false);
   useEffect(() => {
     let objectUrl: string | null = null;
     setPatientPhoto(null);
@@ -1407,13 +1395,6 @@ export function MedicalRecordsPage({
                   {selectedPatient.recordNumber && <span><small>Nº PRONTUÁRIO</small><strong>{selectedPatient.recordNumber}</strong></span>}
                 </div>
               </div>
-            </div>
-            <div className="patient-cpf-privacy">
-              <span>CPF</span>
-              <strong>{showCpf ? formattedCpf(selectedPatient.cpf) : maskedCpf(selectedPatient.cpf)}</strong>
-              <button type="button" onClick={() => setShowCpf(value => !value)} disabled={!cpfDigits(selectedPatient.cpf)} aria-label={showCpf ? "Ocultar CPF" : "Mostrar CPF"} aria-pressed={showCpf}>
-                {showCpf ? <EyeOff size={15} /> : <Eye size={15} />}{showCpf ? "Ocultar" : "Mostrar"}
-              </button>
             </div>
           </div>
           <ClinicalAlertsBand />
