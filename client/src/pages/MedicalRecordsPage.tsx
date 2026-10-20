@@ -575,13 +575,6 @@ function ExamRequestsArea({
                   </div>
                   <label className="exam-request-type-search"><Search size={13} /><input value={examTypeSearch[Number(group.id)] || ""} onChange={(event) => setExamTypeSearch((current) => ({ ...current, [Number(group.id)]: event.target.value }))} placeholder="Acrescentar exame ativo..." /></label>
                   {(examTypeSearch[Number(group.id)] || "").trim() && <div className="exam-request-type-suggestions">{examCatalog.filter((exam) => !(selectedExamTypeIds[Number(group.id)] || []).includes(Number(exam.id)) && `${exam.code} ${exam.name}`.toLocaleLowerCase().includes((examTypeSearch[Number(group.id)] || "").toLocaleLowerCase())).slice(0, 6).map((exam) => <button type="button" key={exam.id} onClick={() => addExamType(Number(group.id), Number(exam.id))}><strong>{exam.code}</strong><span>{exam.name}</span></button>)}</div>}
-                  <div className="exam-request-group-items">
-                    {(selectedExamTypeIds[Number(group.id)] || []).map((examTypeId) => {
-                      const exam = examCatalog.find((item) => Number(item.id) === examTypeId) || (group.items || []).find((item: Row) => Number(item.examTypeId || item.examType?.id) === examTypeId)?.examType;
-                      const checked = (selectedExamTypeIds[Number(group.id)] || []).includes(examTypeId);
-                      return <label className="exam-request-type-option" key={examTypeId}><input type="checkbox" checked={checked} onChange={() => toggleExamType(Number(group.id), examTypeId)} /><span><strong>{exam?.code ? `${exam.code} · ` : ""}{exam?.name || "Exame"}</strong><small>{exam?.value === undefined ? "Preço não informado" : Number(exam.value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</small></span></label>;
-                    })}
-                  </div>
                 </div>
               ))}
             </div>
