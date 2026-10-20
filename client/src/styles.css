@@ -3814,4 +3814,5 @@ tr:last-child td {
 .injectable-selection-line .injectable-row-name { flex: 1; min-width: 0; }
 .injectable-selection-line .injectable-remove { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; }
 .procedure-selected-list .selected-procedure-chip { flex: 0 1 340px; min-height: 46px; border: 1px solid #e7cbd3; border-radius: 999px; background: #fff7f9; }
+.procedure-selected-list { flex-direction: row; align-items: flex-start; }
 .procedure-selected-list .selected-procedure-chip .procedure-remove { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; }
