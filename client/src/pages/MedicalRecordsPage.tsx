@@ -1217,13 +1217,12 @@ function RecordTimelineCard({ record, isEditing, canEdit, canCompose, onRetify, 
   const standardProcedures = procedureRequests.filter(item => (item.procedure?.type || item.type) !== "DIAGNOSTICO_POR_IMAGEM");
   const imageProcedures = procedureRequests.filter(item => (item.procedure?.type || item.type) === "DIAGNOSTICO_POR_IMAGEM");
   const attachments: Row[] = record.attachments || [];
-  const appointmentAttachments: Row[] = record.appointment?.attachments || [];
   const counts: Record<EncounterTab, number> = {
     evolution: 0,
     exams: examRequests.length + ultrasoundRequests.length + imageProcedures.length,
     injectables: injectableRequests.length,
     procedures: standardProcedures.length,
-    attachments: attachments.length + appointmentAttachments.length,
+    attachments: attachments.length,
   };
   const tabs: { id: EncounterTab; label: string; icon: React.ReactNode }[] = [
     { id: "evolution", label: "Evolução", icon: <Activity size={16} /> },
@@ -1233,7 +1232,7 @@ function RecordTimelineCard({ record, isEditing, canEdit, canCompose, onRetify, 
     { id: "attachments", label: "Anexos", icon: <Paperclip size={16} /> },
   ];
   const parsed = parseEvolution(record.conduct);
-  const summaryText = parsed.anamnesis || parsed.conduct || parsed.physicalExam || parsed.diagnosis || String(record.appointment?.notes || "") || "Sem evolução registrada";
+  const summaryText = parsed.anamnesis || parsed.conduct || parsed.physicalExam || parsed.diagnosis || "Sem evolução registrada";
   const oneLine = summaryText.replace(/\s+/g, " ").trim();
   const instanceId = record.id ? String(record.id) : "draft";
 
@@ -1249,7 +1248,6 @@ function RecordTimelineCard({ record, isEditing, canEdit, canCompose, onRetify, 
       </header>
       <div className="record-panel" id={`record-panel-${instanceId}`} hidden={!expanded}>
         {expanded && <>
-        <AppointmentContextRow appointment={record.appointment} eventLabel={record.title} onChanged={onChanged} />
         <nav className="record-tabs" role="tablist" aria-label="Seções do prontuário">
           {tabs.map(tab => <button key={tab.id} type="button" role="tab" id={`tab-${instanceId}-${tab.id}`} aria-controls={`panel-${instanceId}-${tab.id}`} aria-selected={activeTab === tab.id} className={activeTab === tab.id ? "active" : ""} onClick={() => setActiveTab(tab.id)}>{tab.icon}<span>{tab.label}</span>{counts[tab.id] > 0 && <b className="record-tab-count">{counts[tab.id]}</b>}</button>)}
         </nav>
@@ -1273,7 +1271,6 @@ function RecordTimelineCard({ record, isEditing, canEdit, canCompose, onRetify, 
           </section>
           <section role="tabpanel" id={`panel-${instanceId}-attachments`} aria-labelledby={`tab-${instanceId}-attachments`} hidden={activeTab !== "attachments"}>
             {record.id ? <AttachmentsArea recordId={Number(record.id)} attachments={attachments} onChanged={onChanged} /> : <p className="clinical-empty-state">Os arquivos do prontuário estarão disponíveis após o primeiro salvamento automático.</p>}
-            <AppointmentAttachmentsArea appointment={record.appointment} onChanged={onChanged} />
           </section>
         </div>
         </>}
