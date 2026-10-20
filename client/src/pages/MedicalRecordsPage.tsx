@@ -1091,9 +1091,9 @@ function ClinicalAlertsBand({ allergies = [], comorbidities = [], medications = 
 
 function ClinicalEvolutionSummary({ record }: { record: Row }) {
   const fields = parseEvolution(record.conduct);
-  const hasContent = evolutionSections.some(section => fields[section.key].trim());
+  const hasContent = Boolean(fields.conduct.trim());
   return <div className="clinical-evolution-summary">
-    {hasContent ? evolutionSections.map(section => <section className="clinical-evolution-field" key={section.key}><strong>{section.label}</strong><p>{fields[section.key].trim() || "—"}</p></section>) : <p className="clinical-empty-state">Nenhuma evolução registrada.</p>}
+    {hasContent ? <section className="clinical-evolution-field"><strong>Conduta</strong><p>{fields.conduct.trim()}</p></section> : <p className="clinical-empty-state">Nenhuma evolução registrada.</p>}
   </div>;
 }
 
@@ -1191,7 +1191,7 @@ function ClinicalEvolutionEditor({ record, onSave, onPersisted, onFinalize }: { 
   return <div className="clinical-evolution-editor">
     <p className="clinical-field-mapping-note">A evolução é serializada no campo Conduta já existente, mantendo compatibilidade sem alterar a API.</p>
     <div className="clinical-evolution-fields">
-      {evolutionSections.map(section => <GrowingTextarea key={section.key} label={section.label} value={fields[section.key]} onChange={value => updateField(section.key, value)} placeholder={`Descreva ${section.label.toLocaleLowerCase()}…`} />)}
+      <GrowingTextarea label="Conduta" value={fields.conduct} onChange={value => updateField("conduct", value)} placeholder="Descreva a conduta…" />
     </div>
     <footer className="clinical-evolution-footer">
       <span className={`autosave-status ${status}`} aria-live="polite">{status === "saved" && <CheckCircle2 size={15} />}{statusText}</span>
@@ -1232,7 +1232,7 @@ function RecordTimelineCard({ record, isEditing, canEdit, canCompose, onRetify, 
     { id: "attachments", label: "Anexos", icon: <Paperclip size={16} /> },
   ];
   const parsed = parseEvolution(record.conduct);
-  const summaryText = parsed.anamnesis || parsed.conduct || parsed.physicalExam || parsed.diagnosis || "Sem evolução registrada";
+  const summaryText = parsed.conduct || "Sem evolução registrada";
   const oneLine = summaryText.replace(/\s+/g, " ").trim();
   const instanceId = record.id ? String(record.id) : "draft";
 
@@ -1240,7 +1240,7 @@ function RecordTimelineCard({ record, isEditing, canEdit, canCompose, onRetify, 
     <div className="medical-date-rail"><strong>{dateLabel(String(record.recordDate || today()))}</strong><span /></div>
     <section className="medical-record-card">
       <header className={`medical-record-header ${expanded ? "expanded" : ""}`}>
-        {isEditing ? <div className="record-editing-title"><strong>{record.id ? "Retificando atendimento" : "Novo atendimento"}</strong><small>Por: {record.author?.fullName || "Médico"}</small></div> : <button type="button" className="record-summary-toggle" aria-expanded={expanded} aria-controls={`record-panel-${instanceId}`} onClick={() => setExpanded(value => !value)}>
+        {isEditing ? <div className="record-editing-title"><strong>Novo atendimento</strong><small>Por: {record.author?.fullName || "Médico"}</small></div> : <button type="button" className="record-summary-toggle" aria-expanded={expanded} aria-controls={`record-panel-${instanceId}`} onClick={() => setExpanded(value => !value)}>
           <span className="record-summary-line"><strong>{record.appointment?.scheduledTime ? `${record.appointment.scheduledTime} · ` : ""}{record.title || "Atendimento"}</strong><span>{oneLine}</span></span>
           <ChevronDown size={18} aria-hidden="true" />
         </button>}
@@ -1324,10 +1324,11 @@ export function MedicalRecordsPage({
     [patients, selectedPatientId],
   );
   const displayedRecords = useMemo(() => {
-    if (!editing) return records;
-    if (!editing.id) return [editing, ...records];
-    const exists = records.some(record => Number(record.id) === Number(editing.id));
-    return exists ? records.map(record => Number(record.id) === Number(editing.id) ? { ...record, ...editing } : record) : [editing, ...records];
+    const clinicalRecords = records.filter(record => !(record.appointment && record.title === "Agendamento"));
+    if (!editing) return clinicalRecords;
+    if (!editing.id) return [editing, ...clinicalRecords];
+    const exists = clinicalRecords.some(record => Number(record.id) === Number(editing.id));
+    return exists ? clinicalRecords.map(record => Number(record.id) === Number(editing.id) ? { ...record, ...editing } : record) : [editing, ...clinicalRecords];
   }, [editing, records]);
   const [patientPhoto, setPatientPhoto] = useState<string | null>(null);
   const [showCpf, setShowCpf] = useState(false);
