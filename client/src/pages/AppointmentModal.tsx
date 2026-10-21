@@ -252,7 +252,6 @@ export function AppointmentModal({
           </section>
 
           <section className="appointment-section appointment-care-section">
-            <div className="appointment-field-label">Tipo</div>
             <div
               className="appointment-type-toggle"
               role="tablist"
