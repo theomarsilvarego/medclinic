@@ -143,7 +143,6 @@ export function AppointmentModal({
       <div className="modal">
         <div className="modal-header appointment-modal-header">
           <div>
-            <p className="eyebrow">AGENDA</p>
             <h2>{initial.id ? "Editar agendamento" : "Novo agendamento"}</h2>
             <div className="appointment-context">
               <span>
@@ -164,7 +163,6 @@ export function AppointmentModal({
         <div className="modal-fields appointment-modal-fields">
           <section className="appointment-section appointment-people-section">
             <label className="appointment-patient-field">
-              Paciente
               <div className="appointment-patient-picker">
                 <input
                   className="appointment-patient-search"
@@ -214,7 +212,6 @@ export function AppointmentModal({
               </div>
             </label>
             <label>
-              Médico
               <select
                 required
                 value={data.doctorId || ""}
@@ -229,7 +226,6 @@ export function AppointmentModal({
               </select>
             </label>
             <label>
-              Convênio
               <select
                 required
                 value={data.insuranceId || ""}
@@ -288,7 +284,6 @@ export function AppointmentModal({
             </div>
             {itemType === "ATENDIMENTO" ? (
               <label>
-                Atendimento
                 <select
                   required
                   value={data.attendanceId || ""}
@@ -305,7 +300,6 @@ export function AppointmentModal({
               </label>
             ) : (
               <label>
-                Procedimento
                 <select
                   required
                   value={data.procedureId || ""}
@@ -322,7 +316,6 @@ export function AppointmentModal({
             )}
             <div className="appointment-inline-fields">
               <label>
-                Status
                 <select
                   value={data.status || "AGENDADO"}
                   onChange={(e) => update("status", e.target.value)}
@@ -335,7 +328,6 @@ export function AppointmentModal({
                 </select>
               </label>
               <label>
-                Horário
                 <select
                   value={data.scheduledTime || "08:00"}
                   onChange={(e) => update("scheduledTime", e.target.value)}
@@ -349,7 +341,6 @@ export function AppointmentModal({
               </label>
             </div>
             <label className="appointment-notes-field">
-              Observação
               <textarea
                 rows={3}
                 value={data.notes || ""}
@@ -434,7 +425,6 @@ export function AppointmentModal({
             {examUploads.map((exam, index) => (
               <div className="appointment-exam-upload-row" key={index}>
                 <label>
-                  Tipo do exame
                   <select
                     value={exam.examType}
                     onChange={(event) =>
@@ -456,7 +446,6 @@ export function AppointmentModal({
                   </select>
                 </label>
                 <label>
-                  Data do exame
                   <input
                     type="date"
                     value={exam.examDate}
@@ -472,7 +461,6 @@ export function AppointmentModal({
                   />
                 </label>
                 <label className="appointment-exam-file">
-                  Arquivo
                   <input
                     type="file"
                     accept="application/pdf,image/jpeg,image/png"

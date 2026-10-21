@@ -4817,10 +4817,10 @@ tr:last-child td {
 .appointment-modal-fields {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   max-height: calc(90vh - 150px);
   overflow-y: auto;
-  padding: 24px 28px 5px;
+  padding: 10px 28px 10px;
 }
 .appointment-section {
   display: grid;
@@ -5083,6 +5083,7 @@ tr:last-child td {
 }
 .appointment-modal-fields {
   overflow-x: hidden;
+  background: #fbf8f5;
 }
 .appointment-section > *,
 .appointment-exam-upload-row > *,
