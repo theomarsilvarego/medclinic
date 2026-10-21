@@ -1978,13 +1978,34 @@ app.get("/api/medical-records/patients/:patientId/exam-attachments", auth, docto
     return res.status(400).json({ message: "Paciente inválido." });
   const acceptedTypes = [...appointmentExamTypes, ...Object.keys(legacyAppointmentExamTypes)];
   const attachments = await prisma.appointmentAttachment.findMany({
-    where: { patientId, examType: { in: acceptedTypes } },
+    where: { patientId, OR: [{ examType: { in: acceptedTypes } }, { examType: null, examDate: null }] },
     orderBy: [{ examDate: "desc" }, { uploadedAt: "desc" }],
   });
   res.json(attachments.map(attachment => ({
     ...attachment,
     examType: attachment.examType ? legacyAppointmentExamTypes[attachment.examType] || attachment.examType : null,
   })));
+});
+app.patch("/api/appointment-attachments/:id/classification", auth, doctorOnly, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const parsed = z.object({
+    examType: z.enum(appointmentExamTypes),
+    examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Informe a classificação e uma data de exame válida." });
+  const date = new Date(`${parsed.data.examDate}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== parsed.data.examDate)
+    return res.status(400).json({ message: "A data do exame é inválida." });
+  if (parsed.data.examDate > clinicTodayDate())
+    return res.status(400).json({ message: "A data do exame não pode ser futura." });
+  const existing = await prisma.appointmentAttachment.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return res.status(404).json({ message: "Anexo não encontrado." });
+  const attachment = await prisma.appointmentAttachment.update({
+    where: { id },
+    data: { examType: parsed.data.examType, examDate: date },
+  });
+  res.json(attachment);
 });
 app.get("/api/appointment-attachments/file", auth, appointmentAccess, async (req, res) => {
   const storageKey = String(req.query.key || "");

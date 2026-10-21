@@ -1085,6 +1085,12 @@ const legacyPatientExamTypes: Record<string, string> = {
   USG_MANA: "usg_mama",
   PREVENTIVO: "preventivo",
 };
+const allPatientExamGroups = [...patientExamGroups, { id: "unclassified", title: "Sem classificação" }] as const;
+
+function localDateInputToday() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 function examDateLabel(value: unknown) {
   if (!value) return "Data não informada";
@@ -1098,6 +1104,18 @@ function PatientExamSidebar({ patientId, refreshKey }: { patientId: number; refr
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
   const [fileError, setFileError] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [classifyingId, setClassifyingId] = useState<number | null>(null);
+  const [classification, setClassification] = useState({ examType: "", examDate: "" });
+  const [classificationError, setClassificationError] = useState("");
+  const [savingClassification, setSavingClassification] = useState(false);
+
+  useEffect(() => {
+    setSelectedFilter("all");
+    setClassifyingId(null);
+    setClassificationError("");
+  }, [patientId]);
 
   useEffect(() => {
     let active = true;
@@ -1138,27 +1156,82 @@ function PatientExamSidebar({ patientId, refreshKey }: { patientId: number; refr
     }
   }
 
-  const normalizedAttachments: Row[] = attachments.map((item: Row): Row => ({ ...item, normalizedExamType: legacyPatientExamTypes[String(item.examType || "")] || item.examType }));
+  function startClassification(attachment: Row) {
+    const rawType = legacyPatientExamTypes[String(attachment.examType || "")] || String(attachment.examType || "");
+    const knownType = patientExamGroups.some(group => group.id === rawType) ? rawType : "";
+    setClassifyingId(Number(attachment.id));
+    setClassification({ examType: knownType, examDate: attachment.examDate ? String(attachment.examDate).slice(0, 10) : "" });
+    setClassificationError("");
+  }
+
+  async function saveClassification(attachment: Row) {
+    if (!classification.examType || !classification.examDate) {
+      setClassificationError("Selecione o tipo e informe a data do exame.");
+      return;
+    }
+    if (classification.examDate > localDateInputToday()) {
+      setClassificationError("A data do exame não pode ser futura.");
+      return;
+    }
+    setSavingClassification(true);
+    setClassificationError("");
+    try {
+      const saved = await request(`/appointment-attachments/${attachment.id}/classification`, {
+        method: "PATCH",
+        body: JSON.stringify(classification),
+      });
+      setAttachments(current => current.map(item => Number(item.id) === Number(saved.id) ? { ...item, ...saved } : item));
+      setClassifyingId(null);
+    } catch (reason: any) {
+      setClassificationError(reason.message || "Não foi possível salvar a classificação.");
+    } finally {
+      setSavingClassification(false);
+    }
+  }
+
+  const validTypeIds = patientExamGroups.map(group => group.id as string);
+  const normalizedAttachments: Row[] = attachments.map((item: Row): Row => {
+    const rawType = legacyPatientExamTypes[String(item.examType || "")] || String(item.examType || "");
+    return { ...item, normalizedExamType: validTypeIds.includes(rawType) ? rawType : null };
+  });
+  const countForGroup = (groupId: string) => normalizedAttachments.filter(item => groupId === "unclassified" ? !item.normalizedExamType : item.normalizedExamType === groupId).length;
+  const visibleGroups = allPatientExamGroups.filter(group => selectedFilter === "all" || selectedFilter === group.id);
+
   return <aside className="patient-exams-sidebar" aria-labelledby="patient-exams-title">
-    <header className="patient-exams-heading"><div><p>ARQUIVOS CLÍNICOS</p><h2 id="patient-exams-title">Exames do paciente</h2></div><span aria-label={`${attachments.length} exames`}>{attachments.length}</span></header>
+    <header className="patient-exams-heading"><div><p>ARQUIVOS CLÍNICOS</p><h2 id="patient-exams-title">Exames do paciente</h2></div><span aria-label={`${attachments.length} arquivos`}>{attachments.length}</span></header>
+    <div className="patient-exam-filters" role="group" aria-label="Filtrar exames por classificação">
+      <button type="button" className={selectedFilter === "all" ? "active" : ""} aria-pressed={selectedFilter === "all"} onClick={() => setSelectedFilter("all")}>Todos <span>{attachments.length}</span></button>
+      {allPatientExamGroups.map(group => <button type="button" key={group.id} className={selectedFilter === group.id ? "active" : ""} aria-pressed={selectedFilter === group.id} onClick={() => setSelectedFilter(group.id)}>{group.title} <span>{countForGroup(group.id)}</span></button>)}
+    </div>
     {loading ? <div className="patient-exams-state" role="status" aria-live="polite">Carregando exames…</div> : error ? <div className="patient-exams-state patient-exams-error" role="alert"><p>{error}</p><button type="button" onClick={() => setRetryKey(value => value + 1)}><RefreshCw size={15} />Tentar de novo</button></div> : <div className="patient-exam-groups">
-      {patientExamGroups.map(group => {
-        const items = normalizedAttachments.filter(item => item.normalizedExamType === group.id).sort((a, b) => {
+      {visibleGroups.map(group => {
+        const items = normalizedAttachments.filter(item => group.id === "unclassified" ? !item.normalizedExamType : item.normalizedExamType === group.id).sort((a, b) => {
           const dateA = a.examDate ? String(a.examDate).slice(0, 10) : "";
           const dateB = b.examDate ? String(b.examDate).slice(0, 10) : "";
           return dateB.localeCompare(dateA) || String(b.uploadedAt || "").localeCompare(String(a.uploadedAt || ""));
         });
+        const expanded = collapsedGroups[group.id] !== true;
+        const groupPanelId = `patient-exam-panel-${group.id}`;
         return <section className="patient-exam-group" key={group.id} aria-labelledby={`patient-exam-group-${group.id}`}>
-          <h3 id={`patient-exam-group-${group.id}`}>{group.title}<span>{items.length}</span></h3>
-          {items.length === 0 ? <p className="patient-exam-empty">Nenhum exame enviado</p> : <ul>{items.map(item => {
-            const kind = fileTypeLabel(String(item.mimeType || ""), String(item.fileName || ""));
-            return <li className="patient-exam-file" key={item.id}>
-              <div className="patient-exam-file-heading"><span className="patient-exam-file-icon" aria-hidden="true">{kind === "PDF" ? <FileText size={18} /> : <FileImage size={18} />}</span><strong title={item.fileName}>{item.fileName}</strong><span className="patient-exam-file-type">{kind}</span></div>
-              <p className="patient-exam-date">Exame: <strong>{examDateLabel(item.examDate)}</strong></p>
-              <p className="patient-exam-uploaded" title={item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleString("pt-BR")}` : undefined}>{item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleDateString("pt-BR")}` : "Data de envio não informada"}</p>
-              <div className="patient-exam-actions"><button type="button" onClick={() => void openAttachment(item, "view")} aria-label={`Visualizar ${item.fileName}`}><FileText size={15} />Visualizar</button><button type="button" onClick={() => void openAttachment(item, "download")} aria-label={`Baixar ${item.fileName}`}><Download size={15} />Baixar</button></div>
-            </li>;
-          })}</ul>}
+          <h3 id={`patient-exam-group-${group.id}`}><button className="patient-exam-group-toggle" type="button" aria-expanded={expanded} aria-controls={groupPanelId} onClick={() => setCollapsedGroups(current => ({ ...current, [group.id]: !expanded }))}><span className="patient-exam-group-title">{group.title}</span><span className="patient-exam-group-count">{items.length}</span><ChevronDown size={16} aria-hidden="true" /></button></h3>
+          <div id={groupPanelId} className="patient-exam-group-panel" hidden={!expanded}>
+            {items.length === 0 ? <p className="patient-exam-empty">Nenhum exame enviado</p> : <ul>{items.map(item => {
+              const kind = fileTypeLabel(String(item.mimeType || ""), String(item.fileName || ""));
+              const isClassifying = classifyingId === Number(item.id);
+              return <li className="patient-exam-file" key={item.id}>
+                <div className="patient-exam-file-heading"><span className="patient-exam-file-icon" aria-hidden="true">{kind === "PDF" ? <FileText size={18} /> : <FileImage size={18} />}</span><strong title={item.fileName}>{item.fileName}</strong><span className="patient-exam-file-type">{kind}</span></div>
+                <p className="patient-exam-date">Exame: <strong>{examDateLabel(item.examDate)}</strong></p>
+                <p className="patient-exam-uploaded" title={item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleString("pt-BR")}` : undefined}>{item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleDateString("pt-BR")}` : "Data de envio não informada"}</p>
+                <div className="patient-exam-actions"><button type="button" onClick={() => void openAttachment(item, "view")} aria-label={`Visualizar ${item.fileName}`}><FileText size={15} />Visualizar</button><button type="button" onClick={() => void openAttachment(item, "download")} aria-label={`Baixar ${item.fileName}`}><Download size={15} />Baixar</button><button type="button" onClick={() => startClassification(item)} aria-label={`${item.normalizedExamType ? "Editar" : "Classificar"} ${item.fileName}`}>{item.normalizedExamType ? <><Pencil size={15} />Editar</> : <><Pencil size={15} />Classificar</>}</button></div>
+                {isClassifying && <form className="patient-exam-classification-form" onSubmit={event => { event.preventDefault(); void saveClassification(item); }}>
+                  <label><span>Tipo de exame</span><select required value={classification.examType} onChange={event => setClassification(current => ({ ...current, examType: event.target.value }))}><option value="">Selecione</option>{patientExamGroups.map(option => <option key={option.id} value={option.id}>{option.title}</option>)}</select></label>
+                  <label><span>Data do exame</span><input type="date" required max={localDateInputToday()} value={classification.examDate} onChange={event => setClassification(current => ({ ...current, examDate: event.target.value }))} /></label>
+                  {classificationError && <p className="patient-exam-classification-error" role="alert">{classificationError}</p>}
+                  <div className="patient-exam-classification-actions"><button type="button" onClick={() => { setClassifyingId(null); setClassificationError(""); }} disabled={savingClassification}>Cancelar</button><button type="submit" className="primary" disabled={savingClassification}>{savingClassification ? "Salvando…" : "Salvar classificação"}</button></div>
+                </form>}
+              </li>;
+            })}</ul>}
+          </div>
         </section>;
       })}
       {fileError && <p className="patient-exam-file-error" role="alert">{fileError}</p>}

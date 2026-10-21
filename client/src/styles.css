@@ -5243,3 +5243,142 @@ tr:last-child td {
   .patient-exams-heading { padding: 15px; }
   .patient-exam-groups { padding: 4px 14px 12px; }
 }
+
+
+/* Interações da coluna de exames: filtros, grupos recolhíveis e classificação */
+.patient-exams-sidebar {
+  position: sticky;
+  top: 92px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 110px);
+}
+.patient-exam-filters {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  padding: 11px 14px;
+  overflow-x: auto;
+  border-bottom: 1px solid #eee3e6;
+  scrollbar-width: thin;
+}
+.patient-exam-filters button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border: 1px solid #d9c1c8;
+  border-radius: 999px;
+  background: #fff;
+  color: #563744;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.patient-exam-filters button span {
+  display: inline-grid;
+  min-width: 21px;
+  min-height: 21px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: #f4e8eb;
+  color: #5d2b3d;
+  font-size: 13px;
+}
+.patient-exam-filters button.active {
+  border-color: #713048;
+  background: #713048;
+  color: #fff;
+}
+.patient-exam-filters button.active span { background: #fff; color: #642a3e; }
+.patient-exam-groups {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c8a5af transparent;
+}
+.patient-exam-group > h3 { display: block; margin: 0; }
+.patient-exam-group-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #572d3c;
+  text-align: left;
+  cursor: pointer;
+}
+.patient-exam-group-title { flex: 1; font-size: 14px; font-weight: 800; }
+.patient-exam-group-count {
+  display: inline-grid;
+  min-width: 27px;
+  min-height: 25px;
+  padding: 2px 7px;
+  place-items: center;
+  border-radius: 999px;
+  background: #f3e4e8;
+  color: #642a3e;
+  font-size: 13px;
+  font-weight: 800;
+}
+.patient-exam-group-toggle > svg { color: #6a4250; transition: transform .15s ease; }
+.patient-exam-group-toggle[aria-expanded="false"] > svg { transform: rotate(-90deg); }
+.patient-exam-group-panel[hidden] { display: none; }
+.patient-exam-group-panel { padding-top: 7px; }
+.patient-exam-group-panel > ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.patient-exam-actions button { flex: 1 1 auto; min-height: 36px; }
+.patient-exam-classification-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 11px;
+  padding: 12px;
+  border: 1px solid #e5cfd5;
+  border-radius: 10px;
+  background: #fff8f9;
+}
+.patient-exam-classification-form label { display: grid; gap: 5px; color: #49363c; font-size: 13px; font-weight: 700; }
+.patient-exam-classification-form select,
+.patient-exam-classification-form input {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid #cdb5bd;
+  border-radius: 7px;
+  background: #fff;
+  color: #392c31;
+  font-size: 13px;
+}
+.patient-exam-classification-error { margin: 0; color: #8a2436; font-size: 13px; line-height: 1.45; }
+.patient-exam-classification-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.patient-exam-classification-actions button {
+  min-width: 32px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #d8b8c1;
+  border-radius: 8px;
+  background: #fff;
+  color: #642a3e;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.patient-exam-classification-actions button.primary { border-color: #713048; background: #713048; color: #fff; }
+.patient-exam-classification-actions button:disabled { opacity: .65; cursor: wait; }
+.patient-exams-sidebar button:focus-visible,
+.patient-exam-classification-form input:focus-visible,
+.patient-exam-classification-form select:focus-visible {
+  outline: 3px solid #8c3b57;
+  outline-offset: 2px;
+}
+@media (max-width: 1080px) {
+  .patient-exams-sidebar { position: static; max-height: none; }
+  .patient-exam-groups { flex: initial; min-height: auto; max-height: none; overflow: visible; }
+}
