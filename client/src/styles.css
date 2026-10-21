@@ -2831,7 +2831,7 @@ tr:last-child td {
 }
 .exam-group-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
   gap: 14px;
   padding: 20px;
 }
@@ -2984,7 +2984,7 @@ tr:last-child td {
 }
 .exam-picker {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* grid-template-columns: 1fr 1fr; */
   gap: 7px;
   max-height: 270px;
   overflow: auto;
@@ -4013,9 +4013,9 @@ tr:last-child td {
   padding: 12px 18px;
 }
 .clinical-patient-avatar {
-  width: 92px;
-  height: 92px;
-  flex-basis: 92px;
+  width: 140px;
+  height: 140px;
+  flex-basis: 140px;
   margin-right: 15px;
   border-width: 3px;
 }
@@ -4246,7 +4246,7 @@ tr:last-child td {
 }
 .clinical-evolution-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
   gap: 12px;
 }
 .clinical-evolution-field {
