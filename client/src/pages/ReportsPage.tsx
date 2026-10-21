@@ -130,6 +130,24 @@ function downloadBlob(blob: Blob, filename: string) {
 function escapeTsvCell(value: unknown) {
   return String(value ?? "").replace(/\t/g, " ").replace(/\r?\n/g, " ").replace(/"/g, '""');
 }
+function formatReportDate(value: string) {
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : "—";
+}
+function patientAge(birthDate: unknown, referenceDate: string) {
+  if (!birthDate) return "—";
+  const birth = new Date(`${String(birthDate).slice(0, 10)}T12:00:00`);
+  const reference = new Date(`${referenceDate}T12:00:00`);
+  if (Number.isNaN(birth.getTime()) || Number.isNaN(reference.getTime())) return "—";
+  let age = reference.getFullYear() - birth.getFullYear();
+  const birthdayNotReached = reference.getMonth() < birth.getMonth()
+    || (reference.getMonth() === birth.getMonth() && reference.getDate() < birth.getDate());
+  if (birthdayNotReached) age -= 1;
+  return String(Math.max(0, age));
+}
+function cleanTxtValue(value: unknown) {
+  return String(value ?? "—").replace(/\r?\n/g, " ").trim() || "—";
+}
 function escapeXml(value: unknown) {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
@@ -181,6 +199,23 @@ export function ReportsPage() {
     downloadBlob(new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" }), `${reportFilename}.xls`);
   }
   function exportTxt() {
+    if (selectedReport.id === "appointments") {
+      const referenceDate = generatedFor || appointmentDate;
+      const lines = [
+        `Agenda de pacientes - Dia ${formatReportDate(referenceDate)}`,
+        "",
+        ...rows.map(row => {
+          const time = String(row.scheduledTime || "").slice(0, 5) || "—";
+          const patient = cleanTxtValue(row.patient?.fullName);
+          const age = patientAge(row.patient?.birthDate, referenceDate);
+          const service = cleanTxtValue(row.itemType === "PROCEDIMENTO" ? row.procedure?.name : row.attendance?.name);
+          const notes = cleanTxtValue(row.notes);
+          return `${time} - Paciente: ${patient} - Idade ${age} - (${service}) - ${notes}`;
+        }),
+      ];
+      downloadBlob(new Blob(["\uFEFF", lines.join("\r\n")], { type: "text/plain;charset=utf-8" }), `${reportFilename}.txt`);
+      return;
+    }
     const lines = [selectedReport.columns.map(column => escapeTsvCell(column.label)).join("\t"), ...tableValues.map(row => row.map(escapeTsvCell).join("\t"))];
     downloadBlob(new Blob(["\uFEFF", lines.join("\r\n")], { type: "text/plain;charset=utf-8" }), `${reportFilename}.txt`);
   }
