@@ -63,7 +63,9 @@ export function Dashboard({
       <div className="page-heading">
         <div>
           <h1>
-            {saudacao}, Dra. {user.fullName}.
+            {saudacao}, 
+            {user.profile === "MEDICO" ? " Dra. " : null}
+            {user.fullName}.
           </h1>
           <p className="muted">
             Acompanhe os cadastros essenciais da sua clínica.
