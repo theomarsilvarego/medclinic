@@ -4129,3 +4129,36 @@ tr:last-child td {
     min-width: 0;
   }
 }
+
+/* Contenção de largura: a grade de exames não pode impor uma largura mínima ao modal. */
+.appointment-modal,
+.appointment-modal-fields,
+.appointment-section {
+  width: 100%;
+  min-width: 0;
+}
+.appointment-modal-fields {
+  overflow-x: hidden;
+}
+.appointment-section > *,
+.appointment-exam-upload-row > *,
+.appointment-attachment-list,
+.appointment-attachment-chip,
+.appointment-attachment-main {
+  min-width: 0;
+}
+.appointment-exam-upload-row {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1.45fr) 40px;
+}
+.appointment-exam-upload-row input,
+.appointment-exam-upload-row select,
+.appointment-exam-upload-row .appointment-exam-file,
+.appointment-exam-upload-row .appointment-exam-file input {
+  min-width: 0;
+  max-width: 100%;
+}
+.appointment-exam-upload-row .appointment-exam-file input {
+  overflow: hidden;
+}
