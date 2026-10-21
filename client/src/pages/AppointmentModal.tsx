@@ -490,10 +490,6 @@ export function AppointmentModal({
                       );
                     }}
                   />
-                  <small>
-                    <Upload size={13} />{" "}
-                    {exam.file?.name || "Selecione um arquivo"}
-                  </small>
                 </label>
                 <button
                   type="button"
@@ -509,9 +505,6 @@ export function AppointmentModal({
                 </button>
               </div>
             ))}
-            <small className="appointment-exam-help">
-              Tipos aceitos: PDF, JPG ou PNG, até 10 MB por exame.
-            </small>
           </section>
         </div>
 
