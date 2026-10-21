@@ -1030,6 +1030,9 @@ const patientSchema = z.object({
   birthDate: z.coerce.date().optional().nullable(),
   insuranceCode: z.coerce.number().int().optional().nullable(),
   notes: z.string().optional().nullable(),
+  allergies: z.string().trim().optional().nullable(),
+  comorbidities: z.string().trim().optional().nullable(),
+  medicationsInUse: z.string().trim().optional().nullable(),
 });
 
 // Pacientes são acessíveis a qualquer perfil autenticado.

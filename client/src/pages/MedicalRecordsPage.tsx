@@ -1060,16 +1060,16 @@ function ProcedureRequestsArea({
   );
 }
 
-function ClinicalAlertsBand({ allergies = [], comorbidities = [], medications = [] }: { allergies?: string[]; comorbidities?: string[]; medications?: string[] }) {
-  // TODO: ligar estes props a campos explícitos da API quando forem adicionados. Patient.notes é texto livre e não deve ser interpretado como alerta clínico.
+function ClinicalAlertsBand({ allergies = "", comorbidities = "", medications = "" }: { allergies?: string | null; comorbidities?: string | null; medications?: string | null }) {
+  const asList = (value: string | null | undefined) => (value || "").split(/[\r\n,;]+/).map(item => item.trim()).filter(Boolean);
   const groups = [
-    { label: "Alergias", values: allergies },
-    { label: "Comorbidades", values: comorbidities },
-    { label: "Medicamentos em uso", values: medications },
+    { label: "Alergia", values: asList(allergies) },
+    { label: "Comorbidade", values: asList(comorbidities) },
+    { label: "Em uso de medicamento", values: asList(medications) },
   ].filter(group => group.values.length > 0);
   return <section className="clinical-alerts-band" aria-label="Alertas clínicos">
     <ShieldAlert size={17} aria-hidden="true" />
-    {groups.length > 0 ? groups.map(group => <div className="clinical-alert-group" key={group.label}><strong>{group.label}</strong><span>{group.values.join(" · ")}</span></div>) : <div className="clinical-alert-group"><strong>Alertas clínicos</strong><span>Dados ainda não disponíveis na API.</span></div>}
+    {groups.length > 0 ? groups.map(group => <div className="clinical-alert-group" key={group.label}><strong>{group.label}</strong><span>{group.values.join(" · ")}</span></div>) : <div className="clinical-alert-group"><strong>Alertas clínicos</strong><span>Nenhum alerta cadastrado.</span></div>}
   </section>;
 }
 
@@ -1569,7 +1569,7 @@ export function MedicalRecordsPage({
               </div>
             </div>
           </div>
-          <ClinicalAlertsBand />
+          <ClinicalAlertsBand allergies={selectedPatient.allergies} comorbidities={selectedPatient.comorbidities} medications={selectedPatient.medicationsInUse} />
         </section>
       )}
       {!selectedPatientId ? (
