@@ -1195,13 +1195,16 @@ function PatientExamSidebar({ patientId, refreshKey }: { patientId: number; refr
     return { ...item, normalizedExamType: validTypeIds.includes(rawType) ? rawType : null };
   });
   const countForGroup = (groupId: string) => normalizedAttachments.filter(item => groupId === "unclassified" ? !item.normalizedExamType : item.normalizedExamType === groupId).length;
-  const visibleGroups = allPatientExamGroups.filter(group => selectedFilter === "all" || selectedFilter === group.id);
+  const visibleGroups = allPatientExamGroups.filter(group =>
+    (selectedFilter === "all" || selectedFilter === group.id) &&
+    (group.id !== "unclassified" || countForGroup(group.id) > 0),
+  );
 
   return <aside className="patient-exams-sidebar" aria-labelledby="patient-exams-title">
-    <header className="patient-exams-heading"><div><p>ARQUIVOS CLÍNICOS</p><h2 id="patient-exams-title">Exames do paciente</h2></div><span aria-label={`${attachments.length} arquivos`}>{attachments.length}</span></header>
+    <header className="patient-exams-heading"><h2 id="patient-exams-title">Exames do paciente</h2><p>Anexos dos agendamentos, por tipo e data do exame.</p></header>
     <div className="patient-exam-filters" role="group" aria-label="Filtrar exames por classificação">
       <button type="button" className={selectedFilter === "all" ? "active" : ""} aria-pressed={selectedFilter === "all"} onClick={() => setSelectedFilter("all")}>Todos <span>{attachments.length}</span></button>
-      {allPatientExamGroups.map(group => <button type="button" key={group.id} className={selectedFilter === group.id ? "active" : ""} aria-pressed={selectedFilter === group.id} onClick={() => setSelectedFilter(group.id)}>{group.title} <span>{countForGroup(group.id)}</span></button>)}
+      {allPatientExamGroups.filter(group => group.id !== "unclassified" || countForGroup(group.id) > 0).map(group => <button type="button" key={group.id} className={selectedFilter === group.id ? "active" : ""} aria-pressed={selectedFilter === group.id} onClick={() => setSelectedFilter(group.id)}>{group.title} <span>{countForGroup(group.id)}</span></button>)}
     </div>
     {loading ? <div className="patient-exams-state" role="status" aria-live="polite">Carregando exames…</div> : error ? <div className="patient-exams-state patient-exams-error" role="alert"><p>{error}</p><button type="button" onClick={() => setRetryKey(value => value + 1)}><RefreshCw size={15} />Tentar de novo</button></div> : <div className="patient-exam-groups">
       {visibleGroups.map(group => {
@@ -1213,14 +1216,14 @@ function PatientExamSidebar({ patientId, refreshKey }: { patientId: number; refr
         const expanded = collapsedGroups[group.id] !== true;
         const groupPanelId = `patient-exam-panel-${group.id}`;
         return <section className="patient-exam-group" key={group.id} aria-labelledby={`patient-exam-group-${group.id}`}>
-          <h3 id={`patient-exam-group-${group.id}`}><button className="patient-exam-group-toggle" type="button" aria-expanded={expanded} aria-controls={groupPanelId} onClick={() => setCollapsedGroups(current => ({ ...current, [group.id]: !expanded }))}><span className="patient-exam-group-title">{group.title}</span><span className="patient-exam-group-count">{items.length}</span><ChevronDown size={16} aria-hidden="true" /></button></h3>
+          <h3 id={`patient-exam-group-${group.id}`}><button className="patient-exam-group-toggle" type="button" aria-expanded={expanded} aria-controls={groupPanelId} onClick={() => setCollapsedGroups(current => ({ ...current, [group.id]: !expanded }))}><span className="patient-exam-group-title">{group.title}</span><span className={`patient-exam-group-count ${items.length ? "has-items" : "empty"}`}>{items.length}</span><ChevronDown size={16} aria-hidden="true" /></button></h3>
           <div id={groupPanelId} className="patient-exam-group-panel" hidden={!expanded}>
-            {items.length === 0 ? <p className="patient-exam-empty">Nenhum exame enviado</p> : <ul>{items.map(item => {
+            {items.length === 0 ? <p className="patient-exam-empty">Nenhum exame enviado.</p> : <ul>{items.map(item => {
               const kind = fileTypeLabel(String(item.mimeType || ""), String(item.fileName || ""));
               const isClassifying = classifyingId === Number(item.id);
               return <li className="patient-exam-file" key={item.id}>
-                <div className="patient-exam-file-heading"><span className="patient-exam-file-icon" aria-hidden="true">{kind === "PDF" ? <FileText size={18} /> : <FileImage size={18} />}</span><strong title={item.fileName}>{item.fileName}</strong><span className="patient-exam-file-type">{kind}</span></div>
-                <p className="patient-exam-date">Exame: <strong>{examDateLabel(item.examDate)}</strong></p>
+                <div className="patient-exam-file-heading"><span className="patient-exam-file-icon" aria-hidden="true">{kind}</span><strong title={item.fileName}>{item.fileName}</strong></div>
+                <p className={`patient-exam-date ${item.examDate ? "" : "is-missing"}`}>{item.examDate ? <>Exame: <strong>{examDateLabel(item.examDate)}</strong></> : "Data não informada"}</p>
                 <p className="patient-exam-uploaded" title={item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleString("pt-BR")}` : undefined}>{item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleDateString("pt-BR")}` : "Data de envio não informada"}</p>
                 <div className="patient-exam-actions"><button type="button" onClick={() => void openAttachment(item, "view")} aria-label={`Visualizar ${item.fileName}`}><FileText size={15} />Visualizar</button><button type="button" onClick={() => void openAttachment(item, "download")} aria-label={`Baixar ${item.fileName}`}><Download size={15} />Baixar</button><button type="button" onClick={() => startClassification(item)} aria-label={`${item.normalizedExamType ? "Editar" : "Classificar"} ${item.fileName}`}>{item.normalizedExamType ? <><Pencil size={15} />Editar</> : <><Pencil size={15} />Classificar</>}</button></div>
                 {isClassifying && <form className="patient-exam-classification-form" onSubmit={event => { event.preventDefault(); void saveClassification(item); }}>
