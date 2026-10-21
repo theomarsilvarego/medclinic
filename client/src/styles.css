@@ -964,13 +964,18 @@ tr:last-child td {
 }
 .appointment-modal .appointment-patient-field {
   grid-column: 1 / -1;
+  width: 100%;
 }
 .appointment-patient-picker {
   position: relative;
+  width: 100%;
 }
 .appointment-patient-picker .appointment-patient-search {
+  display: block;
+  width: 100%;
   margin-bottom: 0;
   padding-right: 42px;
+  box-sizing: border-box;
 }
 .appointment-patient-options {
   position: absolute;
