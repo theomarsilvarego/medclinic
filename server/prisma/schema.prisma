@@ -410,6 +410,8 @@ model AppointmentAttachment {
   patientId       Int          @map("patient_id")
   fileName        String       @map("file_name") @db.VarChar(255)
   mimeType        String       @map("mime_type") @db.VarChar(100)
+  examType        String?      @map("exam_type") @db.VarChar(40)
+  examDate        DateTime?    @map("exam_date") @db.Date
   sizeBytes       Int          @map("size_bytes")
   storageKey      String       @unique @map("storage_key") @db.VarChar(255)
   url             String       @db.VarChar(255)

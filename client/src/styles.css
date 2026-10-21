@@ -1168,7 +1168,8 @@ tr:last-child td {
   grid-column: 1 / -1;
 }
 .appointment-modal .appointment-attachments-field,
-.appointment-modal .modal-fields label.wide {
+.appointment-modal .modal-fields label.wide,
+.appointment-modal .appointment-exam-attachments {
   grid-column: 1 / -1;
   width: 100%;
 }
@@ -1191,8 +1192,19 @@ tr:last-child td {
 .appointment-attachment-upload-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid #a85a70; border-radius: 8px; color: #8e3f57; background: #fff; font-weight: 800; }
 .appointment-attachment-upload-button:hover { background: #fff3f5; }
 .appointment-hidden-file-input { display: none !important; }
+.appointment-exam-attachments { display: grid; gap: 12px; padding: 14px; border: 1px solid #eadfe3; border-radius: 12px; background: #fffafa; }
+.appointment-exam-attachments > .appointment-attachments-title { justify-content: space-between; }
+.appointment-exam-attachments > .appointment-attachments-title button { display: inline-flex; align-items: center; gap: 6px; }
+.appointment-exam-upload-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(140px, .8fr) minmax(190px, 1.4fr) 34px; align-items: end; gap: 10px; padding: 12px; border: 1px solid #f0e2e5; border-radius: 10px; background: #fff; }
+.appointment-exam-upload-row > label { min-width: 0; }
+.appointment-exam-upload-row .appointment-exam-file input { width: 100%; padding: 7px; }
+.appointment-exam-upload-row .appointment-exam-file small { display: block; margin-top: 4px; overflow: hidden; color: #8f7b82; text-overflow: ellipsis; white-space: nowrap; }
+.appointment-exam-upload-row > .appointment-attachment-remove { width: 34px; height: 38px; border: 1px solid #f0e2e5; border-radius: 8px; }
+.appointment-exam-attachments > small { color: #8f7b82; font-size: 11px; }
 @media (max-width: 620px) {
   .appointment-attachment-list { grid-template-columns: 1fr; }
+  .appointment-exam-upload-row { grid-template-columns: 1fr; }
+  .appointment-exam-upload-row > .appointment-attachment-remove { justify-self: end; }
 }
 .agenda-card {
   overflow: auto;

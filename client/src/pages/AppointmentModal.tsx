@@ -18,6 +18,7 @@ export function AppointmentModal({
   const [patientSearch, setPatientSearch] = useState("");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [examUploads, setExamUploads] = useState<{ examType: string; examDate: string; file: File | null }[]>([]);
   const [savedAttachments, setSavedAttachments] = useState<Row[]>(initial.attachments || []);
   const [dragging, setDragging] = useState(false);
   const update = (key: string, value: any) =>
@@ -237,17 +238,27 @@ export function AppointmentModal({
             />
           </label>
           <label className="wide appointment-attachments-field">
-            <span className="appointment-attachments-title">Anexos <b>{savedAttachments.length + attachmentFiles.length}</b></span>
-            {savedAttachments.length + attachmentFiles.length > 0 && <div className="appointment-attachment-list">{savedAttachments.map(attachment => <div className="appointment-attachment-chip" key={`saved-${attachment.id}`}><button type="button" className="appointment-attachment-main" onClick={() => viewAttachment(attachment)}>{iconFor(attachment.mimeType)}<span><strong>{attachment.fileName}</strong><small>{fileSize(attachment.sizeBytes)} · {attachment.uploadedBy?.fullName || "Usuário"} · {new Date(attachment.uploadedAt).toLocaleDateString("pt-BR")}</small></span></button><button type="button" className="appointment-attachment-view" onClick={() => viewAttachment(attachment)} title="Visualizar"><Eye size={16} /></button><button type="button" className="appointment-attachment-remove" onClick={() => removeSavedAttachment(attachment)} title="Remover"><X size={16} /></button></div>)}{attachmentFiles.map((file, index) => <div className="appointment-attachment-chip" key={`new-${file.name}-${index}`}><button type="button" className="appointment-attachment-main"><FileText size={18} /><span><strong>{file.name}</strong><small>Novo anexo · {fileSize(file.size)}</small></span></button><button type="button" className="appointment-attachment-remove" onClick={() => setAttachmentFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} title="Remover"><X size={16} /></button></div>)}</div>}
+            <span className="appointment-attachments-title">Anexos <b>{savedAttachments.length + attachmentFiles.length + examUploads.length}</b></span>
+            {savedAttachments.length + attachmentFiles.length > 0 && <div className="appointment-attachment-list">{savedAttachments.map(attachment => <div className="appointment-attachment-chip" key={`saved-${attachment.id}`}><button type="button" className="appointment-attachment-main" onClick={() => viewAttachment(attachment)}>{iconFor(attachment.mimeType)}<span><strong>{attachment.fileName}</strong><small>{attachment.examType ? `${({ LABORATORIAIS: "Laboratoriais", USG_TRANSVAGINAL: "USG Transvaginal", USG_MANA: "USG Mana", PREVENTIVO: "Preventivo" } as Record<string, string>)[attachment.examType] || attachment.examType} · ${attachment.examDate ? new Date(`${String(attachment.examDate).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "Data não informada"} · ` : ""}{fileSize(attachment.sizeBytes)} · {attachment.uploadedBy?.fullName || "Usuário"} · {new Date(attachment.uploadedAt).toLocaleDateString("pt-BR")}</small></span></button><button type="button" className="appointment-attachment-view" onClick={() => viewAttachment(attachment)} title="Visualizar"><Eye size={16} /></button><button type="button" className="appointment-attachment-remove" onClick={() => removeSavedAttachment(attachment)} title="Remover"><X size={16} /></button></div>)}{attachmentFiles.map((file, index) => <div className="appointment-attachment-chip" key={`new-${file.name}-${index}`}><button type="button" className="appointment-attachment-main"><FileText size={18} /><span><strong>{file.name}</strong><small>Novo anexo · {fileSize(file.size)}</small></span></button><button type="button" className="appointment-attachment-remove" onClick={() => setAttachmentFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} title="Remover"><X size={16} /></button></div>)}</div>}
             <div className={`appointment-attachment-dropzone ${dragging ? "dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={handleDrop}><span>Arraste arquivos aqui ou</span><button type="button" className="appointment-attachment-upload-button" onClick={event => { event.preventDefault(); (event.currentTarget.nextElementSibling as HTMLInputElement)?.click(); }}><Upload size={16} /> Anexar arquivo</button><input className="appointment-hidden-file-input" type="file" multiple accept="application/pdf,image/jpeg,image/png" onChange={e => addAttachments(e.target.files)} /></div>
             <small>PDF, JPG ou PNG, até 10 MB por arquivo. Cada anexo registra quem enviou e quando.</small>
           </label>
+          <section className="wide appointment-exam-attachments">
+            <div className="appointment-attachments-title"><span>Exames anexados</span><button type="button" className="secondary" disabled={examUploads.length >= 10} onClick={() => setExamUploads(current => current.length >= 10 ? current : [...current, { examType: "", examDate: "", file: null }])}><Plus size={15} /> Adicionar exame</button></div>
+            {examUploads.map((exam, index) => <div className="appointment-exam-upload-row" key={index}>
+              <label>Tipo do exame<select value={exam.examType} onChange={event => setExamUploads(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, examType: event.target.value } : item))}><option value="">Selecione…</option><option value="LABORATORIAIS">Laboratoriais</option><option value="USG_TRANSVAGINAL">USG Transvaginal</option><option value="USG_MANA">USG Mana</option><option value="PREVENTIVO">Preventivo</option></select></label>
+              <label>Data do exame<input type="date" value={exam.examDate} onChange={event => setExamUploads(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, examDate: event.target.value } : item))} /></label>
+              <label className="appointment-exam-file">Anexar exame<input type="file" accept="application/pdf,image/jpeg,image/png" onChange={event => { const file = event.target.files?.[0] || null; if (file && file.size > 10 * 1024 * 1024) { alert("O arquivo deve ter no máximo 10 MB."); event.target.value = ""; return; } setExamUploads(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, file } : item)); }} /><small>{exam.file?.name || "Nenhum arquivo selecionado"}</small></label>
+              <button type="button" className="appointment-attachment-remove" onClick={() => setExamUploads(current => current.filter((_, itemIndex) => itemIndex !== index))} title="Remover exame"><X size={16} /></button>
+            </div>)}
+            <small>Tipos aceitos: PDF, JPG ou PNG, até 10 MB por exame.</small>
+          </section>
         </div>
         <div className="modal-footer">
           <button className="secondary" onClick={onClose}>
             Cancelar
           </button>
-          <button className="primary" onClick={() => onSave({ ...data, attachmentFiles })}>
+          <button className="primary" onClick={() => { const incomplete = examUploads.some(exam => !exam.examType || !exam.examDate || !exam.file); if (incomplete) { alert("Preencha tipo, data e arquivo de cada exame anexado."); return; } onSave({ ...data, attachmentFiles, examUploads: examUploads as Row[] }); }}>
             Salvar agendamento
           </button>
         </div>
