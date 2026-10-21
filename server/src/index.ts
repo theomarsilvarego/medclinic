@@ -410,20 +410,31 @@ async function persistAppointmentAttachments(
     });
   }
 }
-const appointmentExamTypes = ["LABORATORIAIS", "USG_TRANSVAGINAL", "USG_MANA", "PREVENTIVO"] as const;
+const appointmentExamTypes = ["laboratorial", "usg_tv", "usg_mama", "preventivo"] as const;
+const legacyAppointmentExamTypes: Record<string, typeof appointmentExamTypes[number]> = {
+  LABORATORIAIS: "laboratorial",
+  USG_TRANSVAGINAL: "usg_tv",
+  USG_MANA: "usg_mama",
+  PREVENTIVO: "preventivo",
+};
 const appointmentExamMetadataSchema = z.array(z.object({
   examType: z.enum(appointmentExamTypes),
   examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data do exame inválida.").refine((value) => {
     const date = new Date(`${value}T00:00:00.000Z`);
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-  }, "Data do exame inválida."),
+  }, "Data do exame inválida.").nullable(),
 })).max(10);
 function parseAppointmentExamUploads(req: AuthRequest) {
   let rawMetadata: unknown;
   try { rawMetadata = JSON.parse(String(req.body.examMetadata || "[]")); }
   catch { throw new Error("Os dados dos exames anexados são inválidos."); }
-  const metadata = appointmentExamMetadataSchema.safeParse(rawMetadata);
-  if (!metadata.success) throw new Error("Informe um tipo e uma data válidos para cada exame.");
+  const normalizedMetadata = Array.isArray(rawMetadata) ? rawMetadata.map((item: any) => ({
+    ...item,
+    examType: legacyAppointmentExamTypes[item?.examType] || item?.examType,
+    examDate: item?.examDate || null,
+  })) : rawMetadata;
+  const metadata = appointmentExamMetadataSchema.safeParse(normalizedMetadata);
+  if (!metadata.success) throw new Error("Informe uma classificação válida e, se preenchida, uma data válida para cada exame.");
   const fileFields = (req.files || {}) as Record<string, Express.Multer.File[]>;
   const files = fileFields.examFiles || [];
   if (files.length !== metadata.data.length)
@@ -434,7 +445,7 @@ async function persistAppointmentExamAttachments(
   appointmentId: number,
   patientId: number,
   files: Express.Multer.File[],
-  metadata: { examType: typeof appointmentExamTypes[number]; examDate: string }[],
+  metadata: { examType: typeof appointmentExamTypes[number]; examDate: string | null }[],
   uploadedById: number,
 ) {
   if (!files.length) return;
@@ -450,7 +461,7 @@ async function persistAppointmentExamAttachments(
         fileName: file.originalname,
         mimeType: file.mimetype,
         examType: metadata[index].examType,
-        examDate: new Date(`${metadata[index].examDate}T00:00:00.000Z`),
+        examDate: metadata[index].examDate ? new Date(`${metadata[index].examDate}T00:00:00.000Z`) : null,
         sizeBytes: file.size,
         storageKey,
         url: `/appointment-attachments/file?key=${encodeURIComponent(storageKey)}`,
@@ -1961,6 +1972,20 @@ app.delete(
     res.status(204).send();
   },
 );
+app.get("/api/medical-records/patients/:patientId/exam-attachments", auth, doctorOnly, async (req, res) => {
+  const patientId = Number(req.params.patientId);
+  if (!Number.isInteger(patientId) || patientId <= 0)
+    return res.status(400).json({ message: "Paciente inválido." });
+  const acceptedTypes = [...appointmentExamTypes, ...Object.keys(legacyAppointmentExamTypes)];
+  const attachments = await prisma.appointmentAttachment.findMany({
+    where: { patientId, examType: { in: acceptedTypes } },
+    orderBy: [{ examDate: "desc" }, { uploadedAt: "desc" }],
+  });
+  res.json(attachments.map(attachment => ({
+    ...attachment,
+    examType: attachment.examType ? legacyAppointmentExamTypes[attachment.examType] || attachment.examType : null,
+  })));
+});
 app.get("/api/appointment-attachments/file", auth, appointmentAccess, async (req, res) => {
   const storageKey = String(req.query.key || "");
   const attachment = await prisma.appointmentAttachment.findUnique({ where: { storageKey } });

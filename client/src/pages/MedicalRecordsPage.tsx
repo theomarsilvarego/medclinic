@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
+  Download,
   Eye,
   FlaskConical,
   Clock3,
@@ -14,6 +15,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   ShieldAlert,
   Trash2,
@@ -1071,6 +1073,99 @@ function ClinicalAlertsBand({ allergies = [], comorbidities = [], medications = 
   </section>;
 }
 
+const patientExamGroups = [
+  { id: "laboratorial", title: "Exames laboratoriais" },
+  { id: "usg_tv", title: "USG TV" },
+  { id: "usg_mama", title: "USG Mama" },
+  { id: "preventivo", title: "Preventivo" },
+] as const;
+const legacyPatientExamTypes: Record<string, string> = {
+  LABORATORIAIS: "laboratorial",
+  USG_TRANSVAGINAL: "usg_tv",
+  USG_MANA: "usg_mama",
+  PREVENTIVO: "preventivo",
+};
+
+function examDateLabel(value: unknown) {
+  if (!value) return "Data não informada";
+  const date = String(value).slice(0, 10);
+  return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR");
+}
+
+function PatientExamSidebar({ patientId, refreshKey }: { patientId: number; refreshKey: number }) {
+  const [attachments, setAttachments] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
+  const [fileError, setFileError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    request(`/medical-records/patients/${patientId}/exam-attachments`)
+      .then((result: Row[]) => { if (active) setAttachments(result || []); })
+      .catch((reason: any) => { if (active) setError(reason.message || "Não foi possível carregar os exames."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [patientId, refreshKey, retryKey]);
+
+  async function openAttachment(attachment: Row, mode: "view" | "download") {
+    setFileError("");
+    const previewWindow = mode === "view" ? window.open("about:blank", "_blank") : null;
+    if (mode === "view" && !previewWindow) {
+      setFileError("O navegador bloqueou a nova aba. Permita pop-ups e tente novamente.");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("medclinic_token");
+      const response = await fetch(`${API}${attachment.url}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!response.ok) throw new Error("Não foi possível abrir o arquivo.");
+      const blobUrl = URL.createObjectURL(await response.blob());
+      if (previewWindow) previewWindow.location.href = blobUrl;
+      else {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = String(attachment.fileName || "exame");
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (reason: any) {
+      previewWindow?.close();
+      setFileError(reason.message || "Não foi possível abrir o arquivo.");
+    }
+  }
+
+  const normalizedAttachments: Row[] = attachments.map((item: Row): Row => ({ ...item, normalizedExamType: legacyPatientExamTypes[String(item.examType || "")] || item.examType }));
+  return <aside className="patient-exams-sidebar" aria-labelledby="patient-exams-title">
+    <header className="patient-exams-heading"><div><p>ARQUIVOS CLÍNICOS</p><h2 id="patient-exams-title">Exames do paciente</h2></div><span aria-label={`${attachments.length} exames`}>{attachments.length}</span></header>
+    {loading ? <div className="patient-exams-state" role="status" aria-live="polite">Carregando exames…</div> : error ? <div className="patient-exams-state patient-exams-error" role="alert"><p>{error}</p><button type="button" onClick={() => setRetryKey(value => value + 1)}><RefreshCw size={15} />Tentar de novo</button></div> : <div className="patient-exam-groups">
+      {patientExamGroups.map(group => {
+        const items = normalizedAttachments.filter(item => item.normalizedExamType === group.id).sort((a, b) => {
+          const dateA = a.examDate ? String(a.examDate).slice(0, 10) : "";
+          const dateB = b.examDate ? String(b.examDate).slice(0, 10) : "";
+          return dateB.localeCompare(dateA) || String(b.uploadedAt || "").localeCompare(String(a.uploadedAt || ""));
+        });
+        return <section className="patient-exam-group" key={group.id} aria-labelledby={`patient-exam-group-${group.id}`}>
+          <h3 id={`patient-exam-group-${group.id}`}>{group.title}<span>{items.length}</span></h3>
+          {items.length === 0 ? <p className="patient-exam-empty">Nenhum exame enviado</p> : <ul>{items.map(item => {
+            const kind = fileTypeLabel(String(item.mimeType || ""), String(item.fileName || ""));
+            return <li className="patient-exam-file" key={item.id}>
+              <div className="patient-exam-file-heading"><span className="patient-exam-file-icon" aria-hidden="true">{kind === "PDF" ? <FileText size={18} /> : <FileImage size={18} />}</span><strong title={item.fileName}>{item.fileName}</strong><span className="patient-exam-file-type">{kind}</span></div>
+              <p className="patient-exam-date">Exame: <strong>{examDateLabel(item.examDate)}</strong></p>
+              <p className="patient-exam-uploaded" title={item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleString("pt-BR")}` : undefined}>{item.uploadedAt ? `Enviado em ${new Date(item.uploadedAt).toLocaleDateString("pt-BR")}` : "Data de envio não informada"}</p>
+              <div className="patient-exam-actions"><button type="button" onClick={() => void openAttachment(item, "view")} aria-label={`Visualizar ${item.fileName}`}><FileText size={15} />Visualizar</button><button type="button" onClick={() => void openAttachment(item, "download")} aria-label={`Baixar ${item.fileName}`}><Download size={15} />Baixar</button></div>
+            </li>;
+          })}</ul>}
+        </section>;
+      })}
+      {fileError && <p className="patient-exam-file-error" role="alert">{fileError}</p>}
+    </div>}
+  </aside>;
+}
+
 function ClinicalEvolutionSummary({ record }: { record: Row }) {
   const fields = parseEvolution(record.conduct);
   const hasContent = Boolean(fields.conduct.trim());
@@ -1279,6 +1374,7 @@ export function MedicalRecordsPage({
   const [composingRecordId, setComposingRecordId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [examListRefreshKey, setExamListRefreshKey] = useState(0);
 
   useEffect(() => {
     setSelectedPatientId(patientId);
@@ -1408,34 +1504,35 @@ export function MedicalRecordsPage({
             Escolha um paciente para consultar ou criar registros clínicos.
           </span>
         </div>
-      ) : loading ? (
-        <div className="medical-record-empty">Carregando prontuário…</div>
-      ) : displayedRecords.length === 0 ? (
-        <div className="medical-record-empty">
-          <FilePlus2 size={36} />
-          <strong>Nenhum registro clínico</strong>
-          <span>
-            Crie o primeiro registro deste paciente usando o botão acima.
-          </span>
-        </div>
       ) : (
-        <div className="medical-timeline">
-          {displayedRecords.map((record) => {
-            const isEditingRecord = Boolean(editing) && (editing?.id ? Number(editing.id) === Number(record.id) : !record.id);
-            const canCompose = Boolean(enableExamRequests && record.id && Number(composingRecordId) === Number(record.id));
-            return <RecordTimelineCard
-              key={isEditingRecord ? "active-editor" : String(record.id)}
-              record={record}
-              isEditing={isEditingRecord}
-              canEdit={Boolean(allowNewRecord && !editing)}
-              canCompose={canCompose}
-              onRetify={() => setEditing({ ...record, recordDate: formatDateInput(record.recordDate) })}
-              onSave={saveRecord}
-              onPersisted={syncSavedRecord}
-              onFinish={() => setEditing(null)}
-              onChanged={() => reload(selectedPatientId)}
-            />;
-          })}
+        <div className="medical-records-workspace">
+          <section className="medical-records-primary" aria-label="Histórico clínico">
+            {loading ? <div className="medical-record-empty">Carregando prontuário…</div> : displayedRecords.length === 0 ? (
+              <div className="medical-record-empty">
+                <FilePlus2 size={36} />
+                <strong>Nenhum registro clínico</strong>
+                <span>Crie o primeiro registro deste paciente usando o botão acima.</span>
+              </div>
+            ) : <div className="medical-timeline">
+              {displayedRecords.map((record) => {
+                const isEditingRecord = Boolean(editing) && (editing?.id ? Number(editing.id) === Number(record.id) : !record.id);
+                const canCompose = Boolean(enableExamRequests && record.id && Number(composingRecordId) === Number(record.id));
+                return <RecordTimelineCard
+                  key={isEditingRecord ? "active-editor" : String(record.id)}
+                  record={record}
+                  isEditing={isEditingRecord}
+                  canEdit={Boolean(allowNewRecord && !editing)}
+                  canCompose={canCompose}
+                  onRetify={() => setEditing({ ...record, recordDate: formatDateInput(record.recordDate) })}
+                  onSave={saveRecord}
+                  onPersisted={syncSavedRecord}
+                  onFinish={() => setEditing(null)}
+                  onChanged={async () => { await reload(selectedPatientId); setExamListRefreshKey(value => value + 1); }}
+                />;
+              })}
+            </div>}
+          </section>
+          <PatientExamSidebar patientId={Number(selectedPatientId)} refreshKey={examListRefreshKey} />
         </div>
       )}
     </>

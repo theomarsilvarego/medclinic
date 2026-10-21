@@ -16,8 +16,12 @@ import type { Row } from "../lib/app";
 import { API, money, request } from "../lib/app";
 
 const examLabels: Record<string, string> = {
-  LABORATORIAIS: "Laboratoriais",
-  USG_TRANSVAGINAL: "USG Transvaginal",
+  laboratorial: "Exames laboratoriais",
+  usg_tv: "USG TV",
+  usg_mama: "USG Mama",
+  preventivo: "Preventivo",
+  LABORATORIAIS: "Exames laboratoriais",
+  USG_TRANSVAGINAL: "USG TV",
   USG_MANA: "USG Mama",
   PREVENTIVO: "Preventivo",
 };
@@ -124,15 +128,13 @@ export function AppointmentModal({
       itemType === "ATENDIMENTO" && !data.attendanceId && "Atendimento",
       itemType === "PROCEDIMENTO" && !data.procedureId && "Procedimento",
     ].filter(Boolean) as string[];
-    const incompleteExam = examUploads.some(
-      (exam) => !exam.examType || !exam.examDate || !exam.file,
-    );
+    const incompleteExam = examUploads.some((exam) => !exam.examType || !exam.file);
     if (missing.length) {
       alert(`Preencha os campos obrigatórios: ${missing.join(", ")}.`);
       return;
     }
     if (incompleteExam) {
-      alert("Preencha tipo, data e arquivo de cada exame anexado.");
+      alert("Preencha a classificação e selecione um arquivo para cada exame anexado.");
       return;
     }
     onSave({ ...data, examUploads: examUploads as Row[] });
@@ -385,6 +387,7 @@ export function AppointmentModal({
                       type="button"
                       className="appointment-attachment-main"
                       onClick={() => viewAttachment(attachment)}
+                      aria-label={`Visualizar ${attachment.fileName}`}
                     >
                       {iconFor(attachment.mimeType)}
                       <span>
@@ -407,6 +410,7 @@ export function AppointmentModal({
                       className="appointment-attachment-view"
                       onClick={() => viewAttachment(attachment)}
                       title="Visualizar"
+                      aria-label={`Visualizar ${attachment.fileName}`}
                     >
                       <Eye size={16} />
                     </button>
@@ -415,6 +419,7 @@ export function AppointmentModal({
                       className="appointment-attachment-remove"
                       onClick={() => removeSavedAttachment(attachment)}
                       title="Remover"
+                      aria-label={`Remover anexo ${attachment.fileName}`}
                     >
                       <X size={16} />
                     </button>
@@ -425,6 +430,7 @@ export function AppointmentModal({
             {examUploads.map((exam, index) => (
               <div className="appointment-exam-upload-row" key={index}>
                 <label>
+                  <span>Classificação</span>
                   <select
                     value={exam.examType}
                     onChange={(event) =>
@@ -438,7 +444,7 @@ export function AppointmentModal({
                     }
                   >
                     <option value="">Selecione o tipo</option>
-                    {Object.entries(examLabels).map(([value, label]) => (
+                    {Object.entries(examLabels).filter(([value]) => !value.toUpperCase().startsWith("LABORATORIAIS") && !["USG_TRANSVAGINAL", "USG_MANA", "PREVENTIVO"].includes(value)).map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
                       </option>
@@ -446,6 +452,7 @@ export function AppointmentModal({
                   </select>
                 </label>
                 <label>
+                  <span>Data do exame (opcional)</span>
                   <input
                     type="date"
                     value={exam.examDate}
@@ -461,9 +468,11 @@ export function AppointmentModal({
                   />
                 </label>
                 <label className="appointment-exam-file">
+                  <span>Arquivo (PDF, JPG ou PNG)</span>
                   <input
                     type="file"
                     accept="application/pdf,image/jpeg,image/png"
+                    aria-label="Selecionar arquivo do exame (PDF, JPG ou PNG)"
                     onChange={(event) => {
                       const file = event.target.files?.[0] || null;
                       if (file && file.size > 10 * 1024 * 1024) {
@@ -488,6 +497,7 @@ export function AppointmentModal({
                     )
                   }
                   title="Remover exame"
+                  aria-label={`Remover exame ${index + 1}`}
                 >
                   <X size={16} />
                 </button>
