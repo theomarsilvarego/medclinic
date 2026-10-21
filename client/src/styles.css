@@ -4016,7 +4016,7 @@ tr:last-child td {
   font-size: 13px;
 }
 .appointment-exam-upload-row {
-  grid-template-columns: minmax(160px, 1fr) minmax(150px, .8fr) minmax(220px, 1.45fr) 40px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 12px;
   border-color: #f0e2e5;
 }
@@ -4027,6 +4027,13 @@ tr:last-child td {
 .appointment-exam-upload-row label select {
   min-height: 40px;
   font-size: 12px;
+}
+.appointment-exam-upload-row .appointment-exam-file {
+  grid-column: 1 / -1;
+}
+.appointment-exam-upload-row .appointment-exam-remove {
+  grid-column: 2;
+  justify-self: end;
 }
 .appointment-exam-upload-row .appointment-exam-file input {
   padding: 9px;
@@ -4083,7 +4090,11 @@ tr:last-child td {
   .appointment-exam-upload-row {
     grid-template-columns: 1fr;
   }
-  .appointment-exam-upload-row > .appointment-attachment-remove {
+  .appointment-exam-upload-row .appointment-exam-file,
+  .appointment-exam-upload-row .appointment-exam-remove {
+    grid-column: 1;
+  }
+  .appointment-exam-upload-row .appointment-exam-remove {
     justify-self: end;
   }
 }
