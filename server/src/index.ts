@@ -10,6 +10,7 @@ import {
   AppointmentItemType,
   AppointmentStatus,
   InjectableType,
+  Prisma,
   ProcedureType,
   PrismaClient,
   Profile,
@@ -372,8 +373,118 @@ const appointmentSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+const anamnesisText = z.string().trim().max(2000);
+const anamnesisAnswersSchema = z.object({
+  orderNumber: z.string().trim().min(1).max(30),
+  appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  cpf: z.string().trim().max(14),
+  fullName: z.string().trim().min(1).max(180),
+  titularNumber: z.string().trim().max(40),
+  maritalStatus: z.string().trim().max(40),
+  phone: z.string().trim().max(40),
+  birthDate: z.string().trim().max(10),
+  age: z.string().trim().max(3),
+  lastMenstruationDate: z.string().trim().max(10),
+  weightKg: z.string().trim().max(20),
+  bloodPressureSystolic: z.string().trim().max(10),
+  bloodPressureDiastolic: z.string().trim().max(10),
+  menarcheAge: z.string().trim().max(10),
+  contraceptiveUse: z.enum(["SIM", "NAO", ""]),
+  contraceptiveMethod: anamnesisText,
+  pregnancies: z.string().trim().max(10),
+  normalBirths: z.string().trim().max(10),
+  cesareanBirths: z.string().trim().max(10),
+  abortions: z.string().trim().max(10),
+  lastPreventiveExam: z.string().trim().max(7),
+  umg: anamnesisText,
+  hasChronicHypertension: z.boolean(),
+  hasOtherComorbidities: z.boolean(),
+  comorbidityDetails: anamnesisText,
+  hasAllergy: z.enum(["SIM", "NAO", ""]),
+  allergyDetails: anamnesisText,
+  previousSurgeries: anamnesisText,
+  physicalActivity: anamnesisText,
+  chiefComplaint: anamnesisText,
+  routineEvaluation: z.boolean(),
+  otherReason: anamnesisText,
+});
+const anamnesisSubmissionSchema = z.object({
+  answers: anamnesisAnswersSchema,
+  consentAccepted: z.boolean(),
+});
+const anamnesisTokenPattern = /^[a-zA-Z0-9_-]{43}$/;
+const anamnesisConsentVersion = "2026-10-22-v1";
+const anamnesisTokenLifetimeMs = 30 * 24 * 60 * 60 * 1000;
+
+function hashAnamnesisToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function isSindicatoInsurance(name: string | null | undefined) {
+  const normalized = String(name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+  return /^SINDICATO(?:$|[\s\-/])/.test(normalized);
+}
+
+async function isEligibleForAnamnesis(appointment: {
+  insurance: { name: string };
+  patient: { insuranceCode: number | null };
+}) {
+  if (!isSindicatoInsurance(appointment.insurance.name)) return false;
+  if (appointment.patient.insuranceCode === null) return true;
+  const patientInsurance = await prisma.insurance.findUnique({
+    where: { id: appointment.patient.insuranceCode },
+    select: { name: true },
+  });
+  return isSindicatoInsurance(patientInsurance?.name);
+}
+
+function setAnamnesisNoStoreHeaders(res: Response) {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
+}
+
+async function findPublicAnamnesis(token: string) {
+  if (!anamnesisTokenPattern.test(token)) return null;
+  const form = await prisma.patientAnamnesis.findUnique({
+    where: { tokenHash: hashAnamnesisToken(token) },
+    include: {
+      patient: { select: { id: true } },
+      appointment: {
+        include: {
+          patient: {
+            select: {
+              id: true,
+              fullName: true,
+              cpf: true,
+              phone: true,
+              birthDate: true,
+              insuranceCode: true,
+            },
+          },
+          insurance: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (
+    !form ||
+    form.revokedAt ||
+    form.submittedAt ||
+    form.expiresAt.getTime() <= Date.now() ||
+    form.patientId !== form.appointment.patient.id
+  ) return null;
+  if (!(await isEligibleForAnamnesis(form.appointment))) return null;
+  return form;
+}
+
 const appointmentInclude = {
-  patient: { select: { id: true, fullName: true, phone: true } },
+  patient: { select: { id: true, fullName: true, phone: true, insuranceCode: true } },
   doctor: { select: { id: true, fullName: true, specialty: true } },
   insurance: { select: { id: true, name: true } },
   attendance: { select: { id: true, name: true } },
@@ -1857,6 +1968,137 @@ app.get(
     res.json({ patients, doctors, insurances, attendances, procedures });
   },
 );
+app.get("/api/appointments/:id/anamnesis", auth, appointmentAccess, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  setAnamnesisNoStoreHeaders(res);
+  const appointment = await prisma.appointment.findUnique({
+    where: { id },
+    include: {
+      patient: { select: { id: true, insuranceCode: true } },
+      insurance: { select: { name: true } },
+    },
+  });
+  if (!appointment) return res.status(404).json({ message: "Agendamento não encontrado." });
+  if (!(await isEligibleForAnamnesis(appointment)))
+    return res.status(403).json({ message: "A ficha de anamnese está disponível apenas para pacientes do convênio SINDICATO." });
+  const form = await prisma.patientAnamnesis.findUnique({ where: { appointmentId: id } });
+  if (!form || form.patientId !== appointment.patientId || form.revokedAt)
+    return res.json({ state: "not_created" });
+  if (form.submittedAt)
+    return res.json({ state: "submitted", answers: form.answers, submittedAt: form.submittedAt, consentAcceptedAt: form.consentAcceptedAt });
+  return res.json({ state: "pending", expiresAt: form.expiresAt });
+});
+
+app.post("/api/appointments/:id/anamnesis-link", auth, appointmentAccess, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  setAnamnesisNoStoreHeaders(res);
+  const appointment = await prisma.appointment.findUnique({
+    where: { id },
+    include: {
+      patient: { select: { id: true, insuranceCode: true } },
+      insurance: { select: { name: true } },
+    },
+  });
+  if (!appointment) return res.status(404).json({ message: "Agendamento não encontrado." });
+  if (!(await isEligibleForAnamnesis(appointment)))
+    return res.status(403).json({ message: "A ficha de anamnese está disponível apenas para pacientes do convênio SINDICATO." });
+  const existing = await prisma.patientAnamnesis.findUnique({ where: { appointmentId: id } });
+  if (existing?.submittedAt)
+    return res.status(409).json({ message: "A ficha deste agendamento já foi enviada." });
+
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + anamnesisTokenLifetimeMs);
+  await prisma.patientAnamnesis.upsert({
+    where: { appointmentId: id },
+    create: {
+      appointmentId: id,
+      patientId: appointment.patientId,
+      tokenHash: hashAnamnesisToken(token),
+      expiresAt,
+    },
+    update: {
+      patientId: appointment.patientId,
+      tokenHash: hashAnamnesisToken(token),
+      expiresAt,
+      revokedAt: null,
+    },
+  });
+  res.status(201).json({ token, expiresAt });
+});
+
+app.get("/api/public/anamnesis/:token", async (req, res) => {
+  setAnamnesisNoStoreHeaders(res);
+  const form = await findPublicAnamnesis(String(req.params.token || ""));
+  if (!form)
+    return res.status(404).json({ message: "Este link é inválido ou não está mais disponível. Solicite um novo QR Code à clínica." });
+  res.json({
+    orderNumber: String(form.appointment.id).padStart(6, "0"),
+    appointmentDate: form.appointment.appointmentDate.toISOString().slice(0, 10),
+    patient: {
+      fullName: form.appointment.patient.fullName,
+      cpf: form.appointment.patient.cpf,
+      phone: form.appointment.patient.phone,
+      birthDate: form.appointment.patient.birthDate?.toISOString().slice(0, 10) || "",
+    },
+  });
+});
+
+app.post("/api/public/anamnesis/:token", async (req, res) => {
+  setAnamnesisNoStoreHeaders(res);
+  const form = await findPublicAnamnesis(String(req.params.token || ""));
+  if (!form)
+    return res.status(404).json({ message: "Este link é inválido ou não está mais disponível. Solicite um novo QR Code à clínica." });
+  const parsed = anamnesisSubmissionSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: "Confira os campos preenchidos e tente enviar novamente." });
+  if (!parsed.data.consentAccepted)
+    return res.status(400).json({ message: "É necessário aceitar o uso dos dados conforme a LGPD para enviar a ficha." });
+
+  const answers = parsed.data.answers;
+  const today = clinicTodayDate();
+  const isValidDate = (value: string) => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value && value <= today;
+  };
+  if (
+    answers.appointmentDate !== form.appointment.appointmentDate.toISOString().slice(0, 10) ||
+    !isValidDate(answers.birthDate) ||
+    !isValidDate(answers.lastMenstruationDate) ||
+    (answers.lastPreventiveExam && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(answers.lastPreventiveExam) || answers.lastPreventiveExam > today.slice(0, 7)))
+  ) return res.status(400).json({ message: "Revise as datas: elas devem ser válidas e não podem estar no futuro." });
+
+  let age = "";
+  if (answers.birthDate) {
+    const [birthYear, birthMonth, birthDay] = answers.birthDate.split("-").map(Number);
+    const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
+    const years = todayYear - birthYear - (todayMonth < birthMonth || (todayMonth === birthMonth && todayDay < birthDay) ? 1 : 0);
+    if (years >= 0 && years < 130) age = String(years);
+  }
+  const savedAnswers = {
+    ...answers,
+    age,
+    orderNumber: String(form.appointment.id).padStart(6, "0"),
+    appointmentDate: form.appointment.appointmentDate.toISOString().slice(0, 10),
+  };
+  const submittedAt = new Date();
+  const result = await prisma.patientAnamnesis.updateMany({
+    where: { id: form.id, submittedAt: null, revokedAt: null, expiresAt: { gt: submittedAt } },
+    data: {
+      answers: savedAnswers as Prisma.InputJsonValue,
+      consentAcceptedAt: submittedAt,
+      consentVersion: anamnesisConsentVersion,
+      submittedAt,
+    },
+  });
+  if (result.count !== 1)
+    return res.status(409).json({ message: "Esta ficha já foi enviada ou o link expirou." });
+  res.status(201).json({ message: "Ficha enviada com sucesso." });
+});
+
 app.get("/api/appointments", auth, appointmentAccess, async (req, res) => {
   const date = String(req.query.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
@@ -1937,10 +2179,25 @@ app.put("/api/appointments/:id", auth, appointmentManage, appointmentFormUpload.
   const id = routeId(req, res, req.body?.id);
   if (id === null) return;
   try {
+    const previousAppointment = await prisma.appointment.findUnique({
+      where: { id },
+      select: { patientId: true, insuranceId: true },
+    });
+    if (!previousAppointment)
+      return res.status(404).json({ message: "Agendamento não encontrado." });
     await validateAppointmentInsurance(parsed.data);
     const data = appointmentData(parsed.data);
     const examUploads = parseAppointmentExamUploads(req);
     const appointment = await prisma.appointment.update({ where: { id }, data, include: appointmentInclude });
+    if (
+      previousAppointment.patientId !== appointment.patientId ||
+      previousAppointment.insuranceId !== appointment.insuranceId
+    ) {
+      await prisma.patientAnamnesis.updateMany({
+        where: { appointmentId: id, submittedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
     await ensureAppointmentMedicalRecord(
       appointment.id,
       appointment.patientId,

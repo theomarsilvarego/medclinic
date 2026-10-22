@@ -1,0 +1,424 @@
+.anamnesis-page {
+  min-height: 100vh;
+  background: #f1f4f3;
+  color: #26332f;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  padding-bottom: 24px;
+}
+.anamnesis-hero {
+  background: #075f57;
+  color: #fff;
+  padding: 22px 20px 20px;
+}
+.anamnesis-hero-inner {
+  width: min(100%, 740px);
+  margin: 0 auto;
+}
+.anamnesis-kicker {
+  margin: 0 0 7px;
+  color: #d5eeea;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .045em;
+  line-height: 1.45;
+}
+.anamnesis-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.anamnesis-title-row h1 {
+  margin: 0;
+  font-family: Manrope, Inter, sans-serif;
+  font-size: clamp(25px, 6vw, 36px);
+  line-height: 1.16;
+  letter-spacing: -.035em;
+}
+.anamnesis-title-icon {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffffff4d;
+  border-radius: 12px;
+  color: #ddf5f0;
+}
+.anamnesis-subtitle {
+  margin: 7px 0 0;
+  color: #e2f2ef;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.anamnesis-main {
+  width: min(100% - 24px, 740px);
+  margin: 16px auto 0;
+}
+.anamnesis-form {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.anamnesis-section,
+.anamnesis-state-card,
+.anamnesis-success-card {
+  background: #fff;
+  border: 1px solid #e3e9e7;
+  border-radius: 15px;
+  box-shadow: 0 3px 12px #153d3510;
+}
+.anamnesis-section {
+  padding: 17px 15px 14px;
+}
+.anamnesis-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 15px;
+  color: #075f57;
+  font-family: Manrope, Inter, sans-serif;
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: -.015em;
+}
+.anamnesis-section h2 span {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 25px;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: #e4f3f0;
+  color: #075f57;
+  font-size: 13px;
+}
+.anamnesis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 11px 12px;
+}
+.anamnesis-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.anamnesis-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  color: #293732;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.anamnesis-field.wide {
+  grid-column: 1 / -1;
+}
+.anamnesis-field > label,
+.anamnesis-label {
+  color: #293732;
+  font-weight: 600;
+}
+.anamnesis-field input,
+.anamnesis-field select,
+.anamnesis-field textarea,
+.anamnesis-pressure input {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  padding: 10px 11px;
+  border: 1px solid #cbd4d1;
+  border-radius: 9px;
+  background: #fff;
+  color: #26332f;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: inset 0 1px 2px #152f2908;
+}
+.anamnesis-field input::placeholder,
+.anamnesis-pressure input::placeholder {
+  color: #7d8884;
+  opacity: 1;
+}
+.anamnesis-field input[readonly] {
+  background: #f5f7f6;
+  color: #52625d;
+}
+.anamnesis-field input:focus-visible,
+.anamnesis-field select:focus-visible,
+.anamnesis-field textarea:focus-visible,
+.anamnesis-pressure input:focus-visible,
+.anamnesis-check input:focus-visible,
+.anamnesis-choice input:focus-visible,
+.anamnesis-consent input:focus-visible {
+  outline: 3px solid #6eb7aa;
+  outline-offset: 2px;
+}
+.anamnesis-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.anamnesis-pressure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.anamnesis-pressure > span {
+  text-align: center;
+  color: #53615d;
+  font-weight: 800;
+}
+.anamnesis-choice-group {
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.anamnesis-choice-group legend,
+.anamnesis-group-label {
+  margin-bottom: 9px;
+  color: #293732;
+  font-size: 13px;
+  font-weight: 600;
+}
+.anamnesis-choice-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-height: 35px;
+}
+.anamnesis-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  color: #36433f;
+  font-size: 14px;
+  cursor: pointer;
+}
+.anamnesis-choice input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #087267;
+}
+.anamnesis-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 39px;
+  padding: 8px 0;
+  color: #36433f;
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.anamnesis-check input,
+.anamnesis-consent input {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: #087267;
+}
+.anamnesis-gpa {
+  margin-bottom: 12px;
+}
+.anamnesis-consent {
+  padding: 4px 2px 0;
+}
+.anamnesis-consent > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #34413d;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.anamnesis-consent p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0 26px;
+  color: #596762;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.anamnesis-consent p svg {
+  flex: 0 0 15px;
+  color: #087267;
+}
+.anamnesis-submit,
+.anamnesis-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  border-radius: 10px;
+  background: #075f57;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 750;
+  transition: background .16s ease, transform .16s ease;
+}
+.anamnesis-submit {
+  width: 100%;
+  margin-top: 0;
+}
+.anamnesis-button {
+  min-height: 40px;
+  margin-top: 6px;
+  padding: 0 15px;
+  font-size: 13px;
+}
+.anamnesis-submit:hover:not(:disabled),
+.anamnesis-button:hover {
+  background: #064b45;
+  transform: translateY(-1px);
+}
+.anamnesis-submit:disabled {
+  background: #6c8f89;
+  cursor: not-allowed;
+}
+.anamnesis-submit-error,
+.anamnesis-error-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border-color: #efc5c5;
+  background: #fff7f6;
+  color: #8a2e2b;
+}
+.anamnesis-submit-error {
+  padding: 11px 12px;
+  border: 1px solid #efc5c5;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.anamnesis-submit-error svg,
+.anamnesis-error-state > svg {
+  flex: 0 0 18px;
+  margin-top: 1px;
+}
+.anamnesis-state-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-height: 150px;
+  padding: 20px;
+  color: #43514c;
+  font-size: 14px;
+}
+.anamnesis-state-card > div {
+  min-width: 0;
+}
+.anamnesis-error-state {
+  justify-content: flex-start;
+}
+.anamnesis-error-state strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #732a28;
+}
+.anamnesis-error-state p {
+  margin: 0 0 8px;
+  color: #694d4a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.anamnesis-spinner {
+  animation: anamnesis-spin .9s linear infinite;
+}
+@keyframes anamnesis-spin {
+  to { transform: rotate(360deg); }
+}
+.anamnesis-success-card {
+  padding: 30px 22px;
+  text-align: center;
+}
+.anamnesis-success-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #e2f4ee;
+  color: #087267;
+}
+.anamnesis-success-card .anamnesis-kicker {
+  color: #087267;
+}
+.anamnesis-success-card h2 {
+  margin: 0 0 8px;
+  color: #173b35;
+  font-family: Manrope, Inter, sans-serif;
+  font-size: 23px;
+}
+.anamnesis-success-card > p:not(.anamnesis-kicker) {
+  margin: 0 auto;
+  max-width: 470px;
+  color: #52605b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.anamnesis-success-card .anamnesis-success-note {
+  margin-top: 15px !important;
+  color: #67736f !important;
+  font-size: 12px !important;
+}
+.anamnesis-footer {
+  margin: 18px 12px 0;
+  color: #697671;
+  font-size: 11px;
+  text-align: center;
+}
+@media (min-width: 700px) {
+  .anamnesis-hero {
+    padding: 30px 24px 27px;
+  }
+  .anamnesis-main {
+    margin-top: 24px;
+  }
+  .anamnesis-form {
+    gap: 16px;
+  }
+  .anamnesis-section {
+    padding: 22px 24px 20px;
+  }
+  .anamnesis-section h2 {
+    margin-bottom: 18px;
+    font-size: 19px;
+  }
+  .anamnesis-grid {
+    gap: 14px 16px;
+  }
+  .anamnesis-field input,
+  .anamnesis-field select,
+  .anamnesis-field textarea,
+  .anamnesis-pressure input {
+    min-height: 46px;
+    padding: 11px 13px;
+  }
+  .anamnesis-field textarea {
+    min-height: 100px;
+  }
+}
+@media (max-width: 359px) {
+  .anamnesis-main {
+    width: calc(100% - 16px);
+  }
+  .anamnesis-grid.two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .anamnesis-grid.two > .wide {
+    grid-column: auto;
+  }
+  .anamnesis-title-row h1 {
+    font-size: 25px;
+  }
+}

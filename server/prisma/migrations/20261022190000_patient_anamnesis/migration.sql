@@ -1,0 +1,20 @@
+CREATE TABLE `patient_anamneses` (
+  `id` INTEGER NOT NULL AUTO_INCREMENT,
+  `appointment_id` INTEGER NOT NULL,
+  `patient_id` INTEGER NOT NULL,
+  `token_hash` VARCHAR(64) NOT NULL,
+  `answers` JSON NULL,
+  `consent_accepted_at` DATETIME(3) NULL,
+  `consent_version` VARCHAR(40) NULL,
+  `submitted_at` DATETIME(3) NULL,
+  `expires_at` DATETIME(3) NOT NULL,
+  `revoked_at` DATETIME(3) NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `patient_anamneses_appointment_id_key` (`appointment_id`),
+  UNIQUE INDEX `patient_anamneses_token_hash_key` (`token_hash`),
+  INDEX `patient_anamneses_patient_id_submitted_at_idx` (`patient_id`, `submitted_at`),
+  CONSTRAINT `patient_anamneses_appointment_id_fkey` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `patient_anamneses_patient_id_fkey` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

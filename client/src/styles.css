@@ -5495,3 +5495,39 @@ tr:last-child td {
   .patient-exam-uploaded,
   .patient-exam-actions { margin-left: 0; }
 }
+
+
+/* Acesso à ficha de anamnese nos agendamentos elegíveis */
+.appointment-chip .anamnesis-chip-action {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-width: 74px;
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 0 9px;
+  border: 1px solid #b6d5ce;
+  border-radius: 7px;
+  background: #f7fffc;
+  color: #075f57;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+}
+.appointment-chip .anamnesis-chip-action:hover {
+  border-color: #79afa3;
+  background: #e8f5f1;
+  color: #064b45;
+}
+.appointment-chip .appointment-delete-button {
+  min-width: 32px;
+  min-height: 32px;
+}
+.appointment-chip .anamnesis-chip-action:focus-visible,
+.appointment-chip .appointment-delete-button:focus-visible {
+  outline: 3px solid #6eb7aa;
+  outline-offset: 2px;
+}
