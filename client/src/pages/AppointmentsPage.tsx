@@ -14,11 +14,10 @@ function isSindicatoInsurance(name: unknown) {
   return /^SINDICATO(?:$|[\s\-/])/.test(normalized);
 }
 
-function isEligibleAppointment(row: Row, insurances: Row[]) {
+function isEligibleAppointment(row: Row) {
   if (!isSindicatoInsurance(row.insurance?.name)) return false;
   if (row.patient?.insuranceCode === null || row.patient?.insuranceCode === undefined) return true;
-  const patientInsurance = insurances.find(item => Number(item.id) === Number(row.patient.insuranceCode));
-  return isSindicatoInsurance(patientInsurance?.name);
+  return isSindicatoInsurance(row.patient?.insuranceName);
 }
 
 export function AppointmentsPage({ user }: { user: any }) {
@@ -145,7 +144,7 @@ export function AppointmentsPage({ user }: { user: any }) {
               <strong>{row.patient?.fullName}</strong>
               <span>{row.doctor?.fullName}</span>
               <small>{row.itemType === "PROCEDIMENTO" ? row.procedure?.name : row.attendance?.name} · {row.insurance?.name}</small>
-              {canManage && isEligibleAppointment(row, meta.insurances) && <button className="anamnesis-chip-action" type="button" onClick={event => { event.stopPropagation(); setSelectedAnamnesis(row); }} aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`} title="Ficha de anamnese · QR e WhatsApp"><QrCode size={14} />Ficha</button>}
+              {canManage && isEligibleAppointment(row) && <button className="anamnesis-chip-action" type="button" onClick={event => { event.stopPropagation(); setSelectedAnamnesis(row); }} aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`} title="Ficha de anamnese · QR e WhatsApp"><QrCode size={14} />Ficha</button>}
               {canManage && <button className="appointment-delete-button" type="button" onClick={event => { event.stopPropagation(); void remove(Number(row.id)); }} title="Excluir agendamento" aria-label={`Excluir agendamento de ${row.patient?.fullName}`}>×</button>}
             </div>)}
             {canManage && byTime(time).length === 0 && <button className="slot-empty" type="button" onClick={() => openNew(time)}>+ Agendar neste horário</button>}

@@ -5531,3 +5531,31 @@ tr:last-child td {
   outline: 3px solid #6eb7aa;
   outline-offset: 2px;
 }
+
+.doctor-agenda-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.doctor-anamnesis-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #b6d5ce;
+  border-radius: 10px;
+  background: #eff8f5;
+  color: #075f57;
+  transition: 0.2s;
+}
+.doctor-anamnesis-icon:hover {
+  border-color: #79afa3;
+  background: #075f57;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.doctor-agenda-actions button:focus-visible {
+  outline: 3px solid #6eb7aa;
+  outline-offset: 2px;
+}

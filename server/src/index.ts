@@ -2105,13 +2105,30 @@ app.get("/api/appointments", auth, appointmentAccess, async (req, res) => {
     return res
       .status(400)
       .json({ message: "Informe a data no formato AAAA-MM-DD." });
-  res.json(
-    await prisma.appointment.findMany({
-      where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) },
-      orderBy: [{ scheduledTime: "asc" }, { doctor: { fullName: "asc" } }],
-      include: appointmentInclude,
-    }),
-  );
+  const appointments = await prisma.appointment.findMany({
+    where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) },
+    orderBy: [{ scheduledTime: "asc" }, { doctor: { fullName: "asc" } }],
+    include: appointmentInclude,
+  });
+  const insuranceCodes = [...new Set(appointments
+    .map((appointment) => appointment.patient.insuranceCode)
+    .filter((insuranceCode): insuranceCode is number => insuranceCode !== null))];
+  const patientInsurances = insuranceCodes.length
+    ? await prisma.insurance.findMany({
+        where: { id: { in: insuranceCodes } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const insuranceNames = new Map(patientInsurances.map((insurance) => [insurance.id, insurance.name]));
+  res.json(appointments.map((appointment) => ({
+    ...appointment,
+    patient: {
+      ...appointment.patient,
+      insuranceName: appointment.patient.insuranceCode === null
+        ? null
+        : insuranceNames.get(appointment.patient.insuranceCode) || null,
+    },
+  })));
 });
 app.patch("/api/appointments/:id/start", auth, doctorOnly, async (req, res) => {
   const id = routeId(req, res);
