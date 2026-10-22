@@ -1625,6 +1625,21 @@ tr:last-child td {
   }
 }
 
+/* Formulário de paciente: nome e observação em linhas próprias, campos em três colunas */
+.modal-fields:has([data-field-key="birthDate"]) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  .modal-fields:has([data-field-key="birthDate"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .modal-fields:has([data-field-key="birthDate"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Agenda diária do perfil Médico */
 .doctor-page-heading {
   margin-bottom: 28px;

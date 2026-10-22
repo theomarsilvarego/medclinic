@@ -51,7 +51,7 @@ export const configs: Record<
     title: "Pacientes",
     fields: [
       { key: "photo", label: "Foto do paciente", type: "file", fullWidth: true },
-      { key: "fullName", label: "Nome completo" },
+      { key: "fullName", label: "Nome completo", fullWidth: true },
       {
         key: "sex",
         label: "Sexo",
