@@ -83,9 +83,9 @@ export const configs: Record<
         type: "select",
         options: [],
       },
-      { key: "allergies", label: "Alergia", type: "textarea", fullWidth: true },
-      { key: "comorbidities", label: "Comorbidade", type: "textarea", fullWidth: true },
-      { key: "medicationsInUse", label: "Em uso de medicamento", type: "textarea", fullWidth: true },
+      { key: "allergies", label: "Alergia", type: "text" },
+      { key: "comorbidities", label: "Comorbidade", type: "text" },
+      { key: "medicationsInUse", label: "Em uso de medicamento", type: "text" },
       { key: "notes", label: "Observação", type: "textarea", fullWidth: true },
     ],
     columns: [
