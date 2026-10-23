@@ -3121,7 +3121,8 @@ export function MedicalRecordsPage({
       : [editing, ...clinicalRecords];
   }, [editing, records]);
   const selectedAppointmentFinalized = Boolean(
-    appointmentId && records.some(
+    appointmentId &&
+    records.some(
       (record) =>
         Number(record.appointmentId) === Number(appointmentId) &&
         record.appointment?.status === "ATENDIDO",
@@ -3198,7 +3199,7 @@ export function MedicalRecordsPage({
               aria-label="Voltar à Agenda do Dia"
             >
               <ArrowLeft size={14} aria-hidden="true" />
-              Voltar a Agenda do Dia
+              VOLTAR AGENDA
             </button>
           ) : (
             <p className="eyebrow">ÁREA MÉDICA</p>
@@ -3209,8 +3210,17 @@ export function MedicalRecordsPage({
         {allowNewRecord && (
           <button
             className="primary"
-            disabled={!selectedPatientId || loading || Boolean(editing) || selectedAppointmentFinalized}
-            title={selectedAppointmentFinalized ? "Este agendamento já foi finalizado." : undefined}
+            disabled={
+              !selectedPatientId ||
+              loading ||
+              Boolean(editing) ||
+              selectedAppointmentFinalized
+            }
+            title={
+              selectedAppointmentFinalized
+                ? "Este agendamento já foi finalizado."
+                : undefined
+            }
             onClick={() =>
               setEditing(emptyRecord(selectedPatientId, appointmentId))
             }
