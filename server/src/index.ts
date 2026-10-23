@@ -1982,11 +1982,11 @@ app.get(
   auth,
   appointmentAccess,
   async (_req, res) => {
-    const [patients, doctors, insurances, attendances, procedures] =
+    const [patients, doctors, activeInsurances, attendances, procedures] =
       await Promise.all([
         prisma.patient.findMany({
           orderBy: { fullName: "asc" },
-          select: { id: true, fullName: true, phone: true },
+          select: { id: true, fullName: true, phone: true, insuranceCode: true },
         }),
         prisma.doctor.findMany({
           orderBy: { fullName: "asc" },
@@ -1995,7 +1995,7 @@ app.get(
         prisma.insurance.findMany({
           where: { active: true },
           orderBy: { name: "asc" },
-          select: { id: true, name: true },
+          select: { id: true, name: true, active: true },
         }),
         prisma.attendance.findMany({
           where: { active: true },
@@ -2013,6 +2013,26 @@ app.get(
           select: { id: true, name: true, value: true },
         }),
       ]);
+    const patientInsuranceIds = [...new Set(
+      patients
+        .map((patient) => patient.insuranceCode)
+        .filter((insuranceId): insuranceId is number => insuranceId !== null),
+    )];
+    const patientInsurances = patientInsuranceIds.length
+      ? await prisma.insurance.findMany({
+          where: { id: { in: patientInsuranceIds } },
+          select: { id: true, name: true, active: true },
+        })
+      : [];
+    const insurancesById = new Map(
+      [...activeInsurances, ...patientInsurances].map((insurance) => [
+        insurance.id,
+        insurance,
+      ]),
+    );
+    const insurances = [...insurancesById.values()].sort((left, right) =>
+      left.name.localeCompare(right.name, "pt-BR"),
+    );
     res.json({ patients, doctors, insurances, attendances, procedures });
   },
 );

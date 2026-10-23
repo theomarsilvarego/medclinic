@@ -177,7 +177,13 @@ export function AppointmentModal({
                   onChange={(e) => {
                     setPatientSearch(e.target.value);
                     setPatientPickerOpen(true);
-                    if (!e.target.value) update("patientId", "");
+                    if (!e.target.value)
+                      setData({
+                        ...data,
+                        patientId: "",
+                        insuranceId: "",
+                        attendanceId: "",
+                      });
                   }}
                   placeholder="Buscar paciente por nome"
                   aria-label="Buscar paciente por nome"
@@ -196,7 +202,14 @@ export function AppointmentModal({
                           }
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
-                            update("patientId", patient.id);
+                            setData({
+                              ...data,
+                              patientId: patient.id,
+                              insuranceId: patient.insuranceCode
+                                ? String(patient.insuranceCode)
+                                : "",
+                              attendanceId: "",
+                            });
                             setPatientSearch(patient.fullName);
                             setPatientPickerOpen(false);
                           }}
@@ -242,7 +255,7 @@ export function AppointmentModal({
                 <option value="">Selecione o convênio</option>
                 {meta.insurances.map((x: Row) => (
                   <option key={x.id} value={x.id}>
-                    {x.name}
+                    {x.name}{x.active === false ? " (inativo; vínculo atual da paciente)" : ""}
                   </option>
                 ))}
               </select>
