@@ -6850,3 +6850,20 @@ tr:last-child td {
     width: 100%;
   }
 }
+
+
+.doctor-record-icon.view-record {
+  border: 1px solid #c4d9cf;
+  background: #eef6f1;
+  color: #246448;
+  cursor: pointer;
+}
+.doctor-record-icon.view-record:hover {
+  border-color: #76a98e;
+  background: #246448;
+  color: #fff;
+}
+.doctor-record-icon.view-record:focus-visible {
+  outline: 3px solid #8cc4a7;
+  outline-offset: 2px;
+}

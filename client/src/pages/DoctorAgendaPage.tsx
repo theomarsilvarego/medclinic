@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Play, QrCode, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Eye, Play, QrCode, X } from 'lucide-react';
 import type { Row } from '../lib/app';
 import { request } from '../lib/app';
 import { AnamnesisAppointmentModal } from './AnamnesisAppointmentModal';
@@ -24,7 +24,7 @@ function moveDate(dateValue: string, days: number) {
   return localDate(date);
 }
 
-export function DoctorAgendaPage({ onOpenPatient }: { onOpenPatient: (patientId: number, appointmentId: number) => void }) {
+export function DoctorAgendaPage({ onOpenPatient, onViewRecord }: { onOpenPatient: (patientId: number, appointmentId: number) => void; onViewRecord: (patientId: number, appointmentId: number) => void }) {
   const [date, setDate] = useState(() => localDate(new Date()));
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +110,7 @@ export function DoctorAgendaPage({ onOpenPatient }: { onOpenPatient: (patientId:
         <div className="doctor-patient-info"><div className="doctor-patient-name"><strong>{row.patient?.fullName || 'Paciente não informado'}</strong><span className={`doctor-status ${String(row.status || '').toLowerCase()}`}>{statusLabel[row.status] || row.status}</span></div><p>{row.itemType === 'PROCEDIMENTO' ? row.procedure?.name : row.attendance?.name || 'Atendimento'}{row.insurance?.name ? ` · ${row.insurance.name}` : ''}</p></div>
         <div className="doctor-agenda-actions">
           {isAnamnesisEligible(row) && <button className="doctor-anamnesis-icon" type="button" title="Ficha de anamnese · QR e WhatsApp" aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`} onClick={() => setSelectedAnamnesis(row)}><QrCode size={18}/></button>}
-          <button className="doctor-record-icon" title={isToday ? 'Iniciar atendimento' : 'O atendimento só pode ser iniciado na data agendada'} aria-label={`Iniciar atendimento de ${row.patient?.fullName}`} disabled={!isToday || startingId === Number(row.id)} onClick={() => startAppointment(row)}><Play size={18}/></button>
+          {row.status === 'ATENDIDO' ? <button className="doctor-record-icon view-record" type="button" title={`Visualizar prontuário de ${row.patient?.fullName}`} aria-label={`Visualizar prontuário de ${row.patient?.fullName}`} onClick={() => onViewRecord(Number(row.patient?.id), Number(row.id))}><Eye size={18}/></button> : <button className="doctor-record-icon" type="button" title={isToday ? 'Iniciar atendimento' : 'O atendimento só pode ser iniciado na data agendada'} aria-label={`Iniciar atendimento de ${row.patient?.fullName}`} disabled={!isToday || startingId === Number(row.id)} onClick={() => startAppointment(row)}><Play size={18}/></button>}
         </div>
       </div>)}</div>}
     </section>

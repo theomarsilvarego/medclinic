@@ -201,6 +201,12 @@ export function App() {
                   setAllowNewRecord(true);
                   setModule("medical-records");
                 }}
+                onViewRecord={(patientId, appointmentId) => {
+                  setRecordPatientId(patientId);
+                  setRecordAppointmentId(appointmentId);
+                  setAllowNewRecord(false);
+                  setModule("medical-records");
+                }}
               />
             ) : (
               <Dashboard setModule={setModule} user={user} />
