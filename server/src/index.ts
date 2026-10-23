@@ -350,6 +350,7 @@ const injectableRequestSchema = z.object({
         injectableId: z.coerce.number().int().positive(),
         route: z.enum(["IM", "EV", "SC"]),
         sessions: z.coerce.number().int().min(1).max(99),
+        observation: z.string().trim().max(4000).optional().nullable(),
       }),
     )
     .min(1, "Selecione pelo menos um injetável."),
@@ -1860,6 +1861,7 @@ app.post(
           category: injectable.type,
           route: item.route as any,
           sessions: item.sessions,
+          observation: item.observation || null,
           requestedById: req.user!.id,
         };
       });

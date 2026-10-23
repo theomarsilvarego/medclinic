@@ -3523,6 +3523,40 @@ tr:last-child td {
 .injectable-row input {
   width: 72px;
 }
+.injectable-observation-field {
+  flex: 1 0 100%;
+  align-items: stretch !important;
+  flex-direction: column;
+  gap: 5px !important;
+}
+.injectable-observation-field span {
+  color: #9a8990;
+  font-size: 10px;
+  font-weight: 400;
+}
+.injectable-observation-field textarea {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 9px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.injectable-observation-field textarea:focus {
+  outline: none;
+  border-color: var(--rose);
+  box-shadow: 0 0 0 3px #f4e7ea;
+}
+.injectable-observation-preview {
+  color: #765b65 !important;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .injectable-remove {
   border: 0;
   background: transparent;

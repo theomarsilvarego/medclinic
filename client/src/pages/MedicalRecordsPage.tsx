@@ -1200,7 +1200,10 @@ function InjectableRequestsArea({
       }) as Record<string, string>
     )[value] || value;
   function add(item: Row) {
-    setSelected((rows) => [...rows, { ...item, route: "IM", sessions: 1 }]);
+    setSelected((rows) => [
+      ...rows,
+      { ...item, route: "IM", sessions: 1, observation: "" },
+    ]);
     setSearch("");
   }
   function update(id: number, key: string, value: string | number) {
@@ -1222,6 +1225,7 @@ function InjectableRequestsArea({
             injectableId: Number(row.id),
             route: row.route,
             sessions: Number(row.sessions),
+            observation: String(row.observation || "").trim() || null,
           })),
         }),
       });
@@ -1355,6 +1359,18 @@ function InjectableRequestsArea({
                       }
                     />
                   </label>
+                  <label className="injectable-observation-field">
+                    Observação <span>(opcional)</span>
+                    <textarea
+                      value={item.observation || ""}
+                      maxLength={4000}
+                      onChange={(event) =>
+                        update(Number(item.id), "observation", event.target.value)
+                      }
+                      placeholder="Orientações para a aplicação..."
+                      rows={2}
+                    />
+                  </label>
                 </div>
               ))}
             </div>
@@ -1403,6 +1419,11 @@ function InjectableRequestsArea({
                     {item.route} · {item.sessions}{" "}
                     {item.sessions === 1 ? "sessão" : "sessões"}
                   </small>
+                  {item.observation && (
+                    <small className="injectable-observation-preview">
+                      Observação: {item.observation}
+                    </small>
+                  )}
                 </div>
               </div>
               <span className="injectable-status">Aguardando aplicação</span>

@@ -394,6 +394,7 @@ model InjectableRequest {
   category        InjectableType
   route           InjectableRequestRoute
   sessions        Int                     @default(1)
+  observation     String?                 @db.Text
   status          InjectableRequestStatus @default(AGUARDANDO_APLICACAO)
   requestedById   Int                     @map("requested_by_id")
   requestedAt     DateTime                @default(now()) @map("requested_at")
