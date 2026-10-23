@@ -1349,6 +1349,29 @@ app.put(
     );
   },
 );
+app.post(
+  "/api/medical-records/:id/finalize",
+  auth,
+  doctorOnly,
+  async (req: AuthRequest, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    const record = await prisma.medicalRecord.findUnique({
+      where: { id },
+      select: { appointmentId: true },
+    });
+    if (!record?.appointmentId)
+      return res.status(400).json({
+        message: "Este prontuário não está vinculado a um agendamento.",
+      });
+    const appointment = await prisma.appointment.update({
+      where: { id: record.appointmentId },
+      data: { status: AppointmentStatus.ATENDIDO },
+      select: { id: true, status: true },
+    });
+    res.json(appointment);
+  },
+);
 app.delete("/api/medical-records/:id", auth, doctorOnly, async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;

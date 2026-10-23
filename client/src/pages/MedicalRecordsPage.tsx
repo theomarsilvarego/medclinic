@@ -2395,7 +2395,7 @@ function ClinicalEvolutionEditor({
   record: Row;
   onSave: (value: Row) => Promise<Row>;
   onPersisted: (saved: Row) => void;
-  onFinalize: () => void;
+  onFinalize: () => Promise<void>;
 }) {
   const [fields, setFields] = useState<EvolutionFields>(() =>
     parseEvolution(record.conduct),
@@ -2503,7 +2503,12 @@ function ClinicalEvolutionEditor({
           fieldsRef.current[section.key].trim(),
         ))
     )
-      finalizeCallbackRef.current();
+      try {
+        setStatus("saving");
+        await finalizeCallbackRef.current();
+      } catch {
+        setStatus("error");
+      }
   }
   const hasAnyField = evolutionSections.some((section) =>
     fields[section.key].trim(),
@@ -2553,7 +2558,7 @@ function ClinicalEvolutionEditor({
           onClick={() => void finalize()}
           disabled={!idRef.current && !hasAnyField}
         >
-          Finalizar atendimento
+          {status === "saving" ? "Finalizando…" : "Finalizar Atendimento"}
         </button>
       </footer>
     </div>
@@ -2584,7 +2589,7 @@ function RecordTimelineCard({
   onRetify: () => void;
   onSave: (value: Row) => Promise<Row>;
   onPersisted: (saved: Row) => void;
-  onFinish: () => void;
+  onFinish: () => Promise<void>;
   onChanged: () => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(isEditing);
@@ -3121,7 +3126,14 @@ export function MedicalRecordsPage({
                       }
                       onSave={saveRecord}
                       onPersisted={syncSavedRecord}
-                      onFinish={() => setEditing(null)}
+                      onFinish={async () => {
+                        await request(`/medical-records/${record.id}/finalize`, {
+                          method: "POST",
+                        });
+                        await reload(selectedPatientId);
+                        setComposingRecordId(null);
+                        setEditing(null);
+                      }}
                       onChanged={async () => {
                         await reload(selectedPatientId);
                         setExamListRefreshKey((value) => value + 1);
