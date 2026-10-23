@@ -5303,22 +5303,65 @@ tr:last-child td {
 .anamnesis-timeline-card {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   min-height: 62px;
-  padding: 0 17px;
-  border: 1px solid #d9ebe4;
-  border-radius: 12px;
-  background: #f7fcfa;
+  padding: 16px 22px;
+  border: 1px solid #e5dfe1;
+  border-radius: 16px;
+  background: #fff;
 }
-.anamnesis-timeline-card header {
+.anamnesis-timeline-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  color: #27705b;
-  font-size: 13px;
+  gap: 0 17px;
+  min-width: 0;
+  color: #3a2c31;
+  font-size: 16px;
 }
-.anamnesis-timeline-card header svg {
-  margin-right: 2px;
+.anamnesis-timeline-title {
+  color: #2d2025;
+  font-size: 19px;
+  white-space: nowrap;
+}
+.anamnesis-timeline-insurance {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #8a2d56;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.anamnesis-timeline-summary {
+  color: #665b60;
+  overflow-wrap: anywhere;
+}
+.anamnesis-timeline-open {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: #71324d;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.anamnesis-timeline-open:hover {
+  color: #8a2d56;
+  text-decoration: underline;
+}
+@media (max-width: 760px) {
+  .anamnesis-timeline-card {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .anamnesis-timeline-open {
+    padding: 0;
+  }
 }
 @media (max-width: 640px) {
   .patient-anamnesis-title-row {

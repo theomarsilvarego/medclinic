@@ -1812,11 +1812,26 @@ function PatientAnamnesisCard({
     </section>
   );
 }
-function AnamnesisTimelineItem({ status }: { status: PatientAnamnesisStatus }) {
+function AnamnesisTimelineItem({
+  status,
+  patient,
+  onOpen,
+}: {
+  status: PatientAnamnesisStatus;
+  patient: Row;
+  onOpen: (appointment: Row) => void;
+}) {
+  const appointment = anamnesisAppointment(status, patient);
+  const chiefComplaint = anamnesisSummaryValue(status.answers?.chiefComplaint, "Não informada");
   return <article className="medical-timeline-item anamnesis-timeline-item">
     <div className="medical-date-rail"><strong>{dateLabel(String(status.submittedAt || today()))}</strong><span /></div>
     <section className="medical-record-card anamnesis-timeline-card">
-      <header><CheckCircle2 size={17} /><strong>Anamnese digital</strong><span>· {status.insuranceName || "SINDICATO"} · recebida via QR code</span></header>
+      <div className="anamnesis-timeline-main">
+        <strong className="anamnesis-timeline-title">Anamnese digital</strong>
+        <span className="anamnesis-timeline-insurance">{status.insuranceName || "SINDICATO"}</span>
+        <span className="anamnesis-timeline-summary">Recebida via QR code · QP: {chiefComplaint}</span>
+      </div>
+      {appointment && <button type="button" className="anamnesis-timeline-open" onClick={() => onOpen(appointment)}>Abrir</button>}
     </section>
   </article>;
 }
@@ -3046,7 +3061,7 @@ export function MedicalRecordsPage({
               </div>
             ) : (
               <div className="medical-timeline">
-                {patientAnamnesis?.state === "submitted" && <AnamnesisTimelineItem status={patientAnamnesis} />}
+                {patientAnamnesis?.state === "submitted" && selectedPatient && <AnamnesisTimelineItem status={patientAnamnesis} patient={selectedPatient} onOpen={setAnamnesisAppointment} />}
                 {displayedRecords.map((record) => {
                   const isEditingRecord =
                     Boolean(editing) &&
