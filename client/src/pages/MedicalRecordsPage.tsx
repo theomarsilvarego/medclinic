@@ -1366,7 +1366,11 @@ function InjectableRequestsArea({
                       value={item.observation || ""}
                       maxLength={4000}
                       onChange={(event) =>
-                        update(Number(item.id), "observation", event.target.value)
+                        update(
+                          Number(item.id),
+                          "observation",
+                          event.target.value,
+                        )
                       }
                       placeholder="Orientações para a aplicação..."
                     />
@@ -1727,7 +1731,9 @@ function anamnesisValue(value: unknown, fallback = "Não informado") {
   return String(value || "").trim() || fallback;
 }
 function anamnesisSummaryValue(value: unknown, fallback = "Não informado") {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
   return text || fallback;
 }
 function gpaValue(answers: Record<string, unknown>) {
@@ -1739,13 +1745,20 @@ function gpaValue(answers: Record<string, unknown>) {
   const abortions = anamnesisValue(answers.abortions, "—");
   return `G ${pregnancies} · PN ${normalBirths} · PC ${cesareanBirths} · A ${abortions}`;
 }
-function anamnesisAppointment(status: PatientAnamnesisStatus, patient: Row): Row | null {
+function anamnesisAppointment(
+  status: PatientAnamnesisStatus,
+  patient: Row,
+): Row | null {
   if (!status.appointmentId) return null;
   return {
     id: status.appointmentId,
     scheduledTime: status.scheduledTime,
     appointmentDate: status.appointmentDate,
-    patient: { id: patient.id, fullName: patient.fullName, phone: patient.phone },
+    patient: {
+      id: patient.id,
+      fullName: patient.fullName,
+      phone: patient.phone,
+    },
   };
 }
 function PatientAnamnesisCard({
@@ -1775,26 +1788,65 @@ function PatientAnamnesisCard({
     setQrCode("");
     setPublicUrl("");
     request(`/medical-records/patients/${patientId}/anamnesis`)
-      .then((result: PatientAnamnesisStatus) => { if (active) { setStatus(result); onStatusChange(result); } })
-      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Não foi possível carregar a anamnese."); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+      .then((result: PatientAnamnesisStatus) => {
+        if (active) {
+          setStatus(result);
+          onStatusChange(result);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (active)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Não foi possível carregar a anamnese.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [patientId]);
   async function generateLink() {
     setGenerating(true);
     setError("");
     setCopied(false);
     try {
-      const result = await request(`/medical-records/patients/${patientId}/anamnesis-link`, { method: "POST" });
+      const result = await request(
+        `/medical-records/patients/${patientId}/anamnesis-link`,
+        { method: "POST" },
+      );
       const url = `${window.location.origin}/anamnese/${result.token}`;
-      const image = await QRCode.toDataURL(url, { width: 156, margin: 1, errorCorrectionLevel: "M", color: { dark: "#143d37", light: "#ffffff" } });
+      const image = await QRCode.toDataURL(url, {
+        width: 156,
+        margin: 1,
+        errorCorrectionLevel: "M",
+        color: { dark: "#143d37", light: "#ffffff" },
+      });
       setPublicUrl(url);
       setQrCode(image);
-      const nextStatus = status ? { ...status, state: "pending" as const, appointmentId: result.appointmentId, expiresAt: result.expiresAt } : { state: "pending" as const, appointmentId: result.appointmentId, expiresAt: result.expiresAt };
+      const nextStatus = status
+        ? {
+            ...status,
+            state: "pending" as const,
+            appointmentId: result.appointmentId,
+            expiresAt: result.expiresAt,
+          }
+        : {
+            state: "pending" as const,
+            appointmentId: result.appointmentId,
+            expiresAt: result.expiresAt,
+          };
       setStatus(nextStatus);
       onStatusChange(nextStatus);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Não foi possível gerar o QR Code.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível gerar o QR Code.",
+      );
     } finally {
       setGenerating(false);
     }
@@ -1807,37 +1859,142 @@ function PatientAnamnesisCard({
   }
   const appointment = status ? anamnesisAppointment(status, patient) : null;
   const answers = status?.answers || {};
-  const allergy = answers.hasAllergy === "NAO" ? "Não" : answers.hasAllergy === "SIM" ? anamnesisSummaryValue(answers.allergyDetails, "Sim") : "Não informado";
+  const allergy =
+    answers.hasAllergy === "NAO"
+      ? "Não"
+      : answers.hasAllergy === "SIM"
+        ? anamnesisSummaryValue(answers.allergyDetails, "Sim")
+        : "Não informado";
   const comorbidityParts = [
     answers.hasChronicHypertension ? "H.A.C." : "",
-    answers.hasOtherComorbidities ? anamnesisSummaryValue(answers.comorbidityDetails, "Outras") : "",
+    answers.hasOtherComorbidities
+      ? anamnesisSummaryValue(answers.comorbidityDetails, "Outras")
+      : "",
   ].filter(Boolean);
-  const comorbidity = comorbidityParts.length > 0 ? comorbidityParts.join(" · ") : answers.hasChronicHypertension === false && answers.hasOtherComorbidities === false ? "Não" : "Não informado";
+  const comorbidity =
+    comorbidityParts.length > 0
+      ? comorbidityParts.join(" · ")
+      : answers.hasChronicHypertension === false &&
+          answers.hasOtherComorbidities === false
+        ? "Não"
+        : "Não informado";
   return (
-    <section className="patient-anamnesis-card" aria-labelledby="patient-anamnesis-title">
+    <section
+      className="patient-anamnesis-card"
+      aria-labelledby="patient-anamnesis-title"
+    >
       <header className="patient-anamnesis-heading">
-        <div className="patient-anamnesis-title-row"><h2 id="patient-anamnesis-title">Anamnese</h2>{status?.state === "submitted" ? <span className="patient-anamnesis-badge filled">Preenchida em {anamnesisDate(status.submittedAt)}</span> : <span className="patient-anamnesis-badge pending">Pendente</span>}</div>
-        {status?.state === "submitted" && <p className="patient-anamnesis-subtitle">Ficha SINTESV-RO enviada pelo paciente.</p>}
-      </header>
-      {loading ? <div className="patient-anamnesis-state">Carregando status…</div> : error && !status ? <div className="patient-anamnesis-state error">{error}</div> : null}
-      {!loading && status?.state === "submitted" ? <>
-        <dl className="patient-anamnesis-summary">
-          <div><dt>QP</dt><dd>{anamnesisSummaryValue(answers.chiefComplaint)}</dd></div>
-          <div><dt>Alergia</dt><dd>{allergy}</dd></div>
-          <div><dt>Comorbidade</dt><dd>{comorbidity}</dd></div>
-          <div><dt>G.P.A.</dt><dd>{gpaValue(answers)}</dd></div>
-          <div><dt>DUM</dt><dd>{anamnesisDate(answers.lastMenstruationDate)}</dd></div>
-          <div><dt>Último preventivo</dt><dd>{anamnesisMonth(answers.lastPreventiveExam)}</dd></div>
-        </dl>
-        <div className="patient-anamnesis-actions">
-          {appointment && <><button type="button" className="patient-anamnesis-primary" onClick={() => onView(appointment)}>Ver ficha completa</button><button type="button" className="patient-anamnesis-secondary" onClick={() => onPrint(appointment)}>Imprimir</button></>}
+        <div className="patient-anamnesis-title-row">
+          <h2 id="patient-anamnesis-title">Anamnese</h2>
+          {status?.state === "submitted" ? (
+            <span className="patient-anamnesis-badge filled">
+              Preenchida em {anamnesisDate(status.submittedAt)}
+            </span>
+          ) : (
+            <span className="patient-anamnesis-badge pending">Pendente</span>
+          )}
         </div>
-      </> : null}
-      {!loading && status && status.state !== "submitted" ? <div className="patient-anamnesis-pending">
-        {qrCode ? <img className="patient-anamnesis-qr" src={qrCode} alt="QR Code da anamnese" /> : <div className="patient-anamnesis-pending-copy"><strong>Anamnese pendente</strong><span>Gere um QR Code para a paciente preencher a ficha.</span></div>}
-        <div className="patient-anamnesis-actions">{publicUrl ? <button type="button" className="secondary" onClick={() => void copyLink()}><Clipboard size={15} /> {copied ? "Link copiado" : "Copiar link"}</button> : <button type="button" className="primary" onClick={() => void generateLink()} disabled={generating}><QrCode size={15} /> {generating ? "Gerando…" : "Gerar QR Code"}</button>}</div>
-      </div> : null}
-      {error && status ? <p className="patient-anamnesis-inline-error">{error}</p> : null}
+        {status?.state === "submitted" && (
+          <p className="patient-anamnesis-subtitle">
+            Ficha SINTESV-RO enviada pelo paciente.
+          </p>
+        )}
+      </header>
+      {loading ? (
+        <div className="patient-anamnesis-state">Carregando status…</div>
+      ) : error && !status ? (
+        <div className="patient-anamnesis-state error">{error}</div>
+      ) : null}
+      {!loading && status?.state === "submitted" ? (
+        <>
+          <dl className="patient-anamnesis-summary">
+            <div>
+              <dt>QP</dt>
+              <dd>{anamnesisSummaryValue(answers.chiefComplaint)}</dd>
+            </div>
+            <div>
+              <dt>Alergia</dt>
+              <dd>{allergy}</dd>
+            </div>
+            <div>
+              <dt>Comorbidade</dt>
+              <dd>{comorbidity}</dd>
+            </div>
+            <div>
+              <dt>G.P.A.</dt>
+              <dd>{gpaValue(answers)}</dd>
+            </div>
+            <div>
+              <dt>DUM</dt>
+              <dd>{anamnesisDate(answers.lastMenstruationDate)}</dd>
+            </div>
+            <div>
+              <dt>Último preventivo</dt>
+              <dd>{anamnesisMonth(answers.lastPreventiveExam)}</dd>
+            </div>
+          </dl>
+          <div className="patient-anamnesis-actions">
+            {appointment && (
+              <>
+                <button
+                  type="button"
+                  className="patient-anamnesis-primary"
+                  onClick={() => onView(appointment)}
+                >
+                  Ver ficha completa
+                </button>
+                <button
+                  type="button"
+                  className="patient-anamnesis-secondary"
+                  onClick={() => onPrint(appointment)}
+                >
+                  Imprimir
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      ) : null}
+      {!loading && status && status.state !== "submitted" ? (
+        <div className="patient-anamnesis-pending">
+          {qrCode ? (
+            <img
+              className="patient-anamnesis-qr"
+              src={qrCode}
+              alt="QR Code da anamnese"
+            />
+          ) : (
+            <div className="patient-anamnesis-pending-copy">
+              <strong>Anamnese pendente</strong>
+              <span>Gere um QR Code para a paciente preencher a ficha.</span>
+            </div>
+          )}
+          <div className="patient-anamnesis-actions">
+            {publicUrl ? (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void copyLink()}
+              >
+                <Clipboard size={15} />{" "}
+                {copied ? "Link copiado" : "Copiar link"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void generateLink()}
+                disabled={generating}
+              >
+                <QrCode size={15} /> {generating ? "Gerando…" : "Gerar QR Code"}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
+      {error && status ? (
+        <p className="patient-anamnesis-inline-error">{error}</p>
+      ) : null}
     </section>
   );
 }
@@ -1851,18 +2008,38 @@ function AnamnesisTimelineItem({
   onOpen: (appointment: Row) => void;
 }) {
   const appointment = anamnesisAppointment(status, patient);
-  const chiefComplaint = anamnesisSummaryValue(status.answers?.chiefComplaint, "Não informada");
-  return <article className="medical-timeline-item anamnesis-timeline-item">
-    <div className="medical-date-rail"><strong>{dateLabel(String(status.submittedAt || today()))}</strong><span /></div>
-    <section className="medical-record-card anamnesis-timeline-card">
-      <div className="anamnesis-timeline-main">
-        <strong className="anamnesis-timeline-title">Anamnese digital</strong>
-        <span className="anamnesis-timeline-insurance">{status.insuranceName || "SINDICATO"}</span>
-        <span className="anamnesis-timeline-summary">Recebida via QR code · QP: {chiefComplaint}</span>
+  const chiefComplaint = anamnesisSummaryValue(
+    status.answers?.chiefComplaint,
+    "Não informada",
+  );
+  return (
+    <article className="medical-timeline-item anamnesis-timeline-item">
+      <div className="medical-date-rail">
+        <strong>{dateLabel(String(status.submittedAt || today()))}</strong>
+        <span />
       </div>
-      {appointment && <button type="button" className="anamnesis-timeline-open" onClick={() => onOpen(appointment)}>Abrir</button>}
-    </section>
-  </article>;
+      <section className="medical-record-card anamnesis-timeline-card">
+        <div className="anamnesis-timeline-main">
+          <strong className="anamnesis-timeline-title">Anamnese digital</strong>
+          <span className="anamnesis-timeline-insurance">
+            {status.insuranceName || "SINDICATO"}
+          </span>
+          <span className="anamnesis-timeline-summary">
+            Recebida via QR code · QP: {chiefComplaint}
+          </span>
+        </div>
+        {appointment && (
+          <button
+            type="button"
+            className="anamnesis-timeline-open"
+            onClick={() => onOpen(appointment)}
+          >
+            Abrir
+          </button>
+        )}
+      </section>
+    </article>
+  );
 }
 
 const patientExamGroups = [
@@ -2872,8 +3049,11 @@ export function MedicalRecordsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [examListRefreshKey, setExamListRefreshKey] = useState(0);
-  const [patientAnamnesis, setPatientAnamnesis] = useState<PatientAnamnesisStatus | null>(null);
-  const [anamnesisAppointment, setAnamnesisAppointment] = useState<Row | null>(null);
+  const [patientAnamnesis, setPatientAnamnesis] =
+    useState<PatientAnamnesisStatus | null>(null);
+  const [anamnesisAppointment, setAnamnesisAppointment] = useState<Row | null>(
+    null,
+  );
 
   useEffect(() => {
     setSelectedPatientId(patientId);
@@ -3025,7 +3205,6 @@ export function MedicalRecordsPage({
                 <span>FICHA CLÍNICA</span>
                 <div className="clinical-patient-title-row">
                   <h2>{selectedPatient.fullName}</h2>
-                  {patientAnamnesis?.state === "submitted" && <span className="clinical-anamnesis-badge"><span className="clinical-anamnesis-dot" aria-hidden="true" />Anamnese preenchida</span>}
                 </div>
                 <div className="clinical-patient-meta">
                   <span>
@@ -3087,7 +3266,8 @@ export function MedicalRecordsPage({
           >
             {loading ? (
               <div className="medical-record-empty">Carregando prontuário…</div>
-            ) : displayedRecords.length === 0 && patientAnamnesis?.state !== "submitted" ? (
+            ) : displayedRecords.length === 0 &&
+              patientAnamnesis?.state !== "submitted" ? (
               <div className="medical-record-empty">
                 <FilePlus2 size={36} />
                 <strong>Nenhum registro clínico</strong>
@@ -3097,7 +3277,13 @@ export function MedicalRecordsPage({
               </div>
             ) : (
               <div className="medical-timeline">
-                {patientAnamnesis?.state === "submitted" && selectedPatient && <AnamnesisTimelineItem status={patientAnamnesis} patient={selectedPatient} onOpen={setAnamnesisAppointment} />}
+                {patientAnamnesis?.state === "submitted" && selectedPatient && (
+                  <AnamnesisTimelineItem
+                    status={patientAnamnesis}
+                    patient={selectedPatient}
+                    onOpen={setAnamnesisAppointment}
+                  />
+                )}
                 {displayedRecords.map((record) => {
                   const isEditingRecord =
                     Boolean(editing) &&
@@ -3127,9 +3313,12 @@ export function MedicalRecordsPage({
                       onSave={saveRecord}
                       onPersisted={syncSavedRecord}
                       onFinish={async () => {
-                        await request(`/medical-records/${record.id}/finalize`, {
-                          method: "POST",
-                        });
+                        await request(
+                          `/medical-records/${record.id}/finalize`,
+                          {
+                            method: "POST",
+                          },
+                        );
                         await reload(selectedPatientId);
                         setComposingRecordId(null);
                         setEditing(null);
@@ -3145,13 +3334,18 @@ export function MedicalRecordsPage({
             )}
           </section>
           <aside className="medical-records-sidebar">
-            {selectedPatient && isSindicatoInsurance(selectedPatient.insuranceName) && <PatientAnamnesisCard
-              patientId={Number(selectedPatientId)}
-              patient={selectedPatient}
-              onStatusChange={setPatientAnamnesis}
-              onView={setAnamnesisAppointment}
-              onPrint={appointment => setAnamnesisAppointment({ ...appointment, autoPrint: true })}
-            />}
+            {selectedPatient &&
+              isSindicatoInsurance(selectedPatient.insuranceName) && (
+                <PatientAnamnesisCard
+                  patientId={Number(selectedPatientId)}
+                  patient={selectedPatient}
+                  onStatusChange={setPatientAnamnesis}
+                  onView={setAnamnesisAppointment}
+                  onPrint={(appointment) =>
+                    setAnamnesisAppointment({ ...appointment, autoPrint: true })
+                  }
+                />
+              )}
             <PatientExamSidebar
               patientId={Number(selectedPatientId)}
               refreshKey={examListRefreshKey}
@@ -3159,7 +3353,13 @@ export function MedicalRecordsPage({
           </aside>
         </div>
       )}
-      {anamnesisAppointment && <AnamnesisAppointmentModal appointment={anamnesisAppointment} autoPrint={Boolean(anamnesisAppointment.autoPrint)} onClose={() => setAnamnesisAppointment(null)} />}
+      {anamnesisAppointment && (
+        <AnamnesisAppointmentModal
+          appointment={anamnesisAppointment}
+          autoPrint={Boolean(anamnesisAppointment.autoPrint)}
+          onClose={() => setAnamnesisAppointment(null)}
+        />
+      )}
     </>
   );
 }
