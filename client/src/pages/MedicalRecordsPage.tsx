@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
   Activity,
   CheckCircle2,
   Clipboard,
@@ -3033,9 +3034,11 @@ export function MedicalRecordsPage({
   appointmentId = null,
   allowNewRecord = false,
   enableExamRequests = false,
+  onReturnToAgenda,
 }: MedicalRecordsPageProps & {
   allowNewRecord?: boolean;
   enableExamRequests?: boolean;
+  onReturnToAgenda?: () => void;
 }) {
   const [patients, setPatients] = useState<Row[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(
@@ -3187,7 +3190,19 @@ export function MedicalRecordsPage({
     <>
       <div className="page-heading medical-records-heading">
         <div>
-          <p className="eyebrow">ÁREA MÉDICA</p>
+          {appointmentId && onReturnToAgenda ? (
+            <button
+              className="eyebrow medical-records-back"
+              type="button"
+              onClick={onReturnToAgenda}
+              aria-label="Voltar à Agenda do Dia"
+            >
+              <ArrowLeft size={14} aria-hidden="true" />
+              Voltar a Agenda do Dia
+            </button>
+          ) : (
+            <p className="eyebrow">ÁREA MÉDICA</p>
+          )}
           <h1>Prontuários</h1>
           <p className="muted">Histórico clínico organizado por paciente.</p>
         </div>

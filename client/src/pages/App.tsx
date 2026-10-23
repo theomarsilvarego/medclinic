@@ -218,6 +218,12 @@ export function App() {
                 appointmentId={recordAppointmentId}
                 allowNewRecord={allowNewRecord}
                 enableExamRequests={allowNewRecord}
+                onReturnToAgenda={() => {
+                  setRecordPatientId(null);
+                  setRecordAppointmentId(null);
+                  setAllowNewRecord(false);
+                  setModule("doctor-day");
+                }}
               />
             ) : (
               <Dashboard setModule={setModule} user={user} />

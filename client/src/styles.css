@@ -6867,3 +6867,25 @@ tr:last-child td {
   outline: 3px solid #8cc4a7;
   outline-offset: 2px;
 }
+
+
+.medical-records-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  text-align: left;
+  cursor: pointer;
+}
+.medical-records-back:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+.medical-records-back:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
