@@ -321,3 +321,25 @@
   .anamnesis-share-footer { padding: 10px 14px; }
   .anamnesis-answer-group dl { grid-template-columns: minmax(0, 1fr); }
 }
+@media print {
+  body * { visibility: hidden !important; }
+  .anamnesis-share-modal,
+  .anamnesis-share-modal * { visibility: visible !important; }
+  .anamnesis-share-backdrop {
+    position: static;
+    display: block;
+    padding: 0;
+    background: #fff;
+  }
+  .anamnesis-share-modal {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .anamnesis-share-close,
+  .anamnesis-share-footer { display: none !important; }
+  .anamnesis-share-content { overflow: visible; }
+}

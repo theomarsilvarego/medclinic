@@ -2037,6 +2037,83 @@ app.post("/api/appointments/:id/anamnesis-link", auth, appointmentAccess, async 
   res.status(201).json({ token, expiresAt });
 });
 
+app.get("/api/medical-records/patients/:patientId/anamnesis", auth, doctorOnly, async (req, res) => {
+  const patientId = Number(req.params.patientId);
+  if (!Number.isInteger(patientId) || patientId <= 0)
+    return res.status(400).json({ message: "Paciente inválido." });
+  const appointments = await prisma.appointment.findMany({
+    where: { patientId },
+    orderBy: [{ appointmentDate: "desc" }, { createdAt: "desc" }],
+    take: 30,
+    include: {
+      patient: { select: { id: true, fullName: true, phone: true, insuranceCode: true } },
+      insurance: { select: { name: true } },
+    },
+  });
+  const eligibleAppointments: typeof appointments = [];
+  for (const appointment of appointments) {
+    if (await isEligibleForAnamnesis(appointment)) eligibleAppointments.push(appointment);
+  }
+  const forms = await prisma.patientAnamnesis.findMany({
+    where: { patientId, revokedAt: null, submittedAt: { not: null } },
+    orderBy: { submittedAt: "desc" },
+  });
+  const submittedForm = forms.find(form => eligibleAppointments.some(appointment => appointment.id === form.appointmentId));
+  const appointment = submittedForm
+    ? eligibleAppointments.find(item => item.id === submittedForm.appointmentId)
+    : eligibleAppointments[0];
+  if (!appointment) return res.json({ state: "not_created" });
+  if (submittedForm) {
+    return res.json({
+      state: "submitted",
+      appointmentId: appointment.id,
+      appointmentDate: appointment.appointmentDate,
+      scheduledTime: appointment.scheduledTime,
+      insuranceName: appointment.insurance.name,
+      submittedAt: submittedForm.submittedAt,
+      answers: submittedForm.answers,
+    });
+  }
+  const pendingForm = await prisma.patientAnamnesis.findUnique({ where: { appointmentId: appointment.id } });
+  res.json({
+    state: pendingForm && !pendingForm.revokedAt ? "pending" : "not_created",
+    appointmentId: appointment.id,
+    appointmentDate: appointment.appointmentDate,
+    scheduledTime: appointment.scheduledTime,
+    insuranceName: appointment.insurance.name,
+    expiresAt: pendingForm?.expiresAt || null,
+  });
+});
+
+app.post("/api/medical-records/patients/:patientId/anamnesis-link", auth, doctorOnly, async (req, res) => {
+  const patientId = Number(req.params.patientId);
+  if (!Number.isInteger(patientId) || patientId <= 0)
+    return res.status(400).json({ message: "Paciente inválido." });
+  const appointments = await prisma.appointment.findMany({
+    where: { patientId },
+    orderBy: [{ appointmentDate: "desc" }, { createdAt: "desc" }],
+    take: 30,
+    include: {
+      patient: { select: { id: true, insuranceCode: true } },
+      insurance: { select: { name: true } },
+    },
+  });
+  const appointment = appointments.find(item => isSindicatoInsurance(item.insurance.name));
+  if (!appointment || !(await isEligibleForAnamnesis(appointment)))
+    return res.status(404).json({ message: "Nenhum agendamento elegível para anamnese foi encontrado." });
+  const existing = await prisma.patientAnamnesis.findUnique({ where: { appointmentId: appointment.id } });
+  if (existing?.submittedAt)
+    return res.status(409).json({ message: "A anamnese deste paciente já foi preenchida." });
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + anamnesisTokenLifetimeMs);
+  await prisma.patientAnamnesis.upsert({
+    where: { appointmentId: appointment.id },
+    create: { appointmentId: appointment.id, patientId, tokenHash: hashAnamnesisToken(token), expiresAt },
+    update: { patientId, tokenHash: hashAnamnesisToken(token), expiresAt, revokedAt: null },
+  });
+  res.status(201).json({ token, expiresAt, appointmentId: appointment.id });
+});
+
 app.get("/api/public/anamnesis/:token", async (req, res) => {
   setAnamnesisNoStoreHeaders(res);
   const form = await findPublicAnamnesis(String(req.params.token || ""));

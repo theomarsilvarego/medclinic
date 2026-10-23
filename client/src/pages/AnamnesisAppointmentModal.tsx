@@ -40,7 +40,7 @@ function phoneForWhatsApp(phone: unknown) {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
-export function AnamnesisAppointmentModal({ appointment, onClose }: { appointment: Row; onClose: () => void }) {
+export function AnamnesisAppointmentModal({ appointment, onClose, autoPrint = false }: { appointment: Row; onClose: () => void; autoPrint?: boolean }) {
   const [state, setState] = useState<AnamnesisState | null>(null);
   const [qrCode, setQrCode] = useState("");
   const [publicUrl, setPublicUrl] = useState("");
@@ -60,6 +60,12 @@ export function AnamnesisAppointmentModal({ appointment, onClose }: { appointmen
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [appointment.id, retry]);
+
+  useEffect(() => {
+    if (!autoPrint || state?.state !== "submitted") return;
+    const timer = window.setTimeout(() => window.print(), 180);
+    return () => window.clearTimeout(timer);
+  }, [autoPrint, state?.state]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
