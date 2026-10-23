@@ -2185,7 +2185,7 @@ tr:last-child td {
   align-items: center;
   justify-content: space-between;
   padding: 25px 30px;
-  background: linear-gradient(115deg, #fff8f8 0%, #fffdfd 62%, #fdf3f5 100%);
+  /* background: linear-gradient(115deg, #fff8f8 0%, #fffdfd 62%, #fdf3f5 100%); */
   border-bottom: 1px solid #f0e3e5;
   color: var(--brand);
 }
@@ -4045,7 +4045,7 @@ tr:last-child td {
 }
 .clinical-patient-heading h2 {
   font-family: "Inter", sans-serif;
-  font-size: 20px;
+  /* font-size: 20px; */
   line-height: 1.2;
   letter-spacing: normal;
 }
@@ -4068,8 +4068,8 @@ tr:last-child td {
   display: inline;
   margin: 0;
   color: #92757e;
-  font-family: "Inter", sans-serif;
-  font-size: 10px;
+  /* font-family: "Inter", sans-serif; */
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -4297,7 +4297,7 @@ tr:last-child td {
 }
 .clinical-evolution-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
   gap: 12px;
 }
 .clinical-evolution-input {
@@ -5123,7 +5123,6 @@ tr:last-child td {
   overflow: hidden;
 }
 
-
 /* Exames do paciente: coluna lateral e apresentação acessível */
 .medical-records-workspace {
   display: grid;
@@ -5132,7 +5131,9 @@ tr:last-child td {
   gap: 20px;
   min-width: 0;
 }
-.medical-records-primary { min-width: 0; }
+.medical-records-primary {
+  min-width: 0;
+}
 .patient-exams-sidebar {
   min-width: 0;
   overflow: hidden;
@@ -5156,7 +5157,7 @@ tr:last-child td {
   color: #704051;
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
 }
 .patient-exams-heading h2 {
   margin: 0;
@@ -5177,9 +5178,16 @@ tr:last-child td {
   font-size: 13px;
   font-weight: 800;
 }
-.patient-exam-groups { padding: 5px 16px 16px; }
-.patient-exam-group { padding: 14px 0; border-bottom: 1px solid #eee5e7; }
-.patient-exam-group:last-child { border-bottom: 0; }
+.patient-exam-groups {
+  padding: 5px 16px 16px;
+}
+.patient-exam-group {
+  padding: 14px 0;
+  border-bottom: 1px solid #eee5e7;
+}
+.patient-exam-group:last-child {
+  border-bottom: 0;
+}
 .patient-exam-group h3 {
   display: flex;
   align-items: center;
@@ -5190,16 +5198,41 @@ tr:last-child td {
   font-size: 14px;
   line-height: 1.4;
 }
-.patient-exam-group h3 > span { min-width: 27px; min-height: 25px; }
-.patient-exam-group ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.patient-exam-group h3 > span {
+  min-width: 27px;
+  min-height: 25px;
+}
+.patient-exam-group ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .patient-exam-empty,
 .patient-exams-state,
 .patient-exam-uploaded,
-.patient-exam-file-error { margin: 0; color: #55474b; font-size: 13px; line-height: 1.5; }
-.patient-exam-empty { padding: 10px 12px; border-radius: 9px; background: #faf7f7; }
-.patient-exams-state { padding: 18px; }
-.patient-exams-error { color: #762d42; }
-.patient-exams-error p { margin: 0 0 10px; font-size: 13px; }
+.patient-exam-file-error {
+  margin: 0;
+  color: #55474b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.patient-exam-empty {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #faf7f7;
+}
+.patient-exams-state {
+  padding: 18px;
+}
+.patient-exams-error {
+  color: #762d42;
+}
+.patient-exams-error p {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
 .patient-exams-error button,
 .patient-exam-actions button {
   display: inline-flex;
@@ -5224,16 +5257,66 @@ tr:last-child td {
   border-radius: 12px;
   background: #fffdfd;
 }
-.patient-exam-file-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.patient-exam-file-icon { display: inline-grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: #f5e8eb; color: #6f3046; }
-.patient-exam-file-heading > strong { min-width: 0; overflow: hidden; color: #3f3035; font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-.patient-exam-file-type { flex: 0 0 auto; margin-left: auto; color: #55474b; font-size: 13px; font-weight: 700; }
-.patient-exam-date { margin: 9px 0 2px; color: #49363c; font-size: 13px; line-height: 1.45; }
-.patient-exam-date strong { color: #642a3e; font-size: 13px; font-weight: 800; }
-.patient-exam-uploaded { margin: 0 0 9px; color: #62565a; font-size: 13px; }
-.patient-exam-actions { display: flex; flex-wrap: wrap; gap: 7px; }
-.patient-exam-file-error { margin-top: 10px; color: #8a2436; }
-.patient-exams-sidebar button:hover { background: #fff5f7; }
+.patient-exam-file-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.patient-exam-file-icon {
+  display: inline-grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: #f5e8eb;
+  color: #6f3046;
+}
+.patient-exam-file-heading > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #3f3035;
+  font-size: 13px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.patient-exam-file-type {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: #55474b;
+  font-size: 13px;
+  font-weight: 700;
+}
+.patient-exam-date {
+  margin: 9px 0 2px;
+  color: #49363c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.patient-exam-date strong {
+  color: #642a3e;
+  font-size: 13px;
+  font-weight: 800;
+}
+.patient-exam-uploaded {
+  margin: 0 0 9px;
+  color: #62565a;
+  font-size: 13px;
+}
+.patient-exam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.patient-exam-file-error {
+  margin-top: 10px;
+  color: #8a2436;
+}
+.patient-exams-sidebar button:hover {
+  background: #fff5f7;
+}
 .patient-exams-sidebar button:focus-visible,
 .appointment-exam-upload-row input:focus-visible,
 .appointment-exam-upload-row select:focus-visible,
@@ -5241,24 +5324,61 @@ tr:last-child td {
   outline: 3px solid #8c3b57;
   outline-offset: 2px;
 }
-.appointment-exam-upload-row label { display: flex; flex-direction: column; gap: 6px; color: #49363c; font-size: 13px; }
-.appointment-exam-upload-row label > span { color: #49363c; font-size: 13px; font-weight: 700; line-height: 1.35; }
+.appointment-exam-upload-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #49363c;
+  font-size: 13px;
+}
+.appointment-exam-upload-row label > span {
+  color: #49363c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
 .appointment-exam-upload-row label input,
-.appointment-exam-upload-row label select { min-height: 40px; font-size: 13px; }
-.appointment-exam-upload-row .appointment-exam-file input { min-height: 40px; font-size: 13px; }
-.appointment-exam-upload-row .appointment-exam-remove { min-width: 36px; min-height: 36px; align-self: end; }
-.appointment-exam-help { color: #55474b; font-size: 13px; }
+.appointment-exam-upload-row label select {
+  min-height: 40px;
+  font-size: 13px;
+}
+.appointment-exam-upload-row .appointment-exam-file input {
+  min-height: 40px;
+  font-size: 13px;
+}
+.appointment-exam-upload-row .appointment-exam-remove {
+  min-width: 36px;
+  min-height: 36px;
+  align-self: end;
+}
+.appointment-exam-help {
+  color: #55474b;
+  font-size: 13px;
+}
 @media (max-width: 1080px) {
-  .medical-records-workspace { grid-template-columns: minmax(0, 1fr); }
-  .patient-exams-sidebar { width: 100%; }
-  .patient-exam-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+  .medical-records-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .patient-exams-sidebar {
+    width: 100%;
+  }
+  .patient-exam-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 18px;
+  }
 }
 @media (max-width: 640px) {
-  .patient-exam-groups { grid-template-columns: minmax(0, 1fr); }
-  .patient-exams-heading { padding: 15px; }
-  .patient-exam-groups { padding: 4px 14px 12px; }
+  .patient-exam-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .patient-exams-heading {
+    padding: 15px;
+  }
+  .patient-exam-groups {
+    padding: 4px 14px 12px;
+  }
 }
-
 
 /* Interações da coluna de exames: filtros, grupos recolhíveis e classificação */
 .patient-exams-sidebar {
@@ -5308,7 +5428,10 @@ tr:last-child td {
   background: #713048;
   color: #fff;
 }
-.patient-exam-filters button.active span { background: #fff; color: #642a3e; }
+.patient-exam-filters button.active span {
+  background: #fff;
+  color: #642a3e;
+}
 .patient-exam-groups {
   flex: 1 1 auto;
   min-height: 0;
@@ -5318,7 +5441,10 @@ tr:last-child td {
   scrollbar-width: thin;
   scrollbar-color: #c8a5af transparent;
 }
-.patient-exam-group > h3 { display: block; margin: 0; }
+.patient-exam-group > h3 {
+  display: block;
+  margin: 0;
+}
 .patient-exam-group-toggle {
   display: flex;
   align-items: center;
@@ -5332,7 +5458,11 @@ tr:last-child td {
   text-align: left;
   cursor: pointer;
 }
-.patient-exam-group-title { flex: 1; font-size: 14px; font-weight: 800; }
+.patient-exam-group-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 800;
+}
 .patient-exam-group-count {
   display: inline-grid;
   min-width: 27px;
@@ -5345,12 +5475,30 @@ tr:last-child td {
   font-size: 13px;
   font-weight: 800;
 }
-.patient-exam-group-toggle > svg { color: #6a4250; transition: transform .15s ease; }
-.patient-exam-group-toggle[aria-expanded="false"] > svg { transform: rotate(-90deg); }
-.patient-exam-group-panel[hidden] { display: none; }
-.patient-exam-group-panel { padding-top: 7px; }
-.patient-exam-group-panel > ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.patient-exam-actions button { flex: 1 1 auto; min-height: 36px; }
+.patient-exam-group-toggle > svg {
+  color: #6a4250;
+  transition: transform 0.15s ease;
+}
+.patient-exam-group-toggle[aria-expanded="false"] > svg {
+  transform: rotate(-90deg);
+}
+.patient-exam-group-panel[hidden] {
+  display: none;
+}
+.patient-exam-group-panel {
+  padding-top: 7px;
+}
+.patient-exam-group-panel > ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.patient-exam-actions button {
+  flex: 1 1 auto;
+  min-height: 36px;
+}
 .patient-exam-classification-form {
   display: grid;
   gap: 10px;
@@ -5360,7 +5508,13 @@ tr:last-child td {
   border-radius: 10px;
   background: #fff8f9;
 }
-.patient-exam-classification-form label { display: grid; gap: 5px; color: #49363c; font-size: 13px; font-weight: 700; }
+.patient-exam-classification-form label {
+  display: grid;
+  gap: 5px;
+  color: #49363c;
+  font-size: 13px;
+  font-weight: 700;
+}
 .patient-exam-classification-form select,
 .patient-exam-classification-form input {
   width: 100%;
@@ -5372,8 +5526,17 @@ tr:last-child td {
   color: #392c31;
   font-size: 13px;
 }
-.patient-exam-classification-error { margin: 0; color: #8a2436; font-size: 13px; line-height: 1.45; }
-.patient-exam-classification-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.patient-exam-classification-error {
+  margin: 0;
+  color: #8a2436;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.patient-exam-classification-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .patient-exam-classification-actions button {
   min-width: 32px;
   min-height: 36px;
@@ -5386,8 +5549,15 @@ tr:last-child td {
   font-weight: 700;
   cursor: pointer;
 }
-.patient-exam-classification-actions button.primary { border-color: #713048; background: #713048; color: #fff; }
-.patient-exam-classification-actions button:disabled { opacity: .65; cursor: wait; }
+.patient-exam-classification-actions button.primary {
+  border-color: #713048;
+  background: #713048;
+  color: #fff;
+}
+.patient-exam-classification-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 .patient-exams-sidebar button:focus-visible,
 .patient-exam-classification-form input:focus-visible,
 .patient-exam-classification-form select:focus-visible {
@@ -5395,10 +5565,17 @@ tr:last-child td {
   outline-offset: 2px;
 }
 @media (max-width: 1080px) {
-  .patient-exams-sidebar { position: static; max-height: none; }
-  .patient-exam-groups { flex: initial; min-height: auto; max-height: none; overflow: visible; }
+  .patient-exams-sidebar {
+    position: static;
+    max-height: none;
+  }
+  .patient-exam-groups {
+    flex: initial;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+  }
 }
-
 
 /* Acabamento da coluna conforme o protótipo de exames */
 .patient-exams-heading {
@@ -5431,9 +5608,15 @@ tr:last-child td {
   font-size: 13px;
   font-weight: 600;
 }
-.patient-exam-filters button span { font-size: 13px; }
-.patient-exam-groups { padding: 0 16px 12px; }
-.patient-exam-group { padding: 0; }
+.patient-exam-filters button span {
+  font-size: 13px;
+}
+.patient-exam-groups {
+  padding: 0 16px 12px;
+}
+.patient-exam-group {
+  padding: 0;
+}
 .patient-exam-group-toggle {
   min-height: 42px;
   margin: 0 -16px;
@@ -5441,9 +5624,16 @@ tr:last-child td {
   padding: 7px 16px;
   background: #faf6f6;
 }
-.patient-exam-group-title { color: #2a1d22; font-size: 14px; }
-.patient-exam-group-panel { padding-top: 0; }
-.patient-exam-group-panel > ul { gap: 0; }
+.patient-exam-group-title {
+  color: #2a1d22;
+  font-size: 14px;
+}
+.patient-exam-group-panel {
+  padding-top: 0;
+}
+.patient-exam-group-panel > ul {
+  gap: 0;
+}
 .patient-exam-file {
   padding: 12px 0;
   border: 0;
@@ -5451,8 +5641,12 @@ tr:last-child td {
   border-radius: 0;
   background: transparent;
 }
-.patient-exam-group-panel > ul > .patient-exam-file:last-child { border-bottom: 0; }
-.patient-exam-file-heading { gap: 10px; }
+.patient-exam-group-panel > ul > .patient-exam-file:last-child {
+  border-bottom: 0;
+}
+.patient-exam-file-heading {
+  gap: 10px;
+}
 .patient-exam-file-icon {
   display: inline-flex;
   flex: 0 0 40px;
@@ -5465,12 +5659,35 @@ tr:last-child td {
   font-size: 12px;
   font-weight: 800;
 }
-.patient-exam-file-heading > strong { color: #2a1d22; font-size: 14px; font-weight: 600; }
-.patient-exam-date { margin: 3px 0 0 50px; color: #2a1d22; font-size: 13px; font-weight: 700; }
-.patient-exam-date strong { color: #2a1d22; font-size: 13px; font-weight: 700; }
-.patient-exam-date.is-missing { color: #9a3412; font-weight: 600; }
-.patient-exam-uploaded { margin: 0 0 0 50px; color: #6b5a61; font-size: 13px; }
-.patient-exam-actions { gap: 7px; margin: 7px 0 0 50px; }
+.patient-exam-file-heading > strong {
+  color: #2a1d22;
+  font-size: 14px;
+  font-weight: 600;
+}
+.patient-exam-date {
+  margin: 3px 0 0 50px;
+  color: #2a1d22;
+  font-size: 13px;
+  font-weight: 700;
+}
+.patient-exam-date strong {
+  color: #2a1d22;
+  font-size: 13px;
+  font-weight: 700;
+}
+.patient-exam-date.is-missing {
+  color: #9a3412;
+  font-weight: 600;
+}
+.patient-exam-uploaded {
+  margin: 0 0 0 50px;
+  color: #6b5a61;
+  font-size: 13px;
+}
+.patient-exam-actions {
+  gap: 7px;
+  margin: 7px 0 0 50px;
+}
 .patient-exam-actions button {
   flex: 0 0 auto;
   min-height: 32px;
@@ -5481,21 +5698,47 @@ tr:last-child td {
   font-size: 13px;
   font-weight: 600;
 }
-.patient-exam-empty { padding: 12px 0; background: transparent; color: #6b5a61; }
-.patient-exam-group-count.empty { background: #e8dcdf; color: #6b5a61; }
-.patient-exam-group-count.has-items { background: #f6e9ee; color: #7a2d48; }
+.patient-exam-empty {
+  padding: 12px 0;
+  background: transparent;
+  color: #6b5a61;
+}
+.patient-exam-group-count.empty {
+  background: #e8dcdf;
+  color: #6b5a61;
+}
+.patient-exam-group-count.has-items {
+  background: #f6e9ee;
+  color: #7a2d48;
+}
 @media (max-width: 1080px) {
-  .patient-exam-groups { display: block; padding: 0 16px 12px; }
+  .patient-exam-groups {
+    display: block;
+    padding: 0 16px 12px;
+  }
 }
 @media (max-width: 640px) {
-  .patient-exam-filters { padding-right: 12px; padding-left: 12px; }
-  .patient-exam-groups { padding-right: 12px; padding-left: 12px; }
-  .patient-exam-group-toggle { margin-right: -12px; margin-left: -12px; width: calc(100% + 24px); padding-right: 12px; padding-left: 12px; }
+  .patient-exam-filters {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .patient-exam-groups {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .patient-exam-group-toggle {
+    margin-right: -12px;
+    margin-left: -12px;
+    width: calc(100% + 24px);
+    padding-right: 12px;
+    padding-left: 12px;
+  }
   .patient-exam-date,
   .patient-exam-uploaded,
-  .patient-exam-actions { margin-left: 0; }
+  .patient-exam-actions {
+    margin-left: 0;
+  }
 }
-
 
 /* Acesso à ficha de anamnese nos agendamentos elegíveis */
 .appointment-chip .anamnesis-chip-action {
