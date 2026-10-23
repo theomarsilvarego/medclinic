@@ -1856,7 +1856,7 @@ function PatientExamSidebar({
       aria-labelledby="patient-exams-title"
     >
       <header className="patient-exams-heading">
-        <h2 id="patient-exams-title">Exames do paciente</h2>
+        <h2 id="patient-exams-title">EXAMES DA PACIENTE</h2>
       </header>
       <div
         className="patient-exam-filters"

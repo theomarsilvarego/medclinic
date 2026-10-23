@@ -5098,7 +5098,7 @@ tr:last-child td {
 }
 .appointment-modal-fields {
   overflow-x: hidden;
-  background: #fbf8f5;
+  background: var(--paper);
 }
 .appointment-section > *,
 .appointment-exam-upload-row > *,
@@ -5581,10 +5581,10 @@ tr:last-child td {
 .patient-exams-heading {
   display: block;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--brand);
 }
 .patient-exams-heading h2 {
-  color: #2a1d22;
+  color: var(--panel);
   font-size: 16px;
   font-weight: 700;
 }
