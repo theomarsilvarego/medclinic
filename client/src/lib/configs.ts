@@ -20,6 +20,8 @@ export const configs: Record<
       label: string;
       type?: string;
       fullWidth?: boolean;
+      section?: string;
+      placeholder?: string;
       options?: (string | { value: string; label: string })[];
     }[];
     columns: { key: string; label: string; format?: (v: any) => string }[];
@@ -51,11 +53,12 @@ export const configs: Record<
     title: "Pacientes",
     fields: [
       { key: "photo", label: "Foto do paciente", type: "file", fullWidth: true },
-      { key: "fullName", label: "Nome completo", fullWidth: true },
+      { key: "fullName", label: "Nome completo", fullWidth: true, section: "Dados pessoais" },
       {
         key: "sex",
         label: "Sexo",
         type: "select",
+        section: "Dados pessoais",
         options: [
           { value: "1", label: "Masculino" },
           { value: "2", label: "Feminino" },
@@ -65,6 +68,7 @@ export const configs: Record<
         key: "maritalStatus",
         label: "Estado civil",
         type: "select",
+        section: "Dados pessoais",
         options: [
           { value: "1", label: "Solteiro(a)" },
           { value: "2", label: "Casado(a)" },
@@ -73,20 +77,21 @@ export const configs: Record<
           { value: "5", label: "União estável" },
         ],
       },
-      { key: "cpf", label: "CPF" },
-      { key: "email", label: "E-mail" },
-      { key: "phone", label: "Celular" },
-      { key: "birthDate", label: "Data de nascimento", type: "date" },
+      { key: "cpf", label: "CPF", section: "Dados pessoais" },
+      { key: "birthDate", label: "Data de nascimento", type: "date", section: "Dados pessoais" },
+      { key: "email", label: "E-mail", type: "email", section: "Contato" },
+      { key: "phone", label: "WhatsApp", type: "tel", placeholder: "(69) 90000-0000", section: "Contato" },
       {
         key: "insuranceCode",
         label: "Convênio",
         type: "select",
+        section: "Convênio",
         options: [],
       },
-      { key: "allergies", label: "Alergia", type: "text" },
-      { key: "comorbidities", label: "Comorbidade", type: "text" },
-      { key: "medicationsInUse", label: "Em uso de medicamento", type: "text" },
-      { key: "notes", label: "Observação", type: "textarea", fullWidth: true },
+      { key: "allergies", label: "Alergia", type: "text", section: "Saúde" },
+      { key: "comorbidities", label: "Comorbidade", type: "text", section: "Saúde" },
+      { key: "medicationsInUse", label: "Em uso de medicamento", type: "text", section: "Saúde" },
+      { key: "notes", label: "Observação", type: "textarea", fullWidth: true, section: "Saúde" },
     ],
     columns: [
       { key: "sourceCode", label: "Código" },

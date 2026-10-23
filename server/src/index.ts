@@ -1144,6 +1144,10 @@ const patientSchema = z.object({
   allergies: z.string().trim().optional().nullable(),
   comorbidities: z.string().trim().optional().nullable(),
   medicationsInUse: z.string().trim().optional().nullable(),
+  removePhoto: z.preprocess(
+    (value) => value === true || value === "true" || value === "1",
+    z.boolean(),
+  ).optional(),
 });
 
 // Pacientes são acessíveis a qualquer perfil autenticado.
@@ -1209,7 +1213,8 @@ app.post("/api/patients", auth, patientPhotoUpload.single("photo"), async (req, 
         message: "O convênio selecionado não está cadastrado no sistema.",
       });
   }
-  const patient = await prisma.patient.create({ data: parsed.data });
+  const { removePhoto: _removePhoto, ...patientData } = parsed.data;
+  const patient = await prisma.patient.create({ data: patientData });
   if (req.file) {
     const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
     const storageKey = `${patient.id}/${crypto.randomUUID()}${extension}`;
@@ -1245,7 +1250,8 @@ app.put("/api/patients/:id", auth, patientPhotoUpload.single("photo"), async (re
     where: { id },
     select: { photoStorageKey: true },
   });
-  const data: typeof parsed.data & { photoStorageKey?: string } = { ...parsed.data };
+  const { removePhoto, ...patientData } = parsed.data;
+  const data: typeof patientData & { photoStorageKey?: string | null } = { ...patientData };
   let oldPhoto: string | null = null;
   if (req.file) {
     const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
@@ -1253,6 +1259,9 @@ app.put("/api/patients/:id", auth, patientPhotoUpload.single("photo"), async (re
     oldPhoto = current?.photoStorageKey || null;
     await fs.promises.mkdir(path.join(patientPhotoRoot, String(id)), { recursive: true });
     await fs.promises.writeFile(path.join(patientPhotoRoot, data.photoStorageKey), req.file.buffer);
+  } else if (removePhoto) {
+    data.photoStorageKey = null;
+    oldPhoto = current?.photoStorageKey || null;
   }
   const patient = await prisma.patient.update({ where: { id }, data });
   if (oldPhoto) {

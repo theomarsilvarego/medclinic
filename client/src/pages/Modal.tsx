@@ -1,35 +1,104 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ImagePlus, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ImagePlus, Trash2, Upload, X } from 'lucide-react';
 import { API } from '../lib/app';
 import type { Row } from '../lib/app';
-export function Modal({title,fields,initial,onClose,onSave}:{title:string;fields:any[];initial:Row;onClose:()=>void;onSave:(d:Row)=>void}) {
-  const [data,setData]=useState<Row>(initial);
-  const [preview,setPreview]=useState<string | null>(null);
-  const [offsetX,setOffsetX]=useState(50);
-  const [offsetY,setOffsetY]=useState(50);
+
+type FormField = {
+  key: string;
+  label: string;
+  type?: string;
+  fullWidth?: boolean;
+  section?: string;
+  placeholder?: string;
+  options?: (string | { value: string; label: string })[];
+};
+
+const patientSectionOrder = ['Dados pessoais', 'Contato', 'Convênio', 'Saúde'];
+
+export function Modal({
+  title,
+  fields,
+  initial,
+  onClose,
+  onSave,
+}: {
+  title: string;
+  fields: FormField[];
+  initial: Row;
+  onClose: () => void;
+  onSave: (data: Row) => void;
+}) {
+  const [data, setData] = useState<Row>(initial);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const [offsetX, setOffsetX] = useState(50);
+  const [offsetY, setOffsetY] = useState(50);
   const dragPoint = useRef<{ x: number; y: number } | null>(null);
-  const update=(key:string,value:any)=>setData({...data,[key]:value});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isPatientForm = fields.some(field => field.key === 'allergies' || field.key === 'insuranceCode');
+  const photoField = fields.find(field => field.key === 'photo');
+  const patientSections = useMemo(() => patientSectionOrder.map(section => ({
+    title: section,
+    fields: fields.filter(field => field.section === section),
+  })).filter(section => section.fields.length > 0), [fields]);
+
+  const update = (key: string, value: unknown) => setData(current => ({ ...current, [key]: value }));
+
   useEffect(() => {
     let objectUrl: string | null = null;
-    if (!initial.photoUrl) return;
+    let cancelled = false;
+    setPreview(null);
+    setPhotoRemoved(false);
+    if (!initial.photoUrl) return () => { cancelled = true; };
     fetch(`${API}${initial.photoUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem('medclinic_token') || ''}` } })
       .then(response => response.ok ? response.blob() : null)
-      .then(blob => { if (blob) { objectUrl = URL.createObjectURL(blob); setPreview(objectUrl); } })
+      .then(blob => {
+        if (blob && !cancelled) {
+          objectUrl = URL.createObjectURL(blob);
+          setPreview(objectUrl);
+        }
+      })
       .catch(() => undefined);
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [initial.photoUrl]);
+
   useEffect(() => () => {
     if (data.photo instanceof File && preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
   }, [data.photo, preview]);
+
   const handlePhoto = (file: File | undefined) => {
     if (!file) return;
-    if (!['image/jpeg', 'image/png'].includes(file.type)) return alert('A foto deve estar no formato JPG ou PNG.');
-    if (file.size > 10 * 1024 * 1024) return alert('A foto deve ter no máximo 10 MB.');
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      alert('A foto deve estar no formato JPG ou PNG.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('A foto deve ter no máximo 10 MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
-    setOffsetX(50); setOffsetY(50);
+    setOffsetX(50);
+    setOffsetY(50);
+    setPhotoRemoved(false);
     update('photo', file);
+    update('removePhoto', false);
   };
+
+  const removePhoto = () => {
+    if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
+    setPreview(null);
+    setPhotoRemoved(true);
+    update('photo', null);
+    update('removePhoto', true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const startDragging = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!preview) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -44,6 +113,44 @@ export function Modal({title,fields,initial,onClose,onSave}:{title:string;fields
     setOffsetY(value => Math.max(0, Math.min(100, value - dy * 0.7)));
   };
   const stopDragging = () => { dragPoint.current = null; };
+
+  const selectedInsurance = fields
+    .find(field => field.key === 'insuranceCode')
+    ?.options?.find(option => String(typeof option === 'string' ? option : option.value) === String(data.insuranceCode ?? ''));
+  const insuranceName = selectedInsurance
+    ? (typeof selectedInsurance === 'string' ? selectedInsurance : selectedInsurance.label).replace(/^\d+\s*-\s*/, '')
+    : 'Convênio não definido';
+
+  const renderField = (field: FormField) => {
+    const fieldId = `modal-${field.key}`;
+    const fieldValue = field.type === 'date' && data[field.key]
+      ? String(data[field.key]).slice(0, 10)
+      : data[field.key] ?? '';
+    if (field.type === 'checkbox') {
+      return <label key={field.key} htmlFor={fieldId} data-field-key={field.key} className="check-label">
+        <input id={fieldId} type="checkbox" checked={data[field.key] ?? true} onChange={event => update(field.key, event.target.checked)} />
+        {field.label}
+      </label>;
+    }
+    return <label key={field.key} htmlFor={fieldId} data-field-key={field.key} className={`modal-form-field${field.fullWidth ? ' modal-field-full-width' : ''}`}>
+      <span>{field.label}</span>
+      {field.type === 'select' ? (
+        <select id={fieldId} value={String(fieldValue)} onChange={event => update(field.key, event.target.value)}>
+          <option value="">Selecione…</option>
+          {field.options?.map(option => {
+            const value = typeof option === 'string' ? option : option.value;
+            const label = typeof option === 'string' ? option : option.label;
+            return <option key={value} value={value}>{label}</option>;
+          })}
+        </select>
+      ) : field.type === 'textarea' ? (
+        <textarea id={fieldId} rows={4} value={String(fieldValue)} placeholder={field.placeholder} onChange={event => update(field.key, event.target.value)} />
+      ) : (
+        <input id={fieldId} type={field.type || 'text'} value={String(fieldValue)} placeholder={field.placeholder} onChange={event => update(field.key, event.target.value)} />
+      )}
+    </label>;
+  };
+
   const save = async () => {
     let photoToSave = data.photo;
     if (data.photo instanceof File && preview) {
@@ -51,28 +158,60 @@ export function Modal({title,fields,initial,onClose,onSave}:{title:string;fields
       image.src = preview;
       await new Promise(resolve => { image.onload = resolve; image.onerror = resolve; });
       if (image.naturalWidth) {
-        const canvas = document.createElement('canvas'); canvas.width = 800; canvas.height = 800;
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 800;
         const context = canvas.getContext('2d');
         if (context) {
           const scale = Math.max(800 / image.naturalWidth, 800 / image.naturalHeight);
-          const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
-          const x = (800 - width) * offsetX / 100, y = (800 - height) * offsetY / 100;
+          const width = image.naturalWidth * scale;
+          const height = image.naturalHeight * scale;
+          const x = (800 - width) * offsetX / 100;
+          const y = (800 - height) * offsetY / 100;
           context.drawImage(image, x, y, width, height);
           const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, data.photo.type, .9));
           if (blob) photoToSave = new File([blob], data.photo.name, { type: data.photo.type });
         }
       }
     }
-    onSave({ ...data, photo: photoToSave });
+    onSave({ ...data, photo: photoToSave, removePhoto: photoRemoved });
   };
-  return <div className="modal-backdrop"><div className="modal">
-    <div className="modal-header"><div><p className="eyebrow">CADASTRO</p><h2>{title}</h2></div><button className="icon-button" onClick={onClose}><X size={19}/></button></div>
-    <div className="modal-fields">{fields.map(f=><label key={f.key} data-field-key={f.key} className={[f.type==='checkbox'?'check-label':'',f.fullWidth?'modal-field-full-width':''].filter(Boolean).join(' ')}>
-      {f.type==='checkbox' ? <><input type="checkbox" checked={data[f.key] ?? true} onChange={e=>update(f.key,e.target.checked)}/>{f.label}</> : <>
-        {f.label}
-        {f.type==='file' ? <div className="patient-photo-picker"><div className="patient-photo-preview" onPointerDown={startDragging} onPointerMove={dragPhoto} onPointerUp={stopDragging} onPointerCancel={stopDragging}>{preview ? <img src={preview} alt="Prévia enquadrada da foto do paciente" style={{ objectPosition: `${offsetX}% ${offsetY}%` }} /> : <ImagePlus size={28} />}</div><div><input type="file" accept="image/jpeg,image/png" onChange={e=>handlePhoto(e.target.files?.[0])}/><small>{preview ? 'Arraste a foto dentro da thumb para enquadrar.' : 'JPG ou PNG, até 10 MB.'}</small></div></div> : f.type==='select' ? <select value={data[f.key]||''} onChange={e=>update(f.key,e.target.value)}><option value="">Selecione…</option>{f.options.map((o:any)=><option key={typeof o==='string'?o:o.value} value={typeof o==='string'?o:o.value}>{typeof o==='string'?o:o.label}</option>)}</select> : f.type==='textarea' ? <textarea rows={5} value={data[f.key]||''} onChange={e=>update(f.key,e.target.value)}/> : <input type={f.type||'text'} value={data[f.key]||''} onChange={e=>update(f.key,e.target.value)}/>} 
-      </>}
-    </label>)}</div>
-    <div className="modal-footer"><button className="secondary" onClick={onClose}>Cancelar</button><button className="primary" onClick={save}>Salvar cadastro</button></div>
-  </div></div>;
+
+  return <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`modal${isPatientForm ? ' patient-modal' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div className="modal-header">
+        <div><p className="eyebrow">CADASTRO</p><h2 id="modal-title">{title}</h2></div>
+        {isPatientForm && <span className="patient-modal-insurance" title={`Convênio atual: ${insuranceName}`}><span>Convênio</span><strong>{insuranceName}</strong></span>}
+        <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar cadastro"><X size={19}/></button>
+      </div>
+      {isPatientForm ? <div className="modal-fields patient-form-fields">
+        {photoField && <div className="patient-photo-toolbar">
+          <div className="patient-photo-preview" onPointerDown={startDragging} onPointerMove={dragPhoto} onPointerUp={stopDragging} onPointerCancel={stopDragging} aria-label={preview ? 'Prévia da foto do paciente; arraste para ajustar o enquadramento' : 'Paciente sem foto'}>
+            {preview ? <img src={preview} alt="Prévia da foto do paciente" style={{ objectPosition: `${offsetX}% ${offsetY}%` }} /> : <ImagePlus size={28} aria-hidden="true" />}
+          </div>
+          <div className="patient-photo-controls">
+            <strong>Foto do paciente</strong>
+            <span>JPG ou PNG, até 10 MB.</span>
+            <div className="patient-photo-buttons">
+              <label className="patient-photo-button patient-photo-change" htmlFor="patient-photo-input"><Upload size={15} />Trocar foto</label>
+              <input ref={fileInputRef} id="patient-photo-input" className="patient-photo-native-input" type="file" accept="image/jpeg,image/png" onChange={event => handlePhoto(event.target.files?.[0])} />
+              <button className="patient-photo-button patient-photo-remove" type="button" onClick={removePhoto} disabled={!preview && !initial.photoUrl && !(data.photo instanceof File)}><Trash2 size={15} />Remover</button>
+            </div>
+            {preview && <small>Arraste a foto para ajustar o enquadramento.</small>}
+          </div>
+        </div>}
+        {patientSections.map(section => <section className={`patient-form-section patient-section-${section.title.toLocaleLowerCase('pt-BR').replace(/\s+/g, '-')}`} key={section.title} aria-labelledby={`patient-section-${section.title}`}>
+          <h3 id={`patient-section-${section.title}`}>{section.title}</h3>
+          {section.title === 'Saúde' && <p className="patient-section-hint">Essas informações também podem ser preenchidas pela anamnese digital.</p>}
+          <div className={`patient-section-grid${section.title === 'Contato' ? ' contact-grid' : ''}${section.title === 'Convênio' ? ' insurance-grid' : ''}`}>
+            {section.fields.map(renderField)}
+          </div>
+        </section>)}
+      </div> : <div className="modal-fields">{fields.map(field => field.type === 'file' ? <label key={field.key} data-field-key={field.key} className={`modal-form-field${field.fullWidth ? ' modal-field-full-width' : ''}`}>
+        <span>{field.label}</span>
+        <div className="patient-photo-picker"><div className="patient-photo-preview" onPointerDown={startDragging} onPointerMove={dragPhoto} onPointerUp={stopDragging} onPointerCancel={stopDragging}>{preview ? <img src={preview} alt="Prévia enquadrada da foto do paciente" style={{ objectPosition: `${offsetX}% ${offsetY}%` }} /> : <ImagePlus size={28} />}</div><div><input ref={fileInputRef} type="file" accept="image/jpeg,image/png" onChange={event => handlePhoto(event.target.files?.[0])}/><small>{preview ? 'Arraste a foto dentro da thumb para enquadrar.' : 'JPG ou PNG, até 10 MB.'}</small></div></div>
+      </label> : renderField(field))}</div>}
+      <div className="modal-footer"><button className="secondary" type="button" onClick={onClose}>Cancelar</button><button className="primary" type="button" onClick={() => void save()}>Salvar cadastro</button></div>
+    </div>
+  </div>;
 }
