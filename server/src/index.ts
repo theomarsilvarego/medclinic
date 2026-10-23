@@ -30,6 +30,7 @@ const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || "dev-secret";
 const clinicTimeZone = process.env.CLINIC_TIMEZONE || "America/Sao_Paulo";
 const corsOrigins = new Set([
+  "http://100.101.191.54:3000",
   "http://192.168.0.200:3000",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -2831,7 +2832,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 app.listen(port, "0.0.0.0", () => {
   console.log("MedClinic API iniciada com sucesso!");
   console.log(`Localhost: http://localhost:${port}`);
+  console.log(`IP fixo:   http://100.101.191.54:${port}`);
   console.log(`IP fixo:   http://192.168.0.200:${port}`);
   console.log(`API Local: http://localhost:${port}/api`);
+  console.log(`API Rede:  http://100.101.191.54:${port}/api`);
   console.log(`API Rede:  http://192.168.0.200:${port}/api`);
 });
