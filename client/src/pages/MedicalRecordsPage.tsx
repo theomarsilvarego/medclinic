@@ -1361,14 +1361,14 @@ function InjectableRequestsArea({
                   </label>
                   <label className="injectable-observation-field">
                     Observação <span>(opcional)</span>
-                    <textarea
+                    <input
+                      type="text"
                       value={item.observation || ""}
                       maxLength={4000}
                       onChange={(event) =>
                         update(Number(item.id), "observation", event.target.value)
                       }
                       placeholder="Orientações para a aplicação..."
-                      rows={2}
                     />
                   </label>
                 </div>
