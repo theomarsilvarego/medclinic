@@ -6616,3 +6616,237 @@ tr:last-child td {
     min-width: 0;
   }
 }
+
+
+/* Prontuário: apresentação coesa do resumo e da linha do tempo da Anamnese */
+.patient-anamnesis-card {
+  border: 1px solid #ead9de;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(61, 31, 42, .08);
+  color: #49363c;
+}
+.patient-anamnesis-heading {
+  padding: 15px 17px;
+  background: linear-gradient(115deg, #722744, #8a2d56);
+}
+.patient-anamnesis-title-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.patient-anamnesis-heading h2 {
+  color: #fff;
+  font-family: "Manrope", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.patient-anamnesis-subtitle {
+  margin: 5px 0 0;
+  color: #f8eaf0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.patient-anamnesis-badge.filled,
+.patient-anamnesis-badge.pending {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+.patient-anamnesis-summary {
+  padding: 2px 16px 0;
+}
+.patient-anamnesis-summary div {
+  grid-template-columns: minmax(74px, .85fr) minmax(0, 1.35fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 0;
+  border-bottom-color: #eee6e8;
+}
+.patient-anamnesis-summary dt {
+  color: #65565c;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.patient-anamnesis-summary dd {
+  color: #34272d;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+  text-align: right;
+}
+.patient-anamnesis-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 13px 16px 16px;
+}
+.patient-anamnesis-actions button {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+  white-space: normal;
+}
+.patient-anamnesis-actions .patient-anamnesis-primary {
+  flex: 1.55 1 0;
+  border: 1px solid #812b4e;
+  background: #812b4e;
+  color: #fff;
+}
+.patient-anamnesis-actions .patient-anamnesis-primary:hover {
+  border-color: #68203e;
+  background: #68203e;
+}
+.patient-anamnesis-actions .patient-anamnesis-secondary {
+  flex: .85 1 0;
+  border: 1px solid #d9c4cb;
+  background: #fff;
+  color: #642a3e;
+}
+.patient-anamnesis-actions .patient-anamnesis-secondary:hover {
+  background: #fbf4f6;
+}
+.patient-anamnesis-pending {
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.patient-anamnesis-pending .patient-anamnesis-actions {
+  flex: 1 1 auto;
+  padding: 0;
+}
+.patient-anamnesis-pending .patient-anamnesis-actions button {
+  width: 100%;
+}
+.patient-anamnesis-qr {
+  width: 84px;
+  height: 84px;
+  flex-basis: 84px;
+  border-color: #e5d6db;
+  border-radius: 9px;
+}
+.patient-anamnesis-state,
+.patient-anamnesis-inline-error {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.patient-anamnesis-inline-error {
+  margin: 0 16px 12px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fff2f2;
+}
+.anamnesis-timeline-card {
+  position: relative;
+  min-height: 76px;
+  gap: 16px;
+  padding: 14px 17px;
+  border: 1px solid #e8dfe2;
+  border-left: 3px solid #8a2d56;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(61, 31, 42, .045);
+}
+.anamnesis-timeline-main {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: start;
+  align-items: center;
+  gap: 5px 10px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.anamnesis-timeline-title {
+  color: #35252c;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: normal;
+}
+.anamnesis-timeline-insurance {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f5e8ec;
+  color: #67283d;
+  font-size: 11px;
+  font-weight: 800;
+}
+.anamnesis-timeline-summary {
+  grid-column: 1 / -1;
+  color: #65575c;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.anamnesis-timeline-open {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #dfcbd2;
+  border-radius: 8px;
+  background: #fbf6f7;
+  color: #702944;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+}
+.anamnesis-timeline-open:hover {
+  border-color: #a96d7e;
+  background: #f5e8ec;
+  color: #5e2039;
+  text-decoration: none;
+}
+.patient-anamnesis-card button:focus-visible,
+.anamnesis-timeline-open:focus-visible {
+  outline: 3px solid #c78696;
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  .anamnesis-timeline-card {
+    align-items: stretch;
+  }
+  .anamnesis-timeline-open {
+    align-self: flex-start;
+  }
+}
+@media (max-width: 640px) {
+  .patient-anamnesis-title-row {
+    flex-direction: row;
+    align-items: center;
+  }
+  .patient-anamnesis-heading {
+    padding: 14px 15px;
+  }
+  .patient-anamnesis-summary {
+    padding: 2px 15px 0;
+  }
+  .patient-anamnesis-summary div {
+    grid-template-columns: minmax(80px, .8fr) minmax(0, 1.2fr);
+    gap: 8px;
+  }
+  .patient-anamnesis-summary dd {
+    text-align: right;
+  }
+  .patient-anamnesis-actions {
+    display: flex;
+    gap: 7px;
+    padding: 12px 15px 15px;
+  }
+  .patient-anamnesis-pending {
+    flex-direction: row;
+    align-items: center;
+  }
+  .anamnesis-timeline-main {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    width: 100%;
+  }
+}
