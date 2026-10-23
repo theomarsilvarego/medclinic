@@ -2974,7 +2974,7 @@ export function MedicalRecordsPage({
                 <span>FICHA CLÍNICA</span>
                 <div className="clinical-patient-title-row">
                   <h2>{selectedPatient.fullName}</h2>
-                  {patientAnamnesis?.state === "submitted" && <span className="clinical-anamnesis-badge"><CheckCircle2 size={14} /> Anamnese preenchida</span>}
+                  {patientAnamnesis?.state === "submitted" && <span className="clinical-anamnesis-badge"><span className="clinical-anamnesis-dot" aria-hidden="true" />Anamnese preenchida</span>}
                 </div>
                 <div className="clinical-patient-meta">
                   <span>

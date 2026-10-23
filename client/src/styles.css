@@ -5134,7 +5134,28 @@ tr:last-child td {
   align-items: center;
   gap: 8px 12px;
 }
-.clinical-anamnesis-badge,
+.clinical-anamnesis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  padding: 9px 16px;
+  border: 1px solid #acd3c2;
+  border-radius: 999px;
+  background: #e4f3ea;
+  color: #1c5d3d;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.clinical-anamnesis-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border-radius: 50%;
+  background: #229664;
+}
 .patient-anamnesis-badge {
   display: inline-flex;
   align-items: center;
