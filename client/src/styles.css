@@ -6141,3 +6141,98 @@ tr:last-child td {
     min-width: 0;
   }
 }
+
+
+/* Cartão único de foto + convênio em Novo/Editar Paciente */
+.patient-photo-toolbar {
+  display: flex;
+  align-items: stretch;
+  gap: 22px;
+}
+.patient-photo-identity {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 54%;
+  align-items: center;
+  gap: 16px;
+}
+.patient-photo-identity .patient-photo-preview {
+  flex: 0 0 82px;
+}
+.patient-photo-preview.patient-photo-empty-new {
+  border: 2px dashed #9a858d;
+  background: #fbf9fa;
+  color: #6a5860;
+  cursor: default;
+}
+.patient-photo-preview.patient-photo-empty-new:active {
+  cursor: default;
+}
+.patient-photo-identity .patient-photo-controls {
+  flex: 1 1 auto;
+}
+.patient-photo-choose {
+  margin-top: 6px;
+}
+.patient-photo-divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: #ded4d7;
+}
+.patient-photo-insurance {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 46%;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 2px;
+}
+.patient-photo-insurance .modal-form-field {
+  width: 100%;
+}
+.patient-photo-insurance .modal-form-field > span {
+  color: #383034;
+  font-size: 12px;
+  font-weight: 750;
+}
+.patient-photo-insurance .modal-form-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #b9aeb2;
+  border-radius: 8px;
+  background: #fff;
+  color: #2d272a;
+  font-size: 13px;
+}
+.patient-photo-insurance .modal-form-field select:focus-visible {
+  border-color: #8d465c;
+  outline: 3px solid #ead1d8;
+  outline-offset: 1px;
+}
+.patient-photo-insurance-empty {
+  color: #62585c;
+  font-size: 12px;
+}
+.patient-photo-native-input:focus-visible + .patient-photo-button {
+  outline: 3px solid #c78696;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .patient-photo-toolbar {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .patient-photo-identity,
+  .patient-photo-insurance {
+    flex: 1 1 auto;
+  }
+  .patient-photo-divider {
+    flex: 0 0 1px;
+    width: 100%;
+    height: 1px;
+  }
+  .patient-photo-insurance {
+    padding: 0;
+  }
+}

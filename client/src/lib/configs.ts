@@ -85,7 +85,6 @@ export const configs: Record<
         key: "insuranceCode",
         label: "Convênio",
         type: "select",
-        section: "Convênio",
         options: [],
       },
       { key: "allergies", label: "Alergia", type: "text", section: "Saúde" },

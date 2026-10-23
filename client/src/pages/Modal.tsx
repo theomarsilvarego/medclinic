@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ImagePlus, Trash2, Upload, X } from 'lucide-react';
+import { ImagePlus, Trash2, Upload, UserRound, X } from 'lucide-react';
 import { API } from '../lib/app';
 import type { Row } from '../lib/app';
 
@@ -13,7 +13,7 @@ type FormField = {
   options?: (string | { value: string; label: string })[];
 };
 
-const patientSectionOrder = ['Dados pessoais', 'Contato', 'Convênio', 'Saúde'];
+const patientSectionOrder = ['Dados pessoais', 'Contato', 'Saúde'];
 
 export function Modal({
   title,
@@ -36,7 +36,9 @@ export function Modal({
   const dragPoint = useRef<{ x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isPatientForm = fields.some(field => field.key === 'allergies' || field.key === 'insuranceCode');
+  const isEditingPatient = isPatientForm && Boolean(initial.id);
   const photoField = fields.find(field => field.key === 'photo');
+  const insuranceField = fields.find(field => field.key === 'insuranceCode');
   const patientSections = useMemo(() => patientSectionOrder.map(section => ({
     title: section,
     fields: fields.filter(field => field.section === section),
@@ -114,13 +116,6 @@ export function Modal({
   };
   const stopDragging = () => { dragPoint.current = null; };
 
-  const selectedInsurance = fields
-    .find(field => field.key === 'insuranceCode')
-    ?.options?.find(option => String(typeof option === 'string' ? option : option.value) === String(data.insuranceCode ?? ''));
-  const insuranceName = selectedInsurance
-    ? (typeof selectedInsurance === 'string' ? selectedInsurance : selectedInsurance.label).replace(/^\d+\s*-\s*/, '')
-    : 'Convênio não definido';
-
   const renderField = (field: FormField) => {
     const fieldId = `modal-${field.key}`;
     const fieldValue = field.type === 'date' && data[field.key]
@@ -181,23 +176,28 @@ export function Modal({
     <div className={`modal${isPatientForm ? ' patient-modal' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-header">
         <div><p className="eyebrow">CADASTRO</p><h2 id="modal-title">{title}</h2></div>
-        {isPatientForm && <span className="patient-modal-insurance" title={`Convênio atual: ${insuranceName}`}><span>Convênio</span><strong>{insuranceName}</strong></span>}
         <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar cadastro"><X size={19}/></button>
       </div>
       {isPatientForm ? <div className="modal-fields patient-form-fields">
         {photoField && <div className="patient-photo-toolbar">
-          <div className="patient-photo-preview" onPointerDown={startDragging} onPointerMove={dragPhoto} onPointerUp={stopDragging} onPointerCancel={stopDragging} aria-label={preview ? 'Prévia da foto do paciente; arraste para ajustar o enquadramento' : 'Paciente sem foto'}>
-            {preview ? <img src={preview} alt="Prévia da foto do paciente" style={{ objectPosition: `${offsetX}% ${offsetY}%` }} /> : <ImagePlus size={28} aria-hidden="true" />}
-          </div>
-          <div className="patient-photo-controls">
-            <strong>Foto do paciente</strong>
-            <span>JPG ou PNG, até 10 MB.</span>
-            <div className="patient-photo-buttons">
-              <label className="patient-photo-button patient-photo-change" htmlFor="patient-photo-input"><Upload size={15} />Trocar foto</label>
-              <input ref={fileInputRef} id="patient-photo-input" className="patient-photo-native-input" type="file" accept="image/jpeg,image/png" onChange={event => handlePhoto(event.target.files?.[0])} />
-              <button className="patient-photo-button patient-photo-remove" type="button" onClick={removePhoto} disabled={!preview && !initial.photoUrl && !(data.photo instanceof File)}><Trash2 size={15} />Remover</button>
+          <div className="patient-photo-identity">
+            <div className={`patient-photo-preview${!preview && !isEditingPatient ? ' patient-photo-empty-new' : ''}`} onPointerDown={startDragging} onPointerMove={dragPhoto} onPointerUp={stopDragging} onPointerCancel={stopDragging} aria-label={preview ? 'Prévia da foto do paciente; arraste para ajustar o enquadramento' : 'Paciente sem foto'}>
+              {preview ? <img src={preview} alt="Prévia da foto do paciente" style={{ objectPosition: `${offsetX}% ${offsetY}%` }} /> : isEditingPatient ? <ImagePlus size={28} aria-hidden="true" /> : <UserRound size={34} aria-hidden="true" />}
             </div>
-            {preview && <small>Arraste a foto para ajustar o enquadramento.</small>}
+            <div className="patient-photo-controls">
+              <strong>Foto do paciente</strong>
+              <span>{isEditingPatient ? 'JPG ou PNG, até 10 MB.' : 'A foto é opcional.'}</span>
+              <input ref={fileInputRef} id="patient-photo-input" className="patient-photo-native-input" type="file" accept="image/jpeg,image/png" onChange={event => handlePhoto(event.target.files?.[0])} tabIndex={-1} aria-hidden="true" />
+              {isEditingPatient ? <div className="patient-photo-buttons">
+                <button className="patient-photo-button patient-photo-change" type="button" onClick={() => fileInputRef.current?.click()}><Upload size={15} />Trocar foto</button>
+                <button className="patient-photo-button patient-photo-remove" type="button" onClick={removePhoto} disabled={!preview && !initial.photoUrl && !(data.photo instanceof File)}><Trash2 size={15} />Remover</button>
+              </div> : <button className="patient-photo-button patient-photo-change patient-photo-choose" type="button" onClick={() => fileInputRef.current?.click()}><Upload size={15} />Escolher foto</button>}
+              {isEditingPatient && preview && <small>Arraste a foto para ajustar o enquadramento.</small>}
+            </div>
+          </div>
+          <div className="patient-photo-divider" aria-hidden="true" />
+          <div className="patient-photo-insurance">
+            {insuranceField ? renderField(insuranceField) : <span className="patient-photo-insurance-empty">Convênio não disponível</span>}
           </div>
         </div>}
         {patientSections.map(section => <section className={`patient-form-section patient-section-${section.title.toLocaleLowerCase('pt-BR').replace(/\s+/g, '-')}`} key={section.title} aria-labelledby={`patient-section-${section.title}`}>
