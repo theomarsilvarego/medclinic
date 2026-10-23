@@ -6533,3 +6533,86 @@ tr:last-child td {
     padding: 0;
   }
 }
+
+
+/* Navegação por data da agenda médica */
+.doctor-page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+.doctor-heading-copy {
+  min-width: 0;
+}
+.doctor-agenda-date-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.doctor-agenda-date-input {
+  display: flex;
+  min-width: 170px;
+  flex-direction: column;
+  gap: 5px;
+  color: #51464b;
+  font-size: 11px;
+  font-weight: 700;
+}
+.doctor-agenda-date-input input {
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid #cfc1c6;
+  border-radius: 9px;
+  background: #fff;
+  color: #332a2e;
+  font: inherit;
+  font-size: 13px;
+}
+.doctor-agenda-date-nav,
+.doctor-agenda-today {
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddcfd4;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.doctor-agenda-date-nav:hover:not(:disabled),
+.doctor-agenda-today:hover:not(:disabled) {
+  border-color: #a96d7e;
+  background: #fbf3f5;
+}
+.doctor-agenda-today {
+  min-width: 56px;
+  padding: 0 12px;
+}
+.doctor-agenda-today:disabled {
+  cursor: default;
+  color: #867a7f;
+  background: #f4f1f2;
+}
+.doctor-agenda-date-controls button:focus-visible,
+.doctor-agenda-date-input input:focus-visible {
+  outline: 3px solid #e5c8d1;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .doctor-page-heading {
+    display: block;
+  }
+  .doctor-agenda-date-controls {
+    margin-top: 16px;
+  }
+  .doctor-agenda-date-input {
+    flex: 1;
+    min-width: 0;
+  }
+}
