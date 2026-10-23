@@ -1680,6 +1680,14 @@ type PatientAnamnesisStatus = {
   expiresAt?: string | null;
   answers?: Record<string, unknown> | null;
 };
+function isSindicatoInsurance(value: unknown) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+  return /^SINDICATO(?:$|[\s\-/])/.test(normalized);
+}
 function anamnesisDate(value: unknown) {
   if (!value) return "Não informado";
   const text = String(value).slice(0, 10);
@@ -2864,6 +2872,8 @@ export function MedicalRecordsPage({
       .finally(() => setLoading(false));
   }, [selectedPatientId]);
   useEffect(() => {
+    setPatientAnamnesis(null);
+    setAnamnesisAppointment(null);
     if (!selectedPatientId) return;
     request(`/medical-records/patients/${selectedPatientId}/anamnesis`)
       .then((result: PatientAnamnesisStatus) => setPatientAnamnesis(result))
@@ -3102,7 +3112,7 @@ export function MedicalRecordsPage({
             )}
           </section>
           <aside className="medical-records-sidebar">
-            {selectedPatient && <PatientAnamnesisCard
+            {selectedPatient && isSindicatoInsurance(selectedPatient.insuranceName) && <PatientAnamnesisCard
               patientId={Number(selectedPatientId)}
               patient={selectedPatient}
               onStatusChange={setPatientAnamnesis}
