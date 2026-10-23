@@ -28,7 +28,7 @@ const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3333);
 const jwtSecret = process.env.JWT_SECRET || "dev-secret";
-const clinicTimeZone = process.env.CLINIC_TIMEZONE || "America/Sao_Paulo";
+const clinicTimeZone = process.env.CLINIC_TIMEZONE || "America/Porto_Velho";
 const corsOrigins = new Set([
   "http://100.101.191.54:3000",
   "http://192.168.0.200:3000",
