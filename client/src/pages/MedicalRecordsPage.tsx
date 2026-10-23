@@ -16,7 +16,6 @@ import {
   Paperclip,
   Pencil,
   Plus,
-  Printer,
   QrCode,
   RefreshCw,
   Search,
@@ -1706,9 +1705,10 @@ function gpaValue(answers: Record<string, unknown>) {
   const pregnancies = anamnesisValue(answers.pregnancies, "—");
   const normal = Number(answers.normalBirths || 0);
   const cesarean = Number(answers.cesareanBirths || 0);
-  const births = Number.isFinite(normal + cesarean) ? normal + cesarean : "—";
+  const normalBirths = Number.isFinite(normal) ? normal : "—";
+  const cesareanBirths = Number.isFinite(cesarean) ? cesarean : "—";
   const abortions = anamnesisValue(answers.abortions, "—");
-  return `G ${pregnancies} · P ${births} · A ${abortions}`;
+  return `G ${pregnancies} · PN ${normalBirths} · PC ${cesareanBirths} · A ${abortions}`;
 }
 function anamnesisAppointment(status: PatientAnamnesisStatus, patient: Row): Row | null {
   if (!status.appointmentId) return null;
@@ -1779,20 +1779,21 @@ function PatientAnamnesisCard({
   const appointment = status ? anamnesisAppointment(status, patient) : null;
   const answers = status?.answers || {};
   const allergy = answers.hasAllergy === "NAO" ? "Não" : answers.hasAllergy === "SIM" ? anamnesisSummaryValue(answers.allergyDetails, "Sim") : "Não informado";
-  const comorbidity = answers.hasChronicHypertension || answers.hasOtherComorbidities
-    ? anamnesisSummaryValue(answers.comorbidityDetails, "Sim")
-    : answers.hasChronicHypertension === false && answers.hasOtherComorbidities === false ? "Não" : "Não informado";
+  const comorbidityParts = [
+    answers.hasChronicHypertension ? "H.A.C." : "",
+    answers.hasOtherComorbidities ? anamnesisSummaryValue(answers.comorbidityDetails, "Outras") : "",
+  ].filter(Boolean);
+  const comorbidity = comorbidityParts.length > 0 ? comorbidityParts.join(" · ") : answers.hasChronicHypertension === false && answers.hasOtherComorbidities === false ? "Não" : "Não informado";
   return (
     <section className="patient-anamnesis-card" aria-labelledby="patient-anamnesis-title">
       <header className="patient-anamnesis-heading">
-        <div><p>ANAMNESE</p><h2 id="patient-anamnesis-title">Ficha de anamnese</h2></div>
-        {status?.state === "submitted" ? <span className="patient-anamnesis-badge filled"><CheckCircle2 size={14} />Preenchida</span> : <span className="patient-anamnesis-badge pending">Pendente</span>}
+        <div className="patient-anamnesis-title-row"><h2 id="patient-anamnesis-title">Anamnese</h2>{status?.state === "submitted" ? <span className="patient-anamnesis-badge filled">Preenchida em {anamnesisDate(status.submittedAt)}</span> : <span className="patient-anamnesis-badge pending">Pendente</span>}</div>
+        {status?.state === "submitted" && <p className="patient-anamnesis-subtitle">Ficha SINTESV-RO enviada pelo paciente.</p>}
       </header>
       {loading ? <div className="patient-anamnesis-state">Carregando status…</div> : error && !status ? <div className="patient-anamnesis-state error">{error}</div> : null}
       {!loading && status?.state === "submitted" ? <>
-        <p className="patient-anamnesis-submitted">Preenchida em {anamnesisDate(status.submittedAt)}</p>
         <dl className="patient-anamnesis-summary">
-          <div><dt>Queixa principal</dt><dd>{anamnesisSummaryValue(answers.chiefComplaint)}</dd></div>
+          <div><dt>QP</dt><dd>{anamnesisSummaryValue(answers.chiefComplaint)}</dd></div>
           <div><dt>Alergia</dt><dd>{allergy}</dd></div>
           <div><dt>Comorbidade</dt><dd>{comorbidity}</dd></div>
           <div><dt>G.P.A.</dt><dd>{gpaValue(answers)}</dd></div>
@@ -1800,7 +1801,7 @@ function PatientAnamnesisCard({
           <div><dt>Último preventivo</dt><dd>{anamnesisMonth(answers.lastPreventiveExam)}</dd></div>
         </dl>
         <div className="patient-anamnesis-actions">
-          {appointment && <><button type="button" className="secondary" onClick={() => onView(appointment)}><FileText size={15} /> Ver ficha completa</button><button type="button" className="secondary" onClick={() => onPrint(appointment)}><Printer size={15} /> Imprimir</button></>}
+          {appointment && <><button type="button" className="patient-anamnesis-primary" onClick={() => onView(appointment)}>Ver ficha completa</button><button type="button" className="patient-anamnesis-secondary" onClick={() => onPrint(appointment)}>Imprimir</button></>}
         </div>
       </> : null}
       {!loading && status && status.state !== "submitted" ? <div className="patient-anamnesis-pending">
