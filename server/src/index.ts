@@ -642,6 +642,7 @@ const medicalRecordInclude = {
       id: true,
       scheduledTime: true,
       appointmentDate: true,
+      status: true,
       notes: true,
       attachments: {
         orderBy: { uploadedAt: "asc" as const },
@@ -1312,6 +1313,18 @@ app.post(
       return res.status(400).json({
         message: "Preencha a data, o título e o paciente do prontuário.",
       });
+    if (parsed.data.appointmentId) {
+      const appointment = await prisma.appointment.findUnique({
+        where: { id: parsed.data.appointmentId },
+        select: { id: true, patientId: true, status: true },
+      });
+      if (!appointment)
+        return res.status(404).json({ message: "Agendamento não encontrado." });
+      if (appointment.patientId !== parsed.data.patientId)
+        return res.status(400).json({ message: "O agendamento não pertence a este paciente." });
+      if (appointment.status === AppointmentStatus.ATENDIDO)
+        return res.status(409).json({ message: "Este agendamento já foi finalizado e não aceita um novo atendimento." });
+    }
     const data = {
       ...parsed.data,
       recordDate: new Date(`${parsed.data.recordDate}T00:00:00.000Z`),

@@ -3107,6 +3107,13 @@ export function MedicalRecordsPage({
         )
       : [editing, ...clinicalRecords];
   }, [editing, records]);
+  const selectedAppointmentFinalized = Boolean(
+    appointmentId && records.some(
+      (record) =>
+        Number(record.appointmentId) === Number(appointmentId) &&
+        record.appointment?.status === "ATENDIDO",
+    ),
+  );
   const [patientPhoto, setPatientPhoto] = useState<string | null>(null);
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -3177,7 +3184,8 @@ export function MedicalRecordsPage({
         {allowNewRecord && (
           <button
             className="primary"
-            disabled={!selectedPatientId || loading || Boolean(editing)}
+            disabled={!selectedPatientId || loading || Boolean(editing) || selectedAppointmentFinalized}
+            title={selectedAppointmentFinalized ? "Este agendamento já foi finalizado." : undefined}
             onClick={() =>
               setEditing(emptyRecord(selectedPatientId, appointmentId))
             }
