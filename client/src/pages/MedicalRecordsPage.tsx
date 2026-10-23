@@ -3100,11 +3100,21 @@ export function MedicalRecordsPage({
       (record) => Number(record.id) === Number(editing.id),
     );
     return exists
-      ? clinicalRecords.map((record) =>
-          Number(record.id) === Number(editing.id)
-            ? { ...record, ...editing }
-            : record,
-        )
+      ? clinicalRecords.map((record) => {
+          if (Number(record.id) !== Number(editing.id)) return record;
+          const merged = { ...record, ...editing };
+          for (const collection of [
+            "examRequests",
+            "ultrasoundRequests",
+            "injectableRequests",
+            "procedureRequests",
+            "attachments",
+          ] as const) {
+            if (Array.isArray(record[collection]))
+              merged[collection] = record[collection];
+          }
+          return merged;
+        })
       : [editing, ...clinicalRecords];
   }, [editing, records]);
   const selectedAppointmentFinalized = Boolean(
