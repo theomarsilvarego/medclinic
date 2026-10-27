@@ -10,13 +10,21 @@ function localDate(date: Date) {
 }
 
 function isSindicatoInsurance(name: unknown) {
-  const normalized = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+  const normalized = String(name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
   return /^SINDICATO(?:$|[\s\-/])/.test(normalized);
 }
 
 function isEligibleAppointment(row: Row) {
   if (!isSindicatoInsurance(row.insurance?.name)) return false;
-  if (row.patient?.insuranceCode === null || row.patient?.insuranceCode === undefined) return true;
+  if (
+    row.patient?.insuranceCode === null ||
+    row.patient?.insuranceCode === undefined
+  )
+    return true;
   return isSindicatoInsurance(row.patient?.insuranceName);
 }
 
@@ -29,23 +37,39 @@ export function AppointmentsPage({
   createSignal?: number;
   onCreateSignalConsumed?: () => void;
 }) {
-  const canManage = user.profile === "ADMINISTRADOR" || user.profile === "SECRETARIA";
+  const canManage =
+    user.profile === "ADMINISTRADOR" || user.profile === "SECRETARIA";
   const [date, setDate] = useState(localDate(new Date()));
   const [rows, setRows] = useState<Row[]>([]);
-  const [meta, setMeta] = useState<any>({ patients: [], doctors: [], insurances: [], attendances: [], procedures: [] });
+  const [meta, setMeta] = useState<any>({
+    patients: [],
+    doctors: [],
+    insurances: [],
+    attendances: [],
+    procedures: [],
+  });
   const [editing, setEditing] = useState<Row | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAnamnesis, setSelectedAnamnesis] = useState<Row | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const slots = useMemo(() => Array.from({ length: 49 }, (_, index) => {
-    const minutes = 8 * 60 + index * 15;
-    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-  }), []);
+  const slots = useMemo(
+    () =>
+      Array.from({ length: 49 }, (_, index) => {
+        const minutes = 8 * 60 + index * 15;
+        return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+      }),
+    [],
+  );
   const today = localDate(new Date());
   const isToday = date === today;
-  const weekday = new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  const weekday = new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 
   async function load() {
     setLoading(true);
@@ -53,7 +77,9 @@ export function AppointmentsPage({
     try {
       const [day, metadata] = await Promise.all([
         request(`/appointments?date=${date}`),
-        meta.patients.length ? Promise.resolve(meta) : request("/appointments/meta"),
+        meta.patients.length
+          ? Promise.resolve(meta)
+          : request("/appointments/meta"),
       ]);
       setRows(day || []);
       if (!meta.patients.length) setMeta(metadata);
@@ -64,10 +90,17 @@ export function AppointmentsPage({
     }
   }
 
-  useEffect(() => { void load(); }, [date]);
+  useEffect(() => {
+    void load();
+  }, [date]);
 
   function openNew(time: string) {
-    setEditing({ appointmentDate: date, scheduledTime: time, status: "AGENDADO", itemType: "ATENDIMENTO" });
+    setEditing({
+      appointmentDate: date,
+      scheduledTime: time,
+      status: "AGENDADO",
+      itemType: "ATENDIMENTO",
+    });
     setModalOpen(true);
   }
 
@@ -98,18 +131,30 @@ export function AppointmentsPage({
         doctorId: Number(data.doctorId),
         insuranceId: Number(data.insuranceId),
         itemType: data.itemType || "ATENDIMENTO",
-        attendanceId: data.itemType === "ATENDIMENTO" ? Number(data.attendanceId) : null,
-        procedureId: data.itemType === "PROCEDIMENTO" ? Number(data.procedureId) : null,
+        attendanceId:
+          data.itemType === "ATENDIMENTO" ? Number(data.attendanceId) : null,
+        procedureId:
+          data.itemType === "PROCEDIMENTO" ? Number(data.procedureId) : null,
         status: data.status || "AGENDADO",
         notes: data.notes || "",
       };
       const form = new FormData();
       Object.entries(payload).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== "") form.append(key, String(value));
+        if (value !== null && value !== undefined && value !== "")
+          form.append(key, String(value));
       });
       if (editing?.id) form.append("id", String(editing.id));
-      const exams = (data.examUploads || []) as { examType: string; examDate: string; file: File }[];
-      form.append("examMetadata", JSON.stringify(exams.map(({ examType, examDate }) => ({ examType, examDate }))));
+      const exams = (data.examUploads || []) as {
+        examType: string;
+        examDate: string;
+        file: File;
+      }[];
+      form.append(
+        "examMetadata",
+        JSON.stringify(
+          exams.map(({ examType, examDate }) => ({ examType, examDate })),
+        ),
+      );
       exams.forEach(({ file }) => form.append("examFiles", file));
       await request(`/appointments${editing?.id ? `/${editing.id}` : ""}`, {
         method: editing?.id ? "PUT" : "POST",
@@ -133,41 +178,169 @@ export function AppointmentsPage({
     }
   }
 
-  const byTime = (time: string) => rows.filter(row => row.scheduledTime === time);
+  const byTime = (time: string) =>
+    rows.filter((row) => row.scheduledTime === time);
 
-  return <>
-    <div className="page-heading">
-      <div><p className="eyebrow">AGENDA CLÍNICA</p><h1>Agendamentos</h1><p className="muted">{weekday[0].toUpperCase() + weekday.slice(1)} · horários de 08:00 a 20:00 · intervalos de 15 min</p></div>
-      {canManage && <button className="primary" type="button" onClick={() => openNew("08:00")}><Plus size={17} /> Novo agendamento</button>}
-    </div>
-    {error && <div className="error page-error" role="alert">{error}</div>}
-    <div className="agenda-toolbar">
-      <div className="agenda-date-controls">
-        <button className="agenda-nav-button" type="button" onClick={() => navigateDate(-1)} title="Dia anterior" aria-label="Dia anterior"><ChevronLeft size={17} /></button>
-        <label>Dia<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label>
-        <button className="agenda-nav-button" type="button" onClick={() => navigateDate(1)} title="Próximo dia" aria-label="Próximo dia"><ChevronRight size={17} /></button>
-        <button className="today-button" type="button" onClick={() => setDate(today)} disabled={isToday}>Hoje</button>
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">AGENDA CLÍNICA</p>
+          <h1>Agendamentos</h1>
+          <p className="muted">
+            {weekday[0].toUpperCase() + weekday.slice(1)} · horários de 08:00 a
+            20:00 · intervalos de 15 min
+          </p>
+        </div>
+        {canManage && (
+          <button
+            className="primary"
+            type="button"
+            onClick={() => openNew("08:00")}
+          >
+            <Plus size={17} /> Novo agendamento
+          </button>
+        )}
       </div>
-    </div>
-    <div className="table-card agenda-card">
-      <div className="table-head"><strong>{loading ? "Carregando…" : `${rows.length} agendamento${rows.length === 1 ? "" : "s"}`}</strong><span className="muted">{canManage ? "Clique em um horário livre para agendar" : "Lista do dia"}</span></div>
-      {!loading && <div className="agenda-grid">
-        {slots.map(time => <div className="agenda-row" key={time}>
-          <div className="agenda-time">{time}</div>
-          <div className="agenda-slots">
-            {byTime(time).map(row => <div className={`appointment-chip ${String(row.status || "").toLowerCase()}`} key={row.id} onClick={() => canManage && openEdit(row)}>
-              <strong>{row.patient?.fullName}</strong>
-              <span>{row.doctor?.fullName}</span>
-              <small>{row.itemType === "PROCEDIMENTO" ? row.procedure?.name : row.attendance?.name} · {row.insurance?.name}</small>
-              {canManage && isEligibleAppointment(row) && <button className="anamnesis-chip-action" type="button" onClick={event => { event.stopPropagation(); setSelectedAnamnesis(row); }} aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`} title="Ficha de anamnese · QR e WhatsApp"><QrCode size={14} />Ficha</button>}
-              {canManage && <button className="appointment-delete-button" type="button" onClick={event => { event.stopPropagation(); void remove(Number(row.id)); }} title="Excluir agendamento" aria-label={`Excluir agendamento de ${row.patient?.fullName}`}>×</button>}
-            </div>)}
-            {canManage && byTime(time).length === 0 && <button className="slot-empty" type="button" onClick={() => openNew(time)}>+ Agendar neste horário</button>}
+      {error && (
+        <div className="error page-error" role="alert">
+          {error}
+        </div>
+      )}
+      <div className="agenda-toolbar">
+        <div className="agenda-date-controls">
+          <button
+            className="agenda-nav-button"
+            type="button"
+            onClick={() => navigateDate(-1)}
+            title="Dia anterior"
+            aria-label="Dia anterior"
+          >
+            <ChevronLeft size={17} />
+          </button>
+          <label>
+            <input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </label>
+          <button
+            className="agenda-nav-button"
+            type="button"
+            onClick={() => navigateDate(1)}
+            title="Próximo dia"
+            aria-label="Próximo dia"
+          >
+            <ChevronRight size={17} />
+          </button>
+          <button
+            className="today-button"
+            type="button"
+            onClick={() => setDate(today)}
+            disabled={isToday}
+          >
+            Hoje
+          </button>
+        </div>
+      </div>
+      <div className="table-card agenda-card">
+        <div className="table-head">
+          <strong>
+            {loading
+              ? "Carregando…"
+              : `${rows.length} agendamento${rows.length === 1 ? "" : "s"}`}
+          </strong>
+          <span className="muted">
+            {canManage
+              ? "Clique em um horário livre para agendar"
+              : "Lista do dia"}
+          </span>
+        </div>
+        {!loading && (
+          <div className="agenda-grid">
+            {slots.map((time) => (
+              <div className="agenda-row" key={time}>
+                <div className="agenda-time">{time}</div>
+                <div className="agenda-slots">
+                  {byTime(time).map((row) => (
+                    <div
+                      className={`appointment-chip ${String(row.status || "").toLowerCase()}`}
+                      key={row.id}
+                      onClick={() => canManage && openEdit(row)}
+                    >
+                      <strong>{row.patient?.fullName}</strong>
+                      <span>{row.doctor?.fullName}</span>
+                      <small>
+                        {row.itemType === "PROCEDIMENTO"
+                          ? row.procedure?.name
+                          : row.attendance?.name}{" "}
+                        · {row.insurance?.name}
+                      </small>
+                      {canManage && isEligibleAppointment(row) && (
+                        <button
+                          className="anamnesis-chip-action"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedAnamnesis(row);
+                          }}
+                          aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`}
+                          title="Ficha de anamnese · QR e WhatsApp"
+                        >
+                          <QrCode size={14} />
+                          Ficha
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          className="appointment-delete-button"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void remove(Number(row.id));
+                          }}
+                          title="Excluir agendamento"
+                          aria-label={`Excluir agendamento de ${row.patient?.fullName}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {canManage && byTime(time).length === 0 && (
+                    <button
+                      className="slot-empty"
+                      type="button"
+                      onClick={() => openNew(time)}
+                    >
+                      + Agendar neste horário
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>)}
-      </div>}
-    </div>
-    {modalOpen && <AppointmentModal initial={editing || {}} meta={meta} date={date} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={save} />}
-    {selectedAnamnesis && <AnamnesisAppointmentModal appointment={selectedAnamnesis} onClose={() => setSelectedAnamnesis(null)} />}
-  </>;
+        )}
+      </div>
+      {modalOpen && (
+        <AppointmentModal
+          initial={editing || {}}
+          meta={meta}
+          date={date}
+          onClose={() => {
+            setModalOpen(false);
+            setEditing(null);
+          }}
+          onSave={save}
+        />
+      )}
+      {selectedAnamnesis && (
+        <AnamnesisAppointmentModal
+          appointment={selectedAnamnesis}
+          onClose={() => setSelectedAnamnesis(null)}
+        />
+      )}
+    </>
+  );
 }

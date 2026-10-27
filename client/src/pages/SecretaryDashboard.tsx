@@ -42,9 +42,7 @@ type PatientSummary = {
 function dateLabel(value: string) {
   if (!value) return "—";
   const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
-  return Number.isNaN(date.getTime())
-    ? "—"
-    : date.toLocaleDateString("pt-BR");
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("pt-BR");
 }
 
 function requestKindLabel(kind: RequestItem["kind"]) {
@@ -56,11 +54,7 @@ function requestKindLabel(kind: RequestItem["kind"]) {
   }[kind];
 }
 
-export function SecretaryDashboard({
-  onSchedule,
-}: {
-  onSchedule: () => void;
-}) {
+export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -133,14 +127,17 @@ export function SecretaryDashboard({
   );
   const totalAmount = visits.reduce(
     (sum, visit) =>
-      sum + visit.requests.reduce(
-        (requestSum, item) => requestSum + (item.amount === null ? 0 : Number(item.amount) || 0),
+      sum +
+      visit.requests.reduce(
+        (requestSum, item) =>
+          requestSum + (item.amount === null ? 0 : Number(item.amount) || 0),
         0,
       ),
     0,
   );
   const unpricedCount = visits.reduce(
-    (sum, visit) => sum + visit.requests.filter((item) => item.amount === null).length,
+    (sum, visit) =>
+      sum + visit.requests.filter((item) => item.amount === null).length,
     0,
   );
 
@@ -178,20 +175,35 @@ export function SecretaryDashboard({
       <div className="page-heading secretary-dashboard-heading">
         <div>
           <p className="eyebrow">GESTÃO CLÍNICA</p>
-          <h1>Pacientes atendidas hoje</h1>
+          <h1>Pacientes atendidas</h1>
           <p className="muted">
             Solicitações dos atendimentos finalizados hoje pela equipe médica.
           </p>
         </div>
-        <button className="secondary secretary-refresh" type="button" onClick={() => void load()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? "secretary-spinning" : ""} />
+        <button
+          className="secondary secretary-refresh"
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+        >
+          <RefreshCw
+            size={16}
+            className={loading ? "secretary-spinning" : ""}
+          />
           Atualizar
         </button>
       </div>
 
-      {error && <div className="error page-error" role="alert">{error}</div>}
+      {error && (
+        <div className="error page-error" role="alert">
+          {error}
+        </div>
+      )}
 
-      <div className="secretary-summary-grid" aria-label="Resumo dos atendimentos">
+      <div
+        className="secretary-summary-grid"
+        aria-label="Resumo dos atendimentos"
+      >
         <article className="secretary-summary-card">
           <span>Pacientes atendidas hoje</span>
           <strong>{patients.length}</strong>
@@ -203,7 +215,9 @@ export function SecretaryDashboard({
         <article className="secretary-summary-card secretary-summary-total">
           <span>Total conhecido das solicitações</span>
           <strong>{money(totalAmount)}</strong>
-          {unpricedCount > 0 && <small>{unpricedCount} solicitação(ões) sem preço vinculado</small>}
+          {unpricedCount > 0 && (
+            <small>{unpricedCount} solicitação(ões) sem preço vinculado</small>
+          )}
         </article>
       </div>
 
@@ -222,10 +236,14 @@ export function SecretaryDashboard({
       </div>
 
       {loading ? (
-        <div className="secretary-state-card" role="status">Carregando atendimentos…</div>
+        <div className="secretary-state-card" role="status">
+          Carregando atendimentos…
+        </div>
       ) : filteredPatients.length === 0 ? (
         <div className="secretary-state-card">
-          {search ? "Nenhuma paciente encontrada para esta busca." : "Ainda não há atendimentos finalizados hoje."}
+          {search
+            ? "Nenhuma paciente encontrada para esta busca."
+            : "Ainda não há atendimentos finalizados hoje."}
         </div>
       ) : (
         <div className="secretary-patient-list">
@@ -240,7 +258,9 @@ export function SecretaryDashboard({
                 <div className="secretary-patient-total">
                   <span>Total das solicitações</span>
                   <strong>{money(patient.total)}</strong>
-                  {patient.unpriced > 0 && <small>{patient.unpriced} sem preço vinculado</small>}
+                  {patient.unpriced > 0 && (
+                    <small>{patient.unpriced} sem preço vinculado</small>
+                  )}
                 </div>
               </header>
 
@@ -248,28 +268,44 @@ export function SecretaryDashboard({
                 {patient.visits.map((visit) => (
                   <section className="secretary-visit" key={visit.id}>
                     <div className="secretary-visit-heading">
-                      <strong>{dateLabel(visit.date)} · {visit.time}</strong>
+                      <strong>
+                        {dateLabel(visit.date)} · {visit.time}
+                      </strong>
                       <span>Atendida por {visit.doctor.fullName}</span>
                     </div>
                     {visit.requests.length === 0 ? (
-                      <p className="secretary-empty-request">Nenhuma solicitação registrada neste atendimento.</p>
+                      <p className="secretary-empty-request">
+                        Nenhuma solicitação registrada neste atendimento.
+                      </p>
                     ) : (
                       <div className="secretary-request-list">
                         {visit.requests.map((item) => (
-                          <div className="secretary-request-row" key={`${item.kind}-${item.id}`}>
+                          <div
+                            className="secretary-request-row"
+                            key={`${item.kind}-${item.id}`}
+                          >
                             <div className="secretary-request-copy">
                               <div className="secretary-request-labels">
-                                <span className={`secretary-request-tag secretary-tag-${item.kind.toLowerCase()}`}>
+                                <span
+                                  className={`secretary-request-tag secretary-tag-${item.kind.toLowerCase()}`}
+                                >
                                   {item.category}
                                 </span>
-                                {item.code && <span className="secretary-request-code">{item.code}</span>}
+                                {item.code && (
+                                  <span className="secretary-request-code">
+                                    {item.code}
+                                  </span>
+                                )}
                               </div>
-                              <strong>{item.title}</strong>
+                              {/* <strong>{item.title}</strong>
                               <span className="secretary-request-value">
                                 {item.amount === null ? "Preço não vinculado" : money(item.amount)}
-                              </span>
+                              </span> */}
                             </div>
-                            <div className="secretary-request-actions" aria-label={`Ações para ${item.title}`}>
+                            <div
+                              className="secretary-request-actions"
+                              aria-label={`Ações para ${item.title}`}
+                            >
                               <button
                                 type="button"
                                 title="Abrir resumo de cobrança"
@@ -280,11 +316,21 @@ export function SecretaryDashboard({
                               </button>
                               <button
                                 type="button"
-                                title={item.pdfPath ? "Visualizar PDF" : "Visualizar detalhes"}
+                                title={
+                                  item.pdfPath
+                                    ? "Visualizar PDF"
+                                    : "Visualizar detalhes"
+                                }
                                 aria-label={`Visualizar solicitação ${item.title} de ${patient.fullName}`}
-                                onClick={() => void openPdfOrDetails(patient.fullName, item)}
+                                onClick={() =>
+                                  void openPdfOrDetails(patient.fullName, item)
+                                }
                               >
-                                {item.pdfPath ? <FileText size={17} /> : <Eye size={17} />}
+                                {item.pdfPath ? (
+                                  <FileText size={17} />
+                                ) : (
+                                  <Eye size={17} />
+                                )}
                               </button>
                               <button
                                 type="button"
@@ -308,75 +354,151 @@ export function SecretaryDashboard({
       )}
 
       {billing && (
-        <div className="modal-backdrop secretary-modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setBilling(null)}>
-          <section className="modal secretary-dialog" role="dialog" aria-modal="true" aria-labelledby="secretary-billing-title">
+        <div
+          className="modal-backdrop secretary-modal-backdrop"
+          onMouseDown={(event) =>
+            event.target === event.currentTarget && setBilling(null)
+          }
+        >
+          <section
+            className="modal secretary-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="secretary-billing-title"
+          >
             <header className="modal-header secretary-dialog-header">
               <div>
                 <p className="eyebrow">COBRANÇA · RESUMO</p>
                 <h2 id="secretary-billing-title">{billing.item.title}</h2>
                 <span>{billing.patient.fullName}</span>
               </div>
-              <button className="icon-button" type="button" onClick={() => setBilling(null)} aria-label="Fechar resumo de cobrança"><X size={18} /></button>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => setBilling(null)}
+                aria-label="Fechar resumo de cobrança"
+              >
+                <X size={18} />
+              </button>
             </header>
             <div className="secretary-dialog-content">
               <div className="secretary-billing-items">
                 {billing.item.items.map((line, index) => (
                   <div key={`${line.label}-${index}`}>
                     <span>{line.label}</span>
-                    <strong>{line.value === null ? "Preço não vinculado" : money(line.value)}</strong>
+                    <strong>
+                      {line.value === null
+                        ? "Preço não vinculado"
+                        : money(line.value)}
+                    </strong>
                   </div>
                 ))}
               </div>
               <div className="secretary-billing-total">
                 <span>Valor desta solicitação</span>
-                <strong>{billing.item.amount === null ? "Preço não vinculado" : money(billing.item.amount)}</strong>
+                <strong>
+                  {billing.item.amount === null
+                    ? "Preço não vinculado"
+                    : money(billing.item.amount)}
+                </strong>
               </div>
               <div className="secretary-billing-patient-total">
-                <span>Total conhecido de todas as solicitações da paciente</span>
+                <span>
+                  Total conhecido de todas as solicitações da paciente
+                </span>
                 <strong>{money(billing.patient.total)}</strong>
               </div>
               {billing.patient.unpriced > 0 && (
                 <p className="secretary-unpriced-note">
-                  Há {billing.patient.unpriced} solicitação(ões) sem preço cadastrado/vinculado; por isso o total geral pode estar incompleto.
+                  Há {billing.patient.unpriced} solicitação(ões) sem preço
+                  cadastrado/vinculado; por isso o total geral pode estar
+                  incompleto.
                 </p>
               )}
-              <p className="secretary-summary-only-note">Este resumo não registra nem confirma pagamento.</p>
+              <p className="secretary-summary-only-note">
+                Este resumo não registra nem confirma pagamento.
+              </p>
             </div>
             <footer className="modal-footer">
-              <button className="secondary" type="button" onClick={() => setBilling(null)}>Fechar</button>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setBilling(null)}
+              >
+                Fechar
+              </button>
             </footer>
           </section>
         </div>
       )}
 
       {viewing && (
-        <div className="modal-backdrop secretary-modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setViewing(null)}>
-          <section className="modal secretary-dialog" role="dialog" aria-modal="true" aria-labelledby="secretary-view-title">
+        <div
+          className="modal-backdrop secretary-modal-backdrop"
+          onMouseDown={(event) =>
+            event.target === event.currentTarget && setViewing(null)
+          }
+        >
+          <section
+            className="modal secretary-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="secretary-view-title"
+          >
             <header className="modal-header secretary-dialog-header">
               <div>
-                <p className="eyebrow">{requestKindLabel(viewing.item.kind)} · {viewing.item.category}</p>
+                <p className="eyebrow">
+                  {requestKindLabel(viewing.item.kind)} ·{" "}
+                  {viewing.item.category}
+                </p>
                 <h2 id="secretary-view-title">{viewing.item.title}</h2>
-                <span>{viewing.patient}{viewing.item.code ? ` · ${viewing.item.code}` : ""}</span>
+                <span>
+                  {viewing.patient}
+                  {viewing.item.code ? ` · ${viewing.item.code}` : ""}
+                </span>
               </div>
-              <button className="icon-button" type="button" onClick={() => setViewing(null)} aria-label="Fechar detalhes da solicitação"><X size={18} /></button>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => setViewing(null)}
+                aria-label="Fechar detalhes da solicitação"
+              >
+                <X size={18} />
+              </button>
             </header>
             <div className="secretary-dialog-content">
               <div className="secretary-billing-items">
                 {viewing.item.items.map((line, index) => (
                   <div key={`${line.label}-${index}`}>
                     <span>{line.label}</span>
-                    <strong>{line.value === null ? "Preço não vinculado" : money(line.value)}</strong>
+                    <strong>
+                      {line.value === null
+                        ? "Preço não vinculado"
+                        : money(line.value)}
+                    </strong>
                   </div>
                 ))}
               </div>
               <div className="secretary-billing-total">
                 <span>Valor desta solicitação</span>
-                <strong>{viewing.item.amount === null ? "Preço não vinculado" : money(viewing.item.amount)}</strong>
+                <strong>
+                  {viewing.item.amount === null
+                    ? "Preço não vinculado"
+                    : money(viewing.item.amount)}
+                </strong>
               </div>
-              <p className="secretary-view-date">Solicitado em {dateLabel(viewing.item.requestedAt)}</p>
+              <p className="secretary-view-date">
+                Solicitado em {dateLabel(viewing.item.requestedAt)}
+              </p>
             </div>
             <footer className="modal-footer">
-              <button className="secondary" type="button" onClick={() => setViewing(null)}>Fechar</button>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setViewing(null)}
+              >
+                Fechar
+              </button>
             </footer>
           </section>
         </div>
