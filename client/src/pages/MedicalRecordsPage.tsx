@@ -2220,8 +2220,7 @@ function PatientExamSidebar({
         : item.normalizedExamType === groupId,
     ).length;
   const visibleGroups = allPatientExamGroups.filter(
-    (group) =>
-      (group.id !== "unclassified" || countForGroup(group.id) > 0),
+    (group) => group.id !== "unclassified" || countForGroup(group.id) > 0,
   );
 
   return (
@@ -2230,7 +2229,7 @@ function PatientExamSidebar({
       aria-labelledby="patient-exams-title"
     >
       <header className="patient-exams-heading">
-        <h2 id="patient-exams-title">EXAMES DA PACIENTE</h2>
+        <h2 id="patient-exams-title">Exame da paciente</h2>
       </header>
       {loading ? (
         <div className="patient-exams-state" role="status" aria-live="polite">
@@ -2340,18 +2339,7 @@ function PatientExamSidebar({
                                 "Data não informada"
                               )}
                             </p>
-                            <p
-                              className="patient-exam-uploaded"
-                              title={
-                                item.uploadedAt
-                                  ? `Enviado em ${new Date(item.uploadedAt).toLocaleString("pt-BR")}`
-                                  : undefined
-                              }
-                            >
-                              {item.uploadedAt
-                                ? `Enviado em ${new Date(item.uploadedAt).toLocaleDateString("pt-BR")}`
-                                : "Data de envio não informada"}
-                            </p>
+
                             <div className="patient-exam-actions">
                               <button
                                 type="button"
@@ -2783,12 +2771,12 @@ function RecordTimelineCard({
   const oneLine = summaryText.replace(/\s+/g, " ").trim();
   const instanceId = record.id ? String(record.id) : "draft";
   const appointment = record.appointment;
-  const serviceType = appointment?.itemType === "PROCEDIMENTO"
-    ? "Procedimento"
-    : "Atendimento";
-  const serviceName = appointment?.itemType === "PROCEDIMENTO"
-    ? appointment.procedure?.name
-    : appointment?.attendance?.name;
+  const serviceType =
+    appointment?.itemType === "PROCEDIMENTO" ? "Procedimento" : "Atendimento";
+  const serviceName =
+    appointment?.itemType === "PROCEDIMENTO"
+      ? appointment.procedure?.name
+      : appointment?.attendance?.name;
   const timelineTitle = appointment
     ? [appointment.scheduledTime, serviceType, serviceName]
         .filter(Boolean)
@@ -2820,7 +2808,6 @@ function RecordTimelineCard({
             >
               <span className="record-summary-line">
                 <strong>{timelineTitle}</strong>
-                <span>{oneLine}</span>
               </span>
               <ChevronDown size={18} aria-hidden="true" />
             </button>
