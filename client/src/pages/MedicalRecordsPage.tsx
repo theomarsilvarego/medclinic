@@ -2083,7 +2083,6 @@ function PatientExamSidebar({
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
   const [fileError, setFileError] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState("all");
   const [collapsedGroups, setCollapsedGroups] = useState<
     Record<string, boolean>
   >({});
@@ -2096,7 +2095,6 @@ function PatientExamSidebar({
   const [savingClassification, setSavingClassification] = useState(false);
 
   useEffect(() => {
-    setSelectedFilter("all");
     setClassifyingId(null);
     setClassificationError("");
   }, [patientId]);
@@ -2223,7 +2221,6 @@ function PatientExamSidebar({
     ).length;
   const visibleGroups = allPatientExamGroups.filter(
     (group) =>
-      (selectedFilter === "all" || selectedFilter === group.id) &&
       (group.id !== "unclassified" || countForGroup(group.id) > 0),
   );
 
@@ -2235,36 +2232,6 @@ function PatientExamSidebar({
       <header className="patient-exams-heading">
         <h2 id="patient-exams-title">EXAMES DA PACIENTE</h2>
       </header>
-      <div
-        className="patient-exam-filters"
-        role="group"
-        aria-label="Filtrar exames por classificação"
-      >
-        <button
-          type="button"
-          className={selectedFilter === "all" ? "active" : ""}
-          aria-pressed={selectedFilter === "all"}
-          onClick={() => setSelectedFilter("all")}
-        >
-          Todos <span>{attachments.length}</span>
-        </button>
-        {allPatientExamGroups
-          .filter(
-            (group) =>
-              group.id !== "unclassified" || countForGroup(group.id) > 0,
-          )
-          .map((group) => (
-            <button
-              type="button"
-              key={group.id}
-              className={selectedFilter === group.id ? "active" : ""}
-              aria-pressed={selectedFilter === group.id}
-              onClick={() => setSelectedFilter(group.id)}
-            >
-              {group.title} <span>{countForGroup(group.id)}</span>
-            </button>
-          ))}
-      </div>
       {loading ? (
         <div className="patient-exams-state" role="status" aria-live="polite">
           Carregando exames…

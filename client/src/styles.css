@@ -5677,57 +5677,13 @@ tr:last-child td {
   }
 }
 
-/* Interações da coluna de exames: filtros, grupos recolhíveis e classificação */
+/* Interações da coluna de exames: grupos recolhíveis e classificação */
 .patient-exams-sidebar {
   position: sticky;
   top: 92px;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 110px);
-}
-.patient-exam-filters {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 7px;
-  padding: 11px 14px;
-  overflow-x: auto;
-  border-bottom: 1px solid #eee3e6;
-  scrollbar-width: thin;
-}
-.patient-exam-filters button {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 5px 10px;
-  border: 1px solid #d9c1c8;
-  border-radius: 999px;
-  background: #fff;
-  color: #563744;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.patient-exam-filters button span {
-  display: inline-grid;
-  min-width: 21px;
-  min-height: 21px;
-  padding: 0 4px;
-  place-items: center;
-  border-radius: 999px;
-  background: #f4e8eb;
-  color: #5d2b3d;
-  font-size: 13px;
-}
-.patient-exam-filters button.active {
-  border-color: #713048;
-  background: #713048;
-  color: #fff;
-}
-.patient-exam-filters button.active span {
-  background: #fff;
-  color: #642a3e;
 }
 .patient-exam-groups {
   flex: 1 1 auto;
@@ -5893,21 +5849,6 @@ tr:last-child td {
   letter-spacing: normal;
   line-height: 1.45;
 }
-.patient-exam-filters {
-  flex-wrap: wrap;
-  overflow-x: visible;
-  gap: 7px;
-  padding: 10px 14px;
-}
-.patient-exam-filters button {
-  min-height: 32px;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.patient-exam-filters button span {
-  font-size: 13px;
-}
 .patient-exam-groups {
   padding: 0 16px 12px;
 }
@@ -6015,10 +5956,6 @@ tr:last-child td {
   }
 }
 @media (max-width: 640px) {
-  .patient-exam-filters {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
   .patient-exam-groups {
     padding-right: 12px;
     padding-left: 12px;
