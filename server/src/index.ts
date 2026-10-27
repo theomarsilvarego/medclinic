@@ -299,6 +299,18 @@ const injectableSchema = z.object({
   name: requiredText,
   type: z.nativeEnum(InjectableType),
   supplier: requiredText,
+  expirationDate: z.preprocess(
+    (value) => value === "" ? null : value,
+    z.coerce.date().nullable().optional(),
+  ),
+  lot: z.preprocess(
+    (value) => value === "" ? null : value,
+    z.string().trim().max(100).nullable().optional(),
+  ),
+  unit: z.preprocess(
+    (value) => value === "" ? null : value,
+    z.string().trim().max(40).nullable().optional(),
+  ),
   invoiceValue: z.coerce.number().nonnegative(),
   value: z.coerce.number().nonnegative(),
   quantity: z.coerce.number().int().nonnegative(),

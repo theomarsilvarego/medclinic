@@ -109,6 +109,9 @@ model Injectable {
   name          String         @db.VarChar(160)
   type          InjectableType
   supplier      String         @db.VarChar(160)
+  expirationDate DateTime?      @map("expiration_date") @db.Date
+  lot           String?         @db.VarChar(100)
+  unit          String?         @db.VarChar(40)
   invoiceValue  Decimal        @map("invoice_value") @db.Decimal(10, 2)
   value         Decimal        @db.Decimal(10, 2)
   quantity      Int            @default(0)
