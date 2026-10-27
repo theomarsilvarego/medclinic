@@ -667,7 +667,10 @@ const medicalRecordInclude = {
       scheduledTime: true,
       appointmentDate: true,
       status: true,
+      itemType: true,
       notes: true,
+      attendance: { select: { id: true, name: true } },
+      procedure: { select: { id: true, name: true } },
       attachments: {
         orderBy: { uploadedAt: "asc" as const },
         include: { uploadedBy: { select: { id: true, fullName: true } } },

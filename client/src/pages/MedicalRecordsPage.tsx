@@ -2815,6 +2815,18 @@ function RecordTimelineCard({
   const summaryText = parsed.conduct || "Sem evolução registrada";
   const oneLine = summaryText.replace(/\s+/g, " ").trim();
   const instanceId = record.id ? String(record.id) : "draft";
+  const appointment = record.appointment;
+  const serviceType = appointment?.itemType === "PROCEDIMENTO"
+    ? "Procedimento"
+    : "Atendimento";
+  const serviceName = appointment?.itemType === "PROCEDIMENTO"
+    ? appointment.procedure?.name
+    : appointment?.attendance?.name;
+  const timelineTitle = appointment
+    ? [appointment.scheduledTime, serviceType, serviceName]
+        .filter(Boolean)
+        .join(" · ")
+    : record.title || "Atendimento";
 
   return (
     <article className="medical-timeline-item" key={instanceId}>
@@ -2840,12 +2852,7 @@ function RecordTimelineCard({
               onClick={() => setExpanded((value) => !value)}
             >
               <span className="record-summary-line">
-                <strong>
-                  {record.appointment?.scheduledTime
-                    ? `${record.appointment.scheduledTime} · `
-                    : ""}
-                  {record.title || "Atendimento"}
-                </strong>
+                <strong>{timelineTitle}</strong>
                 <span>{oneLine}</span>
               </span>
               <ChevronDown size={18} aria-hidden="true" />
