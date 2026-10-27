@@ -2273,9 +2273,13 @@ app.get(
   auth,
   secretaryOnly,
   async (_req, res) => {
+    const today = clinicTodayDate();
     const [appointments, imagingProcedures] = await Promise.all([
       prisma.appointment.findMany({
-        where: { status: AppointmentStatus.ATENDIDO },
+        where: {
+          status: AppointmentStatus.ATENDIDO,
+          appointmentDate: new Date(`${today}T00:00:00.000Z`),
+        },
         orderBy: [
           { appointmentDate: "desc" },
           { scheduledTime: "desc" },

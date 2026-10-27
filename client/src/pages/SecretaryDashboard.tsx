@@ -178,9 +178,9 @@ export function SecretaryDashboard({
       <div className="page-heading secretary-dashboard-heading">
         <div>
           <p className="eyebrow">GESTÃO CLÍNICA</p>
-          <h1>Pacientes atendidas</h1>
+          <h1>Pacientes atendidas hoje</h1>
           <p className="muted">
-            Solicitações dos atendimentos finalizados pela equipe médica.
+            Solicitações dos atendimentos finalizados hoje pela equipe médica.
           </p>
         </div>
         <button className="secondary secretary-refresh" type="button" onClick={() => void load()} disabled={loading}>
@@ -193,7 +193,7 @@ export function SecretaryDashboard({
 
       <div className="secretary-summary-grid" aria-label="Resumo dos atendimentos">
         <article className="secretary-summary-card">
-          <span>Pacientes atendidas</span>
+          <span>Pacientes atendidas hoje</span>
           <strong>{patients.length}</strong>
         </article>
         <article className="secretary-summary-card">
@@ -225,7 +225,7 @@ export function SecretaryDashboard({
         <div className="secretary-state-card" role="status">Carregando atendimentos…</div>
       ) : filteredPatients.length === 0 ? (
         <div className="secretary-state-card">
-          {search ? "Nenhuma paciente encontrada para esta busca." : "Ainda não há pacientes com atendimentos finalizados."}
+          {search ? "Nenhuma paciente encontrada para esta busca." : "Ainda não há atendimentos finalizados hoje."}
         </div>
       ) : (
         <div className="secretary-patient-list">
