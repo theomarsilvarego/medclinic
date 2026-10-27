@@ -2463,16 +2463,10 @@ app.patch("/api/appointments/:id/start", auth, doctorOnly, async (req, res) => {
   if (id === null) return;
   const appointment = await prisma.appointment.findUnique({
     where: { id },
-    select: { id: true, appointmentDate: true },
+    select: { id: true },
   });
   if (!appointment)
     return res.status(404).json({ message: "Agendamento não encontrado." });
-  if (
-    appointment.appointmentDate.toISOString().slice(0, 10) !== clinicTodayDate()
-  )
-    return res.status(400).json({
-      message: "Só é possível iniciar atendimentos agendados para hoje.",
-    });
   res.json(
     await prisma.appointment.update({
       where: { id },
