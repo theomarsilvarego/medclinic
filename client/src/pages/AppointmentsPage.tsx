@@ -20,7 +20,15 @@ function isEligibleAppointment(row: Row) {
   return isSindicatoInsurance(row.patient?.insuranceName);
 }
 
-export function AppointmentsPage({ user }: { user: any }) {
+export function AppointmentsPage({
+  user,
+  createSignal = 0,
+  onCreateSignalConsumed,
+}: {
+  user: any;
+  createSignal?: number;
+  onCreateSignalConsumed?: () => void;
+}) {
   const canManage = user.profile === "ADMINISTRADOR" || user.profile === "SECRETARIA";
   const [date, setDate] = useState(localDate(new Date()));
   const [rows, setRows] = useState<Row[]>([]);
@@ -62,6 +70,13 @@ export function AppointmentsPage({ user }: { user: any }) {
     setEditing({ appointmentDate: date, scheduledTime: time, status: "AGENDADO", itemType: "ATENDIMENTO" });
     setModalOpen(true);
   }
+
+  useEffect(() => {
+    if (createSignal > 0) {
+      openNew("08:00");
+      onCreateSignalConsumed?.();
+    }
+  }, [createSignal, onCreateSignalConsumed]);
 
   function openEdit(row: Row) {
     setEditing(row);

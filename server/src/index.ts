@@ -201,6 +201,18 @@ function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
   next();
 }
 
+function secretaryOnly(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.profile !== Profile.SECRETARIA)
+    return res.status(403).json({ message: "Acesso restrito ao perfil Secretária." });
+  next();
+}
+
+function clinicalRequestReadAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.profile !== Profile.MEDICO && req.user?.profile !== Profile.SECRETARIA)
+    return res.status(403).json({ message: "Perfil sem permissão para visualizar solicitações clínicas." });
+  next();
+}
+
 function clinicTodayDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: clinicTimeZone,
@@ -1766,7 +1778,7 @@ app.post(
 app.get(
   "/api/medical-record-exam-requests/:id/pdf",
   auth,
-  doctorOnly,
+  clinicalRequestReadAccess,
   async (req: AuthRequest, res) => {
     const id = routeId(req, res);
     if (id === null) return;
@@ -1848,7 +1860,7 @@ app.post(
 app.get(
   "/api/medical-record-ultrasound-requests/:id/pdf",
   auth,
-  doctorOnly,
+  clinicalRequestReadAccess,
   async (req: AuthRequest, res) => {
     const id = routeId(req, res);
     if (id === null) return;
@@ -2255,6 +2267,165 @@ app.post("/api/public/anamnesis/:token", async (req, res) => {
     return res.status(409).json({ message: "Esta ficha já foi enviada ou o link expirou." });
   res.status(201).json({ message: "Ficha enviada com sucesso." });
 });
+
+app.get(
+  "/api/secretary/dashboard/attended-patients",
+  auth,
+  secretaryOnly,
+  async (_req, res) => {
+    const [appointments, imagingProcedures] = await Promise.all([
+      prisma.appointment.findMany({
+        where: { status: AppointmentStatus.ATENDIDO },
+        orderBy: [
+          { appointmentDate: "desc" },
+          { scheduledTime: "desc" },
+        ],
+        include: {
+          patient: { select: { id: true, fullName: true } },
+          doctor: { select: { fullName: true } },
+          medicalRecords: {
+            orderBy: { recordDate: "desc" },
+            include: {
+              examRequests: {
+                orderBy: { requestedAt: "desc" },
+                include: {
+                  examGroup: {
+                    include: {
+                      items: {
+                        orderBy: { id: "asc" },
+                        include: {
+                          examType: { select: { name: true, value: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              ultrasoundRequests: { orderBy: { requestedAt: "desc" } },
+              injectableRequests: {
+                orderBy: { requestedAt: "desc" },
+                include: {
+                  injectable: { select: { value: true } },
+                },
+              },
+              procedureRequests: { orderBy: { requestedAt: "desc" } },
+            },
+          },
+        },
+      }),
+      prisma.procedure.findMany({
+        where: {
+          type: ProcedureType.DIAGNOSTICO_POR_IMAGEM,
+        },
+        orderBy: [{ active: "desc" }, { updatedAt: "desc" }],
+        select: { name: true, value: true },
+      }),
+    ]);
+
+    const normalizeName = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("pt-BR")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    const ultrasoundProcedure = (type: string) => {
+      const procedure = imagingProcedures.find(({ name }) => {
+        const normalized = normalizeName(name);
+        if (type === "MAMAS")
+          return normalized.includes("mama") && !normalized.includes("transvaginal") && !/\btv\b/.test(normalized);
+        if (!normalized.includes("transvaginal") && !/\btv\b/.test(normalized)) return false;
+        const hasPreparation = /\b(preparo|preparacao)\b/.test(normalized);
+        return type === "TRANSVAGINAL_PREPARO"
+          ? hasPreparation
+          : !hasPreparation;
+      });
+      return procedure ? Number(procedure.value) : null;
+    };
+    const isPreventive = (value: string) =>
+      /prevent|papanicolau|citopat|colpocit/.test(normalizeName(value));
+
+    res.json(
+      appointments.map((appointment) => ({
+        id: appointment.id,
+        date: appointment.appointmentDate,
+        time: appointment.scheduledTime,
+        patient: appointment.patient,
+        doctor: appointment.doctor,
+        requests: appointment.medicalRecords.flatMap((record) => [
+          ...record.examRequests.map((item) => {
+            const examItems = item.examGroup.items.map((groupItem) => ({
+              label: groupItem.examType.name,
+              value: Number(groupItem.examType.value),
+            }));
+            return {
+              id: item.id,
+              kind: "EXAME",
+              category: isPreventive(`${item.groupName} ${examItems.map((exam) => exam.label).join(" ")}`)
+                ? "Preventivo"
+                : "Exames de sangue",
+              title: item.groupName,
+              code: item.code,
+              requestedAt: item.requestedAt,
+              amount: examItems.length
+                ? examItems.reduce((sum, exam) => sum + exam.value, 0)
+                : null,
+              items: examItems,
+              pdfPath: `/medical-record-exam-requests/${item.id}/pdf`,
+            };
+          }),
+          ...record.ultrasoundRequests.map((item) => {
+            const amount = ultrasoundProcedure(item.type);
+            const names: Record<string, string> = {
+              MAMAS: "Ultrassom de mamas",
+              TRANSVAGINAL_ROTINA: "Ultrassom transvaginal de rotina",
+              TRANSVAGINAL_PREPARO: "Ultrassom transvaginal com preparo",
+            };
+            return {
+              id: item.id,
+              kind: "ULTRASSOM",
+              category: "Ultrassom",
+              title: names[item.type] || item.type,
+              code: item.code,
+              requestedAt: item.requestedAt,
+              amount,
+              items: [{ label: item.description || names[item.type] || item.type, value: amount }],
+              pdfPath: `/medical-record-ultrasound-requests/${item.id}/pdf`,
+            };
+          }),
+          ...record.injectableRequests.map((item) => {
+            const unitValue = Number(item.injectable.value);
+            return {
+              id: item.id,
+              kind: "INJETAVEL",
+              category: "Injetável",
+              title: item.name,
+              code: null,
+              requestedAt: item.requestedAt,
+              amount: unitValue * item.sessions,
+              items: [{
+                label: `${item.name} · ${item.sessions} sessão(ões)`,
+                value: unitValue * item.sessions,
+              }],
+              pdfPath: null,
+            };
+          }),
+          ...record.procedureRequests.map((item) => ({
+            id: item.id,
+            kind: "PROCEDIMENTO",
+            category: "Procedimento",
+            title: item.name,
+            code: null,
+            requestedAt: item.requestedAt,
+            amount: Number(item.value),
+            items: [{ label: item.name, value: Number(item.value) }],
+            pdfPath: null,
+          })),
+        ]),
+      })),
+    );
+  },
+);
 
 app.get("/api/appointments", auth, appointmentAccess, async (req, res) => {
   const date = String(req.query.date || "");

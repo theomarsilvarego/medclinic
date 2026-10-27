@@ -13,13 +13,22 @@ import {
 } from "lucide-react";
 import type { ModuleKey } from "../lib/app";
 import { profileGreeting } from "../lib/app";
+import { SecretaryDashboard } from "./SecretaryDashboard";
 export function Dashboard({
   setModule,
   user,
+  onScheduleRequest,
 }: {
   setModule: (m: ModuleKey) => void;
   user: any;
+  onScheduleRequest?: () => void;
 }) {
+  if (user.profile === "SECRETARIA")
+    return (
+      <SecretaryDashboard
+        onSchedule={onScheduleRequest || (() => setModule("appointments"))}
+      />
+    );
   const horaAtual = new Date().getHours();
 
   const saudacao =
