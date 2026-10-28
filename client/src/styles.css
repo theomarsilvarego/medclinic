@@ -6823,7 +6823,6 @@ tr:last-child td {
   border-radius: 3px;
 }
 
-
 /* Dashboard operacional da Secretária */
 .secretary-dashboard-heading {
   margin-bottom: 22px;
@@ -6878,7 +6877,9 @@ tr:last-child td {
   animation: secretary-spin 1s linear infinite;
 }
 @keyframes secretary-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .secretary-summary-grid {
   display: grid;
@@ -6976,7 +6977,7 @@ tr:last-child td {
   color: var(--brand);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: .1em;
+  letter-spacing: 0.1em;
 }
 .secretary-patient-header h2 {
   margin: 0;
@@ -7028,7 +7029,9 @@ tr:last-child td {
 .secretary-request-table-head,
 .secretary-request-row {
   display: grid;
-  grid-template-columns: 30px minmax(180px, 1fr) minmax(110px, auto) 110px 110px auto;
+  grid-template-columns:
+    30px minmax(180px, 1fr) minmax(110px, auto)
+    110px 110px auto;
   align-items: center;
   gap: 12px;
   min-width: 760px;
@@ -7038,7 +7041,7 @@ tr:last-child td {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: .04em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .secretary-request-row {
@@ -7071,9 +7074,18 @@ tr:last-child td {
   font-size: 10px;
   font-weight: 700;
 }
-.secretary-tag-ultrassom { background: #e6f1f0; color: #276f68; }
-.secretary-tag-injetavel { background: #f7efd9; color: #80631f; }
-.secretary-tag-procedimento { background: #eee8f4; color: #674d7c; }
+.secretary-tag-ultrassom {
+  background: #e6f1f0;
+  color: #276f68;
+}
+.secretary-tag-injetavel {
+  background: #f7efd9;
+  color: #80631f;
+}
+.secretary-tag-procedimento {
+  background: #eee8f4;
+  color: #674d7c;
+}
 .secretary-request-code {
   color: var(--muted);
   font-size: 10px;
@@ -7140,7 +7152,7 @@ tr:last-child td {
   background: #fff;
   color: var(--brand);
   cursor: pointer;
-  transition: .15s ease;
+  transition: 0.15s ease;
 }
 .secretary-request-actions button:hover {
   border-color: #d3aab5;
@@ -7187,7 +7199,7 @@ tr:last-child td {
 }
 .secretary-billing-dialog-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
   gap: 24px;
   padding: 22px 25px;
   overflow: auto;
@@ -7275,6 +7287,7 @@ tr:last-child td {
 }
 .secretary-payment-option {
   display: flex;
+  flex-direction: row !important;
   align-items: center;
   gap: 11px;
   min-height: 62px;
@@ -7298,6 +7311,7 @@ tr:last-child td {
 }
 .secretary-discount-toggle {
   display: flex;
+  flex-direction: row !important;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -7308,7 +7322,7 @@ tr:last-child td {
   cursor: pointer;
 }
 .secretary-discount-toggle.disabled {
-  opacity: .55;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 .secretary-discount-toggle > span {
@@ -7334,7 +7348,7 @@ tr:last-child td {
   height: 25px;
   border-radius: 999px;
   background: #d9d2d5;
-  transition: .15s ease;
+  transition: 0.15s ease;
 }
 .secretary-discount-toggle i::after {
   position: absolute;
@@ -7345,7 +7359,7 @@ tr:last-child td {
   border-radius: 50%;
   background: #fff;
   content: "";
-  transition: .15s ease;
+  transition: 0.15s ease;
 }
 .secretary-discount-toggle input:checked + i {
   background: var(--brand);

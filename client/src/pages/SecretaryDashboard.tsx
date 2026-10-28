@@ -186,14 +186,18 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
     billingItemKeys.includes(requestKey(item)),
   );
   const billableItems = billingItems.filter(
-    (item) => item.amount !== null && Number.isFinite(Number(item.amount)) && Number(item.amount) > 0,
+    (item) =>
+      item.amount !== null &&
+      Number.isFinite(Number(item.amount)) &&
+      Number(item.amount) > 0,
   );
   const billingSubtotal = billableItems.reduce(
     (sum, item) => sum + Number(item.amount),
     0,
   );
   const discountAllowed = paymentMethod === "PIX" || paymentMethod === "CASH";
-  const billingDiscount = discountEnabled && discountAllowed ? billingSubtotal * 0.05 : 0;
+  const billingDiscount =
+    discountEnabled && discountAllowed ? billingSubtotal * 0.05 : 0;
   const billingTotal = billingSubtotal - billingDiscount;
   function requestKey(item: RequestItem) {
     return `${item.kind}:${item.id}`;
@@ -376,7 +380,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                   <span className="secretary-section-kicker">PACIENTE</span>
                   <h2>{patient.fullName}</h2>
                   <p>
-                    Atendimento finalizado · {patient.visits[0]?.insurance?.name || "Convênio não informado"}
+                    Atendimento finalizado ·{" "}
+                    {patient.visits[0]?.insurance?.name ||
+                      "Convênio não informado"}
                   </p>
                 </div>
                 <div className="secretary-patient-total">
@@ -398,14 +404,6 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                       </p>
                     ) : (
                       <div className="secretary-request-table">
-                        <div className="secretary-request-table-head" aria-hidden="true">
-                          <span />
-                          <span>Solicitação</span>
-                          <span>Valor</span>
-                          <span>Faturamento</span>
-                          <span>Agendamento</span>
-                          <span />
-                        </div>
                         {visit.requests.map((item) => (
                           <div
                             className="secretary-request-row"
@@ -415,7 +413,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                               <input
                                 type="checkbox"
                                 disabled={item.billingStatus === "FATURADO"}
-                                checked={selectedRequests.includes(requestKey(item))}
+                                checked={selectedRequests.includes(
+                                  requestKey(item),
+                                )}
                                 onChange={() => toggleRequest(item)}
                                 aria-label={`Selecionar ${item.title} para faturamento`}
                               />
@@ -436,12 +436,18 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                               <strong>{item.title}</strong>
                             </div>
                             <span className="secretary-request-value">
-                              {item.amount === null ? "Preço não vinculado" : money(item.amount)}
+                              {item.amount === null
+                                ? "Preço não vinculado"
+                                : money(item.amount)}
                             </span>
-                            <span className={`secretary-request-status secretary-billing-${item.billingStatus.toLowerCase()}`}>
+                            <span
+                              className={`secretary-request-status secretary-billing-${item.billingStatus.toLowerCase()}`}
+                            >
                               {billingStatusLabel(item.billingStatus)}
                             </span>
-                            <span className={`secretary-request-status secretary-scheduling-${item.schedulingStatus.toLowerCase()}`}>
+                            <span
+                              className={`secretary-request-status secretary-scheduling-${item.schedulingStatus.toLowerCase()}`}
+                            >
                               {schedulingStatusLabel(item.schedulingStatus)}
                             </span>
                             <div
@@ -495,7 +501,11 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
         </div>
       )}
       {selectedItems.length > 0 && (
-        <div className="secretary-bulk-bar" role="region" aria-label="Ações em lote">
+        <div
+          className="secretary-bulk-bar"
+          role="region"
+          aria-label="Ações em lote"
+        >
           <div>
             <strong>{selectedItems.length} selecionada(s)</strong>
             <span>Total: {money(selectedTotal)}</span>
@@ -529,7 +539,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
             <header className="modal-header secretary-dialog-header">
               <div>
                 <p className="eyebrow">COBRANÇA · CONFIRMAÇÃO</p>
-                <h2 id="secretary-billing-confirm-title">Faturar selecionadas</h2>
+                <h2 id="secretary-billing-confirm-title">
+                  Faturar selecionadas
+                </h2>
                 <span>Revise os itens e confirme a forma de pagamento.</span>
               </div>
               <button
@@ -547,7 +559,10 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                 <h3>Itens a faturar</h3>
                 <div className="secretary-billing-selection-list">
                   {billingItems.map((item) => {
-                    const hasValue = item.amount !== null && Number.isFinite(Number(item.amount)) && Number(item.amount) > 0;
+                    const hasValue =
+                      item.amount !== null &&
+                      Number.isFinite(Number(item.amount)) &&
+                      Number(item.amount) > 0;
                     return (
                       <div
                         className={`secretary-billing-selection-item${hasValue ? "" : " secretary-billing-unpriced"}`}
@@ -561,7 +576,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                             onChange={() =>
                               setBillingItemKeys((current) =>
                                 current.includes(requestKey(item))
-                                  ? current.filter((key) => key !== requestKey(item))
+                                  ? current.filter(
+                                      (key) => key !== requestKey(item),
+                                    )
                                   : [...current, requestKey(item)],
                               )
                             }
@@ -569,21 +586,31 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                           />
                         </label>
                         <div className="secretary-billing-item-copy">
-                          <span className={`secretary-request-tag secretary-tag-${item.kind.toLowerCase()}`}>
+                          <span
+                            className={`secretary-request-tag secretary-tag-${item.kind.toLowerCase()}`}
+                          >
                             {item.category}
                           </span>
                           <strong>{item.title}</strong>
                           {!hasValue && (
-                            <small>Sem valor informado · não pode ser faturado</small>
+                            <small>
+                              Sem valor informado · não pode ser faturado
+                            </small>
                           )}
                         </div>
                         {hasValue ? (
-                          <strong className="secretary-billing-item-price">{money(Number(item.amount))}</strong>
+                          <strong className="secretary-billing-item-price">
+                            {money(Number(item.amount))}
+                          </strong>
                         ) : (
                           <button
                             type="button"
                             className="secretary-inform-value"
-                            onClick={() => setError(`Informe o valor de ${item.title} no cadastro de injetáveis.`)}
+                            onClick={() =>
+                              setError(
+                                `Informe o valor de ${item.title} no cadastro de injetáveis.`,
+                              )
+                            }
                           >
                             Informar valor
                           </button>
@@ -596,12 +623,14 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
               <div className="secretary-billing-column">
                 <h3>Forma de pagamento</h3>
                 <div className="secretary-payment-options">
-                  {([
-                    ["PIX", "Pix"],
-                    ["DEBIT_CARD", "Cartão de débito"],
-                    ["CREDIT_CARD", "Cartão de crédito"],
-                    ["CASH", "Dinheiro"],
-                  ] as [PaymentMethod, string][]).map(([value, label]) => (
+                  {(
+                    [
+                      ["PIX", "Pix"],
+                      ["DEBIT_CARD", "Cartão de débito"],
+                      ["CREDIT_CARD", "Cartão de crédito"],
+                      ["CASH", "Dinheiro"],
+                    ] as [PaymentMethod, string][]
+                  ).map(([value, label]) => (
                     <label
                       className={`secretary-payment-option${paymentMethod === value ? " selected" : ""}`}
                       key={value}
@@ -613,23 +642,30 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                         checked={paymentMethod === value}
                         onChange={() => {
                           setPaymentMethod(value);
-                          if (value !== "PIX" && value !== "CASH") setDiscountEnabled(false);
+                          if (value !== "PIX" && value !== "CASH")
+                            setDiscountEnabled(false);
                         }}
                       />
                       <span>{label}</span>
                     </label>
                   ))}
                 </div>
-                <label className={`secretary-discount-toggle${!discountAllowed ? " disabled" : ""}`}>
+                <label
+                  className={`secretary-discount-toggle${!discountAllowed ? " disabled" : ""}`}
+                >
                   <span>
                     <strong>Liberar desconto de 5%</strong>
-                    <small>Aplicado sobre o subtotal dos itens selecionados.</small>
+                    <small>
+                      Aplicado sobre o subtotal dos itens selecionados.
+                    </small>
                   </span>
                   <input
                     type="checkbox"
                     checked={discountEnabled && discountAllowed}
                     disabled={!discountAllowed || billingSelected}
-                    onChange={(event) => setDiscountEnabled(event.target.checked)}
+                    onChange={(event) =>
+                      setDiscountEnabled(event.target.checked)
+                    }
                   />
                   <i aria-hidden="true" />
                 </label>
@@ -638,22 +674,53 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                     <span>Parcelas</span>
                     <select
                       value={installments}
-                      onChange={(event) => setInstallments(Number(event.target.value))}
+                      onChange={(event) =>
+                        setInstallments(Number(event.target.value))
+                      }
                       disabled={billingSelected}
                     >
-                      {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
-                        <option key={value} value={value}>
-                          {value}x {money(billingTotal / value)}
-                        </option>
-                      ))}
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                        (value) => (
+                          <option key={value} value={value}>
+                            {value}x {money(billingTotal / value)}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </label>
                 )}
                 <div className="secretary-billing-summary">
-                  <div><span>Subtotal ({billableItems.length} {billableItems.length === 1 ? "item" : "itens"})</span><strong>{money(billingSubtotal)}</strong></div>
-                  <div className="discount"><span>Desconto {billingDiscount ? "5%" : "0%"}</span><strong>− {money(billingDiscount)}</strong></div>
-                  <div className="total"><span>Total a pagar</span><strong>{money(billingTotal)}</strong></div>
-                  <small>Pagamento: {({ PIX: "Pix", DEBIT_CARD: "Cartão de débito", CREDIT_CARD: "Cartão de crédito", CASH: "Dinheiro" } as Record<PaymentMethod, string>)[paymentMethod]}{paymentMethod === "CREDIT_CARD" ? ` · ${installments}x` : ""}</small>
+                  <div>
+                    <span>
+                      Subtotal ({billableItems.length}{" "}
+                      {billableItems.length === 1 ? "item" : "itens"})
+                    </span>
+                    <strong>{money(billingSubtotal)}</strong>
+                  </div>
+                  <div className="discount">
+                    <span>Desconto {billingDiscount ? "5%" : "0%"}</span>
+                    <strong>− {money(billingDiscount)}</strong>
+                  </div>
+                  <div className="total">
+                    <span>Total a pagar</span>
+                    <strong>{money(billingTotal)}</strong>
+                  </div>
+                  <small>
+                    Pagamento:{" "}
+                    {
+                      (
+                        {
+                          PIX: "Pix",
+                          DEBIT_CARD: "Cartão de débito",
+                          CREDIT_CARD: "Cartão de crédito",
+                          CASH: "Dinheiro",
+                        } as Record<PaymentMethod, string>
+                      )[paymentMethod]
+                    }
+                    {paymentMethod === "CREDIT_CARD"
+                      ? ` · ${installments}x`
+                      : ""}
+                  </small>
                 </div>
               </div>
             </div>
@@ -672,7 +739,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                 onClick={() => void confirmBilling()}
                 disabled={!billableItems.length || billingSelected}
               >
-                {billingSelected ? "Faturando…" : `Confirmar faturamento · ${money(billingTotal)}`}
+                {billingSelected
+                  ? "Faturando…"
+                  : `Confirmar faturamento · ${money(billingTotal)}`}
               </button>
             </footer>
           </section>
