@@ -267,12 +267,7 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
               <div className="secretary-visits">
                 {patient.visits.map((visit) => (
                   <section className="secretary-visit" key={visit.id}>
-                    <div className="secretary-visit-heading">
-                      <strong>
-                        {dateLabel(visit.date)} · {visit.time}
-                      </strong>
-                      <span>Atendida por {visit.doctor.fullName}</span>
-                    </div>
+                    <div className="secretary-visit-heading"></div>
                     {visit.requests.length === 0 ? (
                       <p className="secretary-empty-request">
                         Nenhuma solicitação registrada neste atendimento.
@@ -297,10 +292,10 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                                   </span>
                                 )}
                               </div>
-                              {/* <strong>{item.title}</strong>
+                               <strong>{item.title}</strong>
                               <span className="secretary-request-value">
                                 {item.amount === null ? "Preço não vinculado" : money(item.amount)}
-                              </span> */}
+                              </span> 
                             </div>
                             <div
                               className="secretary-request-actions"
