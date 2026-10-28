@@ -7181,22 +7181,23 @@ tr:last-child td {
   font-size: 12px;
 }
 .secretary-billing-dialog {
-  width: min(1080px, 100%);
-  max-height: min(92vh, 900px);
+  width: min(980px, 100%);
+  max-height: min(88vh, 820px);
   overflow: hidden;
 }
 .secretary-billing-dialog-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(340px, .9fr);
-  gap: 28px;
-  padding: 24px 30px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+  gap: 24px;
+  padding: 22px 25px;
   overflow: auto;
 }
 .secretary-billing-column h3 {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   color: var(--ink);
   font-family: "Manrope", sans-serif;
-  font-size: 18px;
+  font-size: 17px;
+  letter-spacing: -0.2px;
 }
 .secretary-billing-selection-list {
   display: grid;
@@ -7207,10 +7208,10 @@ tr:last-child td {
   grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 92px;
-  padding: 16px 18px;
+  min-height: 82px;
+  padding: 13px 15px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 11px;
   background: #fff;
 }
 .secretary-billing-selection-item:has(input:checked) {
@@ -7225,6 +7226,12 @@ tr:last-child td {
   width: 19px;
   height: 19px;
   accent-color: var(--brand);
+}
+.secretary-billing-item-check {
+  display: grid !important;
+  place-items: center;
+  margin: 0 !important;
+  padding: 0;
 }
 .secretary-billing-item-copy {
   display: grid;
@@ -7270,10 +7277,11 @@ tr:last-child td {
   display: flex;
   align-items: center;
   gap: 11px;
-  min-height: 72px;
-  padding: 0 18px;
+  min-height: 62px;
+  margin: 0 !important;
+  padding: 0 15px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 11px;
   color: var(--ink);
   cursor: pointer;
   font-size: 14px;
@@ -7293,10 +7301,10 @@ tr:last-child td {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 28px;
-  padding: 17px 18px;
+  margin: 20px 0 0 !important;
+  padding: 14px 15px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 11px;
   cursor: pointer;
 }
 .secretary-discount-toggle.disabled {
@@ -7348,7 +7356,7 @@ tr:last-child td {
 .secretary-installments {
   display: grid;
   gap: 6px;
-  margin-top: 15px;
+  margin: 14px 0 0 !important;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -7365,10 +7373,10 @@ tr:last-child td {
 .secretary-billing-summary {
   display: grid;
   gap: 0;
-  margin-top: 24px;
-  padding: 18px;
+  margin-top: 18px;
+  padding: 15px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 11px;
   background: #fff;
 }
 .secretary-billing-summary > div {
@@ -7394,7 +7402,7 @@ tr:last-child td {
 .secretary-billing-summary .total strong {
   color: var(--brand);
   font-family: "Manrope", sans-serif;
-  font-size: 27px;
+  font-size: 24px;
 }
 .secretary-billing-summary > small {
   margin-top: 6px;
@@ -7404,6 +7412,9 @@ tr:last-child td {
 .secretary-billing-dialog-footer {
   justify-content: flex-end;
   gap: 12px;
+}
+.secretary-billing-dialog-footer button {
+  min-height: 42px;
 }
 .secretary-empty-request,
 .secretary-state-card {
