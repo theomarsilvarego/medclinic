@@ -19,6 +19,8 @@ type RequestItem = {
   code: string | null;
   requestedAt: string;
   amount: number | null;
+  billingStatus: "A_FATURAR" | "FATURADO";
+  schedulingStatus: "NAO_AGENDADO" | "AGENDADO";
   items: { label: string; value: number | null }[];
   pdfPath: string | null;
 };
@@ -27,6 +29,7 @@ type Visit = {
   date: string;
   time: string;
   patient: { id: number; fullName: string };
+  insurance: { name: string };
   doctor: { fullName: string };
   requests: RequestItem[];
 };
@@ -53,6 +56,12 @@ function requestKindLabel(kind: RequestItem["kind"]) {
     PROCEDIMENTO: "Procedimento",
   }[kind];
 }
+function billingStatusLabel(status: RequestItem["billingStatus"]) {
+  return status === "FATURADO" ? "Faturado" : "A faturar";
+}
+function schedulingStatusLabel(status: RequestItem["schedulingStatus"]) {
+  return status === "AGENDADO" ? "Agendado" : "Não agendado";
+}
 
 export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -67,6 +76,8 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
     patient: string;
     item: RequestItem;
   } | null>(null);
+  const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
+  const [billingSelected, setBillingSelected] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -140,6 +151,52 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
       sum + visit.requests.filter((item) => item.amount === null).length,
     0,
   );
+  const selectedItems = useMemo(
+    () =>
+      visits
+        .flatMap((visit) => visit.requests)
+        .filter(
+          (item) =>
+            item.billingStatus !== "FATURADO" &&
+            selectedRequests.includes(`${item.kind}:${item.id}`),
+        ),
+    [selectedRequests, visits],
+  );
+  const selectedTotal = selectedItems.reduce(
+    (sum, item) => sum + (item.amount === null ? 0 : Number(item.amount) || 0),
+    0,
+  );
+  function requestKey(item: RequestItem) {
+    return `${item.kind}:${item.id}`;
+  }
+  function toggleRequest(item: RequestItem) {
+    if (item.billingStatus === "FATURADO") return;
+    const key = requestKey(item);
+    setSelectedRequests((current) =>
+      current.includes(key)
+        ? current.filter((value) => value !== key)
+        : [...current, key],
+    );
+  }
+  async function billSelected() {
+    if (!selectedItems.length) return;
+    setBillingSelected(true);
+    setError("");
+    try {
+      await request("/secretary/dashboard/billing", {
+        method: "POST",
+        body: JSON.stringify({
+          items: selectedItems.map(({ kind, id }) => ({ kind, id })),
+        }),
+      });
+      setSelectedRequests([]);
+      await load();
+    } catch (cause: any) {
+      setError(cause.message || "Não foi possível faturar as solicitações.");
+    } finally {
+      setBillingSelected(false);
+    }
+  }
 
   async function openPdfOrDetails(patient: string, item: RequestItem) {
     if (!item.pdfPath) {
@@ -253,7 +310,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                 <div>
                   <span className="secretary-section-kicker">PACIENTE</span>
                   <h2>{patient.fullName}</h2>
-                  <p>{patient.visits.length} atendimento(s) finalizado(s)</p>
+                  <p>
+                    Atendimento finalizado · {patient.visits[0]?.insurance?.name || "Convênio não informado"}
+                  </p>
                 </div>
                 <div className="secretary-patient-total">
                   <span>Total das solicitações</span>
@@ -273,12 +332,29 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                         Nenhuma solicitação registrada neste atendimento.
                       </p>
                     ) : (
-                      <div className="secretary-request-list">
+                      <div className="secretary-request-table">
+                        <div className="secretary-request-table-head" aria-hidden="true">
+                          <span />
+                          <span>Solicitação</span>
+                          <span>Valor</span>
+                          <span>Faturamento</span>
+                          <span>Agendamento</span>
+                          <span />
+                        </div>
                         {visit.requests.map((item) => (
                           <div
                             className="secretary-request-row"
                             key={`${item.kind}-${item.id}`}
                           >
+                            <label className="secretary-request-check">
+                              <input
+                                type="checkbox"
+                                disabled={item.billingStatus === "FATURADO"}
+                                checked={selectedRequests.includes(requestKey(item))}
+                                onChange={() => toggleRequest(item)}
+                                aria-label={`Selecionar ${item.title} para faturamento`}
+                              />
+                            </label>
                             <div className="secretary-request-copy">
                               <div className="secretary-request-labels">
                                 <span
@@ -292,11 +368,17 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                                   </span>
                                 )}
                               </div>
-                               <strong>{item.title}</strong>
-                              <span className="secretary-request-value">
-                                {item.amount === null ? "Preço não vinculado" : money(item.amount)}
-                              </span> 
+                              <strong>{item.title}</strong>
                             </div>
+                            <span className="secretary-request-value">
+                              {item.amount === null ? "Preço não vinculado" : money(item.amount)}
+                            </span>
+                            <span className={`secretary-request-status secretary-billing-${item.billingStatus.toLowerCase()}`}>
+                              {billingStatusLabel(item.billingStatus)}
+                            </span>
+                            <span className={`secretary-request-status secretary-scheduling-${item.schedulingStatus.toLowerCase()}`}>
+                              {schedulingStatusLabel(item.schedulingStatus)}
+                            </span>
                             <div
                               className="secretary-request-actions"
                               aria-label={`Ações para ${item.title}`}
@@ -345,6 +427,22 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
               </div>
             </article>
           ))}
+        </div>
+      )}
+      {selectedItems.length > 0 && (
+        <div className="secretary-bulk-bar" role="region" aria-label="Ações em lote">
+          <div>
+            <strong>{selectedItems.length} selecionada(s)</strong>
+            <span>Total: {money(selectedTotal)}</span>
+          </div>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void billSelected()}
+            disabled={billingSelected}
+          >
+            {billingSelected ? "Faturando…" : "Faturar selecionadas"}
+          </button>
         </div>
       )}
 

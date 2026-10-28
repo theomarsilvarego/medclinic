@@ -6979,11 +6979,29 @@ tr:last-child td {
   display: grid;
   padding-bottom: 12px;
 }
+.secretary-request-table {
+  display: grid;
+  gap: 7px;
+  padding-bottom: 12px;
+  overflow-x: auto;
+}
+.secretary-request-table-head,
 .secretary-request-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 30px minmax(180px, 1fr) minmax(110px, auto) 110px 110px auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+  min-width: 760px;
+}
+.secretary-request-table-head {
+  padding: 0 12px 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.secretary-request-row {
   min-height: 72px;
   padding: 11px 12px;
   border: 1px solid #eee6e8;
@@ -7026,10 +7044,46 @@ tr:last-child td {
   font-size: 13px;
   text-overflow: ellipsis;
 }
+.secretary-request-check {
+  display: grid;
+  place-items: center;
+}
+.secretary-request-check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--brand);
+}
 .secretary-request-value {
   color: var(--brand-dark);
   font-size: 12px;
   font-weight: 700;
+}
+.secretary-request-status {
+  display: inline-flex;
+  justify-content: center;
+  width: fit-content;
+  min-width: 94px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.secretary-billing-a_faturar {
+  background: #fff1d5;
+  color: #8a641d;
+}
+.secretary-billing-faturado {
+  background: #e3f3e9;
+  color: #26734a;
+}
+.secretary-scheduling-nao_agendado {
+  background: #f0edef;
+  color: #6d6268;
+}
+.secretary-scheduling-agendado {
+  background: #e4eefb;
+  color: #35659a;
 }
 .secretary-request-actions {
   display: flex;
@@ -7057,6 +7111,34 @@ tr:last-child td {
 .secretary-dialog .icon-button:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
+}
+.secretary-bulk-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 4px;
+  padding: 12px 16px;
+  border: 1px solid #d9b6c1;
+  border-radius: 13px;
+  background: #fff8fa;
+  box-shadow: 0 10px 28px #4c28332b;
+}
+.secretary-bulk-bar > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.secretary-bulk-bar strong {
+  color: var(--brand-dark);
+  font-size: 12px;
+}
+.secretary-bulk-bar span {
+  color: var(--muted);
+  font-size: 12px;
 }
 .secretary-empty-request,
 .secretary-state-card {
@@ -7208,9 +7290,26 @@ tr:last-child td {
   .secretary-request-row {
     align-items: flex-start;
     flex-direction: column;
+    display: flex;
+    min-width: 0;
+  }
+  .secretary-request-table-head {
+    display: none;
+  }
+  .secretary-request-check,
+  .secretary-request-value,
+  .secretary-request-status {
+    align-self: flex-start;
   }
   .secretary-request-actions {
     align-self: flex-end;
+  }
+  .secretary-bulk-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .secretary-bulk-bar > div {
+    justify-content: space-between;
   }
   .secretary-dialog-content {
     padding: 16px;

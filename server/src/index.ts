@@ -380,6 +380,16 @@ const injectableRequestSchema = z.object({
     )
     .min(1, "Selecione pelo menos um injetável."),
 });
+const secretaryBillingSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        kind: z.enum(["EXAME", "ULTRASSOM", "INJETAVEL", "PROCEDIMENTO"]),
+        id: z.coerce.number().int().positive(),
+      }),
+    )
+    .min(1, "Selecione ao menos uma solicitação."),
+});
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
@@ -2289,6 +2299,7 @@ app.get(
         ],
         include: {
           patient: { select: { id: true, fullName: true } },
+          insurance: { select: { name: true } },
           doctor: { select: { fullName: true } },
           medicalRecords: {
             orderBy: { recordDate: "desc" },
@@ -2358,6 +2369,7 @@ app.get(
         date: appointment.appointmentDate,
         time: appointment.scheduledTime,
         patient: appointment.patient,
+        insurance: appointment.insurance,
         doctor: appointment.doctor,
         requests: appointment.medicalRecords.flatMap((record) => [
           ...record.examRequests.map((item) => {
@@ -2374,6 +2386,8 @@ app.get(
               title: item.groupName,
               code: item.code,
               requestedAt: item.requestedAt,
+              billingStatus: item.billingStatus,
+              schedulingStatus: item.schedulingStatus,
               amount: examItems.length
                 ? examItems.reduce((sum, exam) => sum + exam.value, 0)
                 : null,
@@ -2395,6 +2409,8 @@ app.get(
               title: names[item.type] || item.type,
               code: item.code,
               requestedAt: item.requestedAt,
+              billingStatus: item.billingStatus,
+              schedulingStatus: item.schedulingStatus,
               amount,
               items: [{ label: item.description || names[item.type] || item.type, value: amount }],
               pdfPath: `/medical-record-ultrasound-requests/${item.id}/pdf`,
@@ -2409,6 +2425,8 @@ app.get(
               title: item.name,
               code: null,
               requestedAt: item.requestedAt,
+              billingStatus: item.billingStatus,
+              schedulingStatus: item.schedulingStatus,
               amount: unitValue * item.sessions,
               items: [{
                 label: `${item.name} · ${item.sessions} sessão(ões)`,
@@ -2424,6 +2442,8 @@ app.get(
             title: item.name,
             code: null,
             requestedAt: item.requestedAt,
+            billingStatus: item.billingStatus,
+            schedulingStatus: item.schedulingStatus,
             amount: Number(item.value),
             items: [{ label: item.name, value: Number(item.value) }],
             pdfPath: null,
@@ -2431,6 +2451,51 @@ app.get(
         ]),
       })),
     );
+  },
+);
+app.post(
+  "/api/secretary/dashboard/billing",
+  auth,
+  secretaryOnly,
+  async (req, res) => {
+    const parsed = secretaryBillingSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ message: "Selecione ao menos uma solicitação." });
+    const grouped = new Map<string, number[]>();
+    parsed.data.items.forEach(({ kind, id }) => {
+      const ids = grouped.get(kind) || [];
+      if (!ids.includes(id)) ids.push(id);
+      grouped.set(kind, ids);
+    });
+    const updates = await Promise.all([
+      grouped.has("EXAME")
+        ? prisma.examRequest.updateMany({
+            where: { id: { in: grouped.get("EXAME") } },
+            data: { billingStatus: "FATURADO" },
+          })
+        : null,
+      grouped.has("ULTRASSOM")
+        ? prisma.ultrasoundRequest.updateMany({
+            where: { id: { in: grouped.get("ULTRASSOM") } },
+            data: { billingStatus: "FATURADO" },
+          })
+        : null,
+      grouped.has("INJETAVEL")
+        ? prisma.injectableRequest.updateMany({
+            where: { id: { in: grouped.get("INJETAVEL") } },
+            data: { billingStatus: "FATURADO" },
+          })
+        : null,
+      grouped.has("PROCEDIMENTO")
+        ? prisma.procedureRequest.updateMany({
+            where: { id: { in: grouped.get("PROCEDIMENTO") } },
+            data: { billingStatus: "FATURADO" },
+          })
+        : null,
+    ]);
+    res.json({
+      updated: updates.reduce((total, result) => total + (result?.count || 0), 0),
+    });
   },
 );
 

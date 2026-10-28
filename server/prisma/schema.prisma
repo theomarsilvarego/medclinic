@@ -324,6 +324,16 @@ enum ExamRequestStatus {
   AGUARDANDO_RESULTADO
 }
 
+enum RequestBillingStatus {
+  A_FATURAR
+  FATURADO
+}
+
+enum RequestSchedulingStatus {
+  NAO_AGENDADO
+  AGENDADO
+}
+
 model ExamRequest {
   id             Int               @id @default(autoincrement())
   medicalRecordId Int              @map("medical_record_id")
@@ -333,6 +343,8 @@ model ExamRequest {
   code           String            @unique @db.VarChar(20)
   groupName      String            @map("group_name") @db.VarChar(160)
   status         ExamRequestStatus @default(AGUARDANDO_RESULTADO)
+  billingStatus  RequestBillingStatus @default(A_FATURAR) @map("billing_status")
+  schedulingStatus RequestSchedulingStatus @default(NAO_AGENDADO) @map("scheduling_status")
   pdfUrl         String?           @map("pdf_url") @db.VarChar(255)
   requestedById  Int               @map("requested_by_id")
   requestedAt    DateTime          @default(now()) @map("requested_at")
@@ -365,6 +377,8 @@ model UltrasoundRequest {
   description     String?                 @db.Text
   code            String                  @unique @db.VarChar(20)
   status          UltrasoundRequestStatus @default(AGUARDANDO_RESULTADO)
+  billingStatus   RequestBillingStatus @default(A_FATURAR) @map("billing_status")
+  schedulingStatus RequestSchedulingStatus @default(NAO_AGENDADO) @map("scheduling_status")
   pdfUrl          String?                 @map("pdf_url") @db.VarChar(255)
   requestedById   Int                     @map("requested_by_id")
   requestedAt     DateTime                @default(now()) @map("requested_at")
@@ -399,6 +413,8 @@ model InjectableRequest {
   sessions        Int                     @default(1)
   observation     String?                 @db.Text
   status          InjectableRequestStatus @default(AGUARDANDO_APLICACAO)
+  billingStatus   RequestBillingStatus @default(A_FATURAR) @map("billing_status")
+  schedulingStatus RequestSchedulingStatus @default(NAO_AGENDADO) @map("scheduling_status")
   requestedById   Int                     @map("requested_by_id")
   requestedAt     DateTime                @default(now()) @map("requested_at")
   medicalRecord   MedicalRecord           @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
@@ -468,6 +484,8 @@ model ProcedureRequest {
   name            String                @db.VarChar(160)
   value           Decimal               @db.Decimal(10, 2)
   status          ProcedureRequestStatus @default(AGUARDANDO_AGENDAMENTO)
+  billingStatus   RequestBillingStatus @default(A_FATURAR) @map("billing_status")
+  schedulingStatus RequestSchedulingStatus @default(NAO_AGENDADO) @map("scheduling_status")
   requestedById   Int                   @map("requested_by_id")
   requestedAt     DateTime              @default(now()) @map("requested_at")
   medicalRecord   MedicalRecord         @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
