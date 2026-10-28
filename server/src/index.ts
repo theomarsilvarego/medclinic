@@ -2425,6 +2425,9 @@ app.get(
           }),
           ...record.injectableRequests.map((item) => {
             const unitValue = Number(item.injectable.value);
+            const amount = Number.isFinite(unitValue) && unitValue > 0
+              ? unitValue * item.sessions
+              : null;
             return {
               id: item.id,
               kind: "INJETAVEL",
@@ -2434,10 +2437,10 @@ app.get(
               requestedAt: item.requestedAt,
               billingStatus: item.billingStatus,
               schedulingStatus: item.schedulingStatus,
-              amount: unitValue * item.sessions,
+              amount,
               items: [{
                 label: `${item.name} · ${item.sessions} sessão(ões)`,
-                value: unitValue * item.sessions,
+                value: amount,
               }],
               pdfPath: null,
             };

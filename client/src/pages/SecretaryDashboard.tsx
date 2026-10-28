@@ -42,6 +42,7 @@ type PatientSummary = {
   total: number;
   unpriced: number;
 };
+type PaymentMethod = "PIX" | "DEBIT_CARD" | "CREDIT_CARD" | "CASH";
 
 function dateLabel(value: string) {
   if (!value) return "—";
@@ -83,6 +84,11 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
   } | null>(null);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [billingSelected, setBillingSelected] = useState(false);
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [billingItemKeys, setBillingItemKeys] = useState<string[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [installments, setInstallments] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -176,6 +182,19 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
     (sum, item) => sum + (item.amount === null ? 0 : Number(item.amount) || 0),
     0,
   );
+  const billingItems = selectedItems.filter((item) =>
+    billingItemKeys.includes(requestKey(item)),
+  );
+  const billableItems = billingItems.filter(
+    (item) => item.amount !== null && Number.isFinite(Number(item.amount)) && Number(item.amount) > 0,
+  );
+  const billingSubtotal = billableItems.reduce(
+    (sum, item) => sum + Number(item.amount),
+    0,
+  );
+  const discountAllowed = paymentMethod === "PIX" || paymentMethod === "CASH";
+  const billingDiscount = discountEnabled && discountAllowed ? billingSubtotal * 0.05 : 0;
+  const billingTotal = billingSubtotal - billingDiscount;
   function requestKey(item: RequestItem) {
     return `${item.kind}:${item.id}`;
   }
@@ -188,18 +207,33 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
         : [...current, key],
     );
   }
-  async function billSelected() {
+  function openBillingModal() {
     if (!selectedItems.length) return;
+    setBillingItemKeys(selectedItems.map(requestKey));
+    setPaymentMethod("PIX");
+    setDiscountEnabled(false);
+    setInstallments(1);
+    setBillingModalOpen(true);
+  }
+  async function confirmBilling() {
+    if (!billableItems.length) return;
     setBillingSelected(true);
     setError("");
     try {
       await request("/secretary/dashboard/billing", {
         method: "POST",
         body: JSON.stringify({
-          items: selectedItems.map(({ kind, id }) => ({ kind, id })),
+          items: billableItems.map(({ kind, id }) => ({ kind, id })),
+          paymentMethod,
+          discountPercent: billingDiscount ? 5 : 0,
+          installments: paymentMethod === "CREDIT_CARD" ? installments : 1,
         }),
       });
-      setSelectedRequests([]);
+      const billedKeys = new Set(billableItems.map(requestKey));
+      setSelectedRequests((current) =>
+        current.filter((key) => !billedKeys.has(key)),
+      );
+      setBillingModalOpen(false);
       await load();
     } catch (cause: any) {
       setError(cause.message || "Não foi possível faturar as solicitações.");
@@ -469,11 +503,179 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
           <button
             type="button"
             className="primary"
-            onClick={() => void billSelected()}
-            disabled={billingSelected}
+            onClick={openBillingModal}
+            disabled={billingSelected || selectedItems.length === 0}
           >
-            {billingSelected ? "Faturando…" : "Faturar selecionadas"}
+            Faturar selecionadas
           </button>
+        </div>
+      )}
+
+      {billingModalOpen && (
+        <div
+          className="modal-backdrop secretary-modal-backdrop"
+          onMouseDown={(event) =>
+            event.target === event.currentTarget &&
+            !billingSelected &&
+            setBillingModalOpen(false)
+          }
+        >
+          <section
+            className="modal secretary-billing-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="secretary-billing-confirm-title"
+          >
+            <header className="modal-header secretary-dialog-header">
+              <div>
+                <p className="eyebrow">COBRANÇA · CONFIRMAÇÃO</p>
+                <h2 id="secretary-billing-confirm-title">Faturar selecionadas</h2>
+                <span>Revise os itens e confirme a forma de pagamento.</span>
+              </div>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => setBillingModalOpen(false)}
+                disabled={billingSelected}
+                aria-label="Fechar faturamento"
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="secretary-billing-dialog-content">
+              <div className="secretary-billing-column">
+                <h3>Itens a faturar</h3>
+                <div className="secretary-billing-selection-list">
+                  {billingItems.map((item) => {
+                    const hasValue = item.amount !== null && Number.isFinite(Number(item.amount)) && Number(item.amount) > 0;
+                    return (
+                      <div
+                        className={`secretary-billing-selection-item${hasValue ? "" : " secretary-billing-unpriced"}`}
+                        key={requestKey(item)}
+                      >
+                        <label className="secretary-billing-item-check">
+                          <input
+                            type="checkbox"
+                            checked={billingItemKeys.includes(requestKey(item))}
+                            disabled={!hasValue || billingSelected}
+                            onChange={() =>
+                              setBillingItemKeys((current) =>
+                                current.includes(requestKey(item))
+                                  ? current.filter((key) => key !== requestKey(item))
+                                  : [...current, requestKey(item)],
+                              )
+                            }
+                            aria-label={`Incluir ${item.title} no faturamento`}
+                          />
+                        </label>
+                        <div className="secretary-billing-item-copy">
+                          <span className={`secretary-request-tag secretary-tag-${item.kind.toLowerCase()}`}>
+                            {item.category}
+                          </span>
+                          <strong>{item.title}</strong>
+                          {!hasValue && (
+                            <small>Sem valor informado · não pode ser faturado</small>
+                          )}
+                        </div>
+                        {hasValue ? (
+                          <strong className="secretary-billing-item-price">{money(Number(item.amount))}</strong>
+                        ) : (
+                          <button
+                            type="button"
+                            className="secretary-inform-value"
+                            onClick={() => setError(`Informe o valor de ${item.title} no cadastro de injetáveis.`)}
+                          >
+                            Informar valor
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="secretary-billing-column">
+                <h3>Forma de pagamento</h3>
+                <div className="secretary-payment-options">
+                  {([
+                    ["PIX", "Pix"],
+                    ["DEBIT_CARD", "Cartão de débito"],
+                    ["CREDIT_CARD", "Cartão de crédito"],
+                    ["CASH", "Dinheiro"],
+                  ] as [PaymentMethod, string][]).map(([value, label]) => (
+                    <label
+                      className={`secretary-payment-option${paymentMethod === value ? " selected" : ""}`}
+                      key={value}
+                    >
+                      <input
+                        type="radio"
+                        name="secretary-payment-method"
+                        value={value}
+                        checked={paymentMethod === value}
+                        onChange={() => {
+                          setPaymentMethod(value);
+                          if (value !== "PIX" && value !== "CASH") setDiscountEnabled(false);
+                        }}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <label className={`secretary-discount-toggle${!discountAllowed ? " disabled" : ""}`}>
+                  <span>
+                    <strong>Liberar desconto de 5%</strong>
+                    <small>Aplicado sobre o subtotal dos itens selecionados.</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={discountEnabled && discountAllowed}
+                    disabled={!discountAllowed || billingSelected}
+                    onChange={(event) => setDiscountEnabled(event.target.checked)}
+                  />
+                  <i aria-hidden="true" />
+                </label>
+                {paymentMethod === "CREDIT_CARD" && (
+                  <label className="secretary-installments">
+                    <span>Parcelas</span>
+                    <select
+                      value={installments}
+                      onChange={(event) => setInstallments(Number(event.target.value))}
+                      disabled={billingSelected}
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
+                        <option key={value} value={value}>
+                          {value}x {money(billingTotal / value)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <div className="secretary-billing-summary">
+                  <div><span>Subtotal ({billableItems.length} {billableItems.length === 1 ? "item" : "itens"})</span><strong>{money(billingSubtotal)}</strong></div>
+                  <div className="discount"><span>Desconto {billingDiscount ? "5%" : "0%"}</span><strong>− {money(billingDiscount)}</strong></div>
+                  <div className="total"><span>Total a pagar</span><strong>{money(billingTotal)}</strong></div>
+                  <small>Pagamento: {({ PIX: "Pix", DEBIT_CARD: "Cartão de débito", CREDIT_CARD: "Cartão de crédito", CASH: "Dinheiro" } as Record<PaymentMethod, string>)[paymentMethod]}{paymentMethod === "CREDIT_CARD" ? ` · ${installments}x` : ""}</small>
+                </div>
+              </div>
+            </div>
+            <footer className="modal-footer secretary-billing-dialog-footer">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setBillingModalOpen(false)}
+                disabled={billingSelected}
+              >
+                Cancelar
+              </button>
+              <button
+                className="primary"
+                type="button"
+                onClick={() => void confirmBilling()}
+                disabled={!billableItems.length || billingSelected}
+              >
+                {billingSelected ? "Faturando…" : `Confirmar faturamento · ${money(billingTotal)}`}
+              </button>
+            </footer>
+          </section>
         </div>
       )}
 
