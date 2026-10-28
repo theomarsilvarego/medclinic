@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import {
   Calendar,
   CalendarDays,
+  ClipboardCheck,
   Clock3,
+  Droplets,
   Eye,
   FileImage,
   FileText,
@@ -52,6 +54,10 @@ export function AppointmentModal({
   const update = (key: string, value: any) =>
     setData({ ...data, [key]: value });
   const itemType = data.itemType || "ATENDIMENTO";
+  const selectedInjectableType = data.injectableType || data.injectable?.type || "";
+  const injectables = (meta.injectables || []).filter(
+    (item: Row) => item.type === selectedInjectableType,
+  );
   const attendances = (meta.attendances || []).filter(
     (x: Row) =>
       !data.insuranceId || Number(x.insuranceId) === Number(data.insuranceId),
@@ -127,6 +133,7 @@ export function AppointmentModal({
       !data.insuranceId && "Convênio",
       itemType === "ATENDIMENTO" && !data.attendanceId && "Atendimento",
       itemType === "PROCEDIMENTO" && !data.procedureId && "Procedimento",
+      itemType === "INJETAVEL" && !data.injectableId && "Produto injetável",
     ].filter(Boolean) as string[];
     const incompleteExam = examUploads.some((exam) => !exam.examType || !exam.file);
     if (missing.length) {
@@ -277,6 +284,7 @@ export function AppointmentModal({
                     itemType: "ATENDIMENTO",
                     attendanceId: "",
                     procedureId: "",
+                    injectableId: "",
                   })
                 }
               >
@@ -291,10 +299,41 @@ export function AppointmentModal({
                     itemType: "PROCEDIMENTO",
                     attendanceId: "",
                     procedureId: "",
+                    injectableId: "",
                   })
                 }
               >
-                <Syringe size={18} /> Procedimento
+                <ClipboardCheck size={18} /> Procedimento
+              </button>
+              <button
+                type="button"
+                className={itemType === "INJETAVEL" ? "active" : ""}
+                onClick={() =>
+                  setData({
+                    ...data,
+                    itemType: "INJETAVEL",
+                    attendanceId: "",
+                    procedureId: "",
+                    injectableId: "",
+                  })
+                }
+              >
+                <Syringe size={18} /> Injetável
+              </button>
+              <button
+                type="button"
+                className={itemType === "COLETA" ? "active" : ""}
+                onClick={() =>
+                  setData({
+                    ...data,
+                    itemType: "COLETA",
+                    attendanceId: "",
+                    procedureId: "",
+                    injectableId: "",
+                  })
+                }
+              >
+                <Droplets size={18} /> Coleta
               </button>
             </div>
             {itemType === "ATENDIMENTO" ? (
@@ -313,7 +352,7 @@ export function AppointmentModal({
                   ))}
                 </select>
               </label>
-            ) : (
+            ) : itemType === "PROCEDIMENTO" ? (
               <label>
                 <select
                   required
@@ -326,6 +365,57 @@ export function AppointmentModal({
                       {x.name} · {money(x.value)}
                     </option>
                   ))}
+                </select>
+              </label>
+            ) : itemType === "INJETAVEL" ? (
+              <>
+                <label>
+                  <span>Tipo de injetável</span>
+                  <select
+                    required
+                    value={selectedInjectableType}
+                    onChange={(event) =>
+                      setData({
+                        ...data,
+                        injectableType: event.target.value,
+                        injectableId: "",
+                      })
+                    }
+                  >
+                    <option value="">Selecione o tipo</option>
+                    <option value="VITAMINAS">Vitamina</option>
+                    <option value="PROTOCOLOS">Protocolos</option>
+                    <option value="IMUNIDADES">Imunidades</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Produto</span>
+                  <select
+                    required
+                    disabled={!selectedInjectableType}
+                    value={data.injectableId || ""}
+                    onChange={(event) => update("injectableId", event.target.value)}
+                  >
+                    <option value="">
+                      {selectedInjectableType
+                        ? injectables.length
+                          ? "Selecione o produto"
+                          : "Nenhum produto cadastrado neste tipo"
+                        : "Selecione primeiro o tipo"}
+                    </option>
+                    {injectables.map((item: Row) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} · {money(item.value)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <label className="appointment-collection-field">
+                <span>Exame</span>
+                <select value="EXAME_SANGUE" disabled aria-label="Exame de coleta">
+                  <option value="EXAME_SANGUE">Exame de sangue</option>
                 </select>
               </label>
             )}

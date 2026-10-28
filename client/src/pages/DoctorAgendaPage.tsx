@@ -234,7 +234,11 @@ export function DoctorAgendaPage({
                   <p>
                     {row.itemType === "PROCEDIMENTO"
                       ? row.procedure?.name
-                      : row.attendance?.name || "Atendimento"}
+                      : row.itemType === "INJETAVEL"
+                        ? row.injectable?.name
+                        : row.itemType === "COLETA"
+                          ? "Exame de sangue"
+                          : row.attendance?.name || "Atendimento"}
                     {row.insurance?.name ? ` · ${row.insurance.name}` : ""}
                   </p>
                 </div>
@@ -322,11 +326,15 @@ export function DoctorAgendaPage({
                 <strong>{selected.insurance?.name || "Não informado"}</strong>
               </div>
               <div>
-                <span>Atendimento</span>
+                <span>Serviço</span>
                 <strong>
                   {selected.itemType === "PROCEDIMENTO"
                     ? selected.procedure?.name
-                    : selected.attendance?.name || "Não informado"}
+                    : selected.itemType === "INJETAVEL"
+                      ? selected.injectable?.name
+                      : selected.itemType === "COLETA"
+                        ? "Exame de sangue"
+                        : selected.attendance?.name || "Não informado"}
                 </strong>
               </div>
               <div className="doctor-detail-wide">

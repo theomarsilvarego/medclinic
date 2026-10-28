@@ -40,7 +40,7 @@ const reportDefinitions: ReportDefinition[] = [
       { key: "time", label: "Horário", value: row => String(row.scheduledTime || "").slice(0, 5) || "—" },
       { key: "patient", label: "Paciente", value: row => row.patient?.fullName || "—" },
       { key: "doctor", label: "Médico", value: row => row.doctor?.fullName || "—" },
-      { key: "service", label: "Atendimento / procedimento", value: row => row.attendance?.name || row.procedure?.name || "—" },
+      { key: "service", label: "Serviço", value: row => row.procedure?.name || row.injectable?.name || row.attendance?.name || (row.itemType === "COLETA" ? "Exame de sangue" : "—") },
       { key: "insurance", label: "Convênio", value: row => row.insurance?.name || "—" },
       { key: "status", label: "Situação", value: row => appointmentStatusLabels[String(row.status)] || row.status || "—" },
     ],
@@ -208,7 +208,7 @@ export function ReportsPage() {
           const time = String(row.scheduledTime || "").slice(0, 5) || "—";
           const patient = cleanTxtValue(row.patient?.fullName);
           const age = patientAge(row.patient?.birthDate, referenceDate);
-          const service = cleanTxtValue(row.itemType === "PROCEDIMENTO" ? row.procedure?.name : row.attendance?.name);
+          const service = cleanTxtValue(row.itemType === "PROCEDIMENTO" ? row.procedure?.name : row.itemType === "INJETAVEL" ? row.injectable?.name : row.itemType === "COLETA" ? "Exame de sangue" : row.attendance?.name);
           const notes = cleanTxtValue(row.notes);
           return `${time} - Paciente: ${patient} - Idade ${age} - (${service}) - ${notes}`;
         }),

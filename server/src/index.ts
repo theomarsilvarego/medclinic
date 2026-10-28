@@ -405,6 +405,7 @@ const appointmentSchema = z.object({
   itemType: z.nativeEnum(AppointmentItemType),
   attendanceId: z.coerce.number().int().positive().nullable().optional(),
   procedureId: z.coerce.number().int().positive().nullable().optional(),
+  injectableId: z.coerce.number().int().positive().nullable().optional(),
   status: z.nativeEnum(AppointmentStatus).default(AppointmentStatus.AGENDADO),
   notes: z.string().optional().nullable(),
 });
@@ -525,6 +526,7 @@ const appointmentInclude = {
   insurance: { select: { id: true, name: true } },
   attendance: { select: { id: true, name: true } },
   procedure: { select: { id: true, name: true } },
+  injectable: { select: { id: true, name: true, type: true, value: true } },
   attachments: {
     orderBy: { uploadedAt: "asc" as const },
     include: { uploadedBy: { select: { id: true, fullName: true } } },
@@ -681,6 +683,7 @@ const medicalRecordInclude = {
       notes: true,
       attendance: { select: { id: true, name: true } },
       procedure: { select: { id: true, name: true } },
+      injectable: { select: { id: true, name: true, type: true } },
       attachments: {
         orderBy: { uploadedAt: "asc" as const },
         include: { uploadedBy: { select: { id: true, fullName: true } } },
@@ -1084,19 +1087,32 @@ async function validateAppointmentInsurance(
         "O atendimento selecionado não pertence ao convênio informado.",
       );
   }
+  if (data.itemType === AppointmentItemType.INJETAVEL && data.injectableId) {
+    const injectable = await prisma.injectable.findUnique({
+      where: { id: data.injectableId },
+      select: { id: true },
+    });
+    if (!injectable)
+      throw new Error("O injetável selecionado não está cadastrado.");
+  }
 }
 
 function appointmentData(data: z.infer<typeof appointmentSchema>) {
   const isAttendance = data.itemType === AppointmentItemType.ATENDIMENTO;
+  const isProcedure = data.itemType === AppointmentItemType.PROCEDIMENTO;
+  const isInjectable = data.itemType === AppointmentItemType.INJETAVEL;
   if (isAttendance && !data.attendanceId)
     throw new Error("Selecione um atendimento.");
-  if (!isAttendance && !data.procedureId)
+  if (isProcedure && !data.procedureId)
     throw new Error("Selecione um procedimento.");
+  if (isInjectable && !data.injectableId)
+    throw new Error("Selecione um produto injetável.");
   return {
     ...data,
     appointmentDate: new Date(`${data.appointmentDate}T00:00:00.000Z`),
     attendanceId: isAttendance ? data.attendanceId : null,
-    procedureId: isAttendance ? null : data.procedureId,
+    procedureId: isProcedure ? data.procedureId : null,
+    injectableId: isInjectable ? data.injectableId : null,
   };
 }
 async function clinicalRequestRecord(id: number) {
@@ -2019,7 +2035,7 @@ app.get(
   auth,
   appointmentAccess,
   async (_req, res) => {
-    const [patients, doctors, activeInsurances, attendances, procedures] =
+    const [patients, doctors, activeInsurances, attendances, procedures, injectables] =
       await Promise.all([
         prisma.patient.findMany({
           orderBy: { fullName: "asc" },
@@ -2049,6 +2065,10 @@ app.get(
           orderBy: { name: "asc" },
           select: { id: true, name: true, value: true },
         }),
+        prisma.injectable.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, type: true, value: true },
+        }),
       ]);
     const patientInsuranceIds = [...new Set(
       patients
@@ -2070,7 +2090,7 @@ app.get(
     const insurances = [...insurancesById.values()].sort((left, right) =>
       left.name.localeCompare(right.name, "pt-BR"),
     );
-    res.json({ patients, doctors, insurances, attendances, procedures });
+    res.json({ patients, doctors, insurances, attendances, procedures, injectables });
   },
 );
 app.get("/api/appointments/:id/anamnesis", auth, appointmentAccess, async (req, res) => {

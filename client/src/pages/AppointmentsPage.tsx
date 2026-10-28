@@ -47,6 +47,7 @@ export function AppointmentsPage({
     insurances: [],
     attendances: [],
     procedures: [],
+    injectables: [],
   });
   const [editing, setEditing] = useState<Row | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -135,6 +136,8 @@ export function AppointmentsPage({
           data.itemType === "ATENDIMENTO" ? Number(data.attendanceId) : null,
         procedureId:
           data.itemType === "PROCEDIMENTO" ? Number(data.procedureId) : null,
+        injectableId:
+          data.itemType === "INJETAVEL" ? Number(data.injectableId) : null,
         status: data.status || "AGENDADO",
         notes: data.notes || "",
       };
@@ -274,7 +277,11 @@ export function AppointmentsPage({
                       <small>
                         {row.itemType === "PROCEDIMENTO"
                           ? row.procedure?.name
-                          : row.attendance?.name}{" "}
+                          : row.itemType === "INJETAVEL"
+                            ? row.injectable?.name
+                            : row.itemType === "COLETA"
+                              ? "Exame de sangue"
+                              : row.attendance?.name}{" "}
                         · {row.insurance?.name}
                       </small>
                       {canManage && isEligibleAppointment(row) && (

@@ -119,6 +119,7 @@ model Injectable {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   requests      InjectableRequest[]
+  appointments  Appointment[]
 
   @@index([type])
   @@index([name])
@@ -244,6 +245,8 @@ enum AppointmentStatus {
 enum AppointmentItemType {
   ATENDIMENTO
   PROCEDIMENTO
+  INJETAVEL
+  COLETA
 }
 
 model Appointment {
@@ -256,6 +259,7 @@ model Appointment {
   itemType        AppointmentItemType @map("item_type")
   attendanceId    Int?                @map("attendance_id")
   procedureId     Int?                @map("procedure_id")
+  injectableId    Int?                @map("injectable_id")
   status          AppointmentStatus   @default(AGENDADO)
   notes           String?             @db.Text
   patient         Patient             @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Restrict)
@@ -263,6 +267,7 @@ model Appointment {
   insurance       Insurance           @relation(fields: [insuranceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   attendance      Attendance?         @relation(fields: [attendanceId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   procedure       Procedure?          @relation(fields: [procedureId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  injectable      Injectable?         @relation(fields: [injectableId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
   medicalRecords  MedicalRecord[]

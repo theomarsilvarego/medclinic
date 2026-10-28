@@ -2772,11 +2772,21 @@ function RecordTimelineCard({
   const instanceId = record.id ? String(record.id) : "draft";
   const appointment = record.appointment;
   const serviceType =
-    appointment?.itemType === "PROCEDIMENTO" ? "Procedimento" : "Atendimento";
+    appointment?.itemType === "PROCEDIMENTO"
+      ? "Procedimento"
+      : appointment?.itemType === "INJETAVEL"
+        ? "Injetável"
+        : appointment?.itemType === "COLETA"
+          ? "Coleta"
+          : "Atendimento";
   const serviceName =
     appointment?.itemType === "PROCEDIMENTO"
       ? appointment.procedure?.name
-      : appointment?.attendance?.name;
+      : appointment?.itemType === "INJETAVEL"
+        ? appointment.injectable?.name
+        : appointment?.itemType === "COLETA"
+          ? "Exame de sangue"
+          : appointment?.attendance?.name;
   const timelineTitle = appointment
     ? [appointment.scheduledTime, serviceType, serviceName]
         .filter(Boolean)
