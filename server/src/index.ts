@@ -2285,13 +2285,20 @@ app.get(
   "/api/secretary/dashboard/attended-patients",
   auth,
   secretaryOnly,
-  async (_req, res) => {
-    const today = clinicTodayDate();
+  async (req, res) => {
+    const selectedDate = String(req.query.date || clinicTodayDate());
+    const parsedDate = new Date(`${selectedDate}T00:00:00.000Z`);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(selectedDate) ||
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== selectedDate
+    )
+      return res.status(400).json({ message: "Informe uma data válida." });
     const [appointments, imagingProcedures] = await Promise.all([
       prisma.appointment.findMany({
         where: {
           status: AppointmentStatus.ATENDIDO,
-          appointmentDate: new Date(`${today}T00:00:00.000Z`),
+          appointmentDate: parsedDate,
         },
         orderBy: [
           { appointmentDate: "desc" },

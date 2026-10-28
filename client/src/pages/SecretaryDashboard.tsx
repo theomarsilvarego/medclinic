@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Calendar,
   CalendarPlus,
   CircleDollarSign,
   Eye,
@@ -62,9 +63,13 @@ function billingStatusLabel(status: RequestItem["billingStatus"]) {
 function schedulingStatusLabel(status: RequestItem["schedulingStatus"]) {
   return status === "AGENDADO" ? "Agendado" : "Não agendado";
 }
-
+function localDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
+  const today = localDate(new Date());
   const [visits, setVisits] = useState<Visit[]>([]);
+  const [date, setDate] = useState(today);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -83,7 +88,9 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
     setLoading(true);
     setError("");
     try {
-      const data = await request("/secretary/dashboard/attended-patients");
+      const data = await request(
+        `/secretary/dashboard/attended-patients?date=${encodeURIComponent(date)}`,
+      );
       setVisits(data || []);
     } catch (cause: any) {
       setError(cause.message || "Não foi possível carregar os atendimentos.");
@@ -94,7 +101,10 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [date]);
+  useEffect(() => {
+    setSelectedRequests([]);
+  }, [date]);
 
   const patients = useMemo(() => {
     const grouped = new Map<number, PatientSummary>();
@@ -237,18 +247,39 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
             Solicitações dos atendimentos finalizados hoje pela equipe médica.
           </p>
         </div>
-        <button
-          className="secondary secretary-refresh"
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-        >
-          <RefreshCw
-            size={16}
-            className={loading ? "secretary-spinning" : ""}
-          />
-          Atualizar
-        </button>
+        <div className="secretary-heading-actions">
+          <label className="secretary-date-picker">
+            <Calendar size={16} aria-hidden="true" />
+            <span>Dia</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value || today)}
+              aria-label="Selecionar dia dos pacientes atendidos"
+            />
+          </label>
+          {date !== today && (
+            <button
+              className="secondary secretary-today-button"
+              type="button"
+              onClick={() => setDate(today)}
+            >
+              Hoje
+            </button>
+          )}
+          <button
+            className="secondary secretary-refresh"
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            <RefreshCw
+              size={16}
+              className={loading ? "secretary-spinning" : ""}
+            />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {error && (
