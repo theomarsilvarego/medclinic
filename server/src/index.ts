@@ -58,6 +58,11 @@ const examRequestPdfRoot = path.resolve(
     path.join(process.cwd(), "uploads", "exam-requests"),
 );
 fs.mkdirSync(examRequestPdfRoot, { recursive: true });
+const clinicalDocumentRoot = path.resolve(
+  process.env.CLINICAL_DOCUMENT_PDF_DIR ||
+    path.join(process.cwd(), "uploads", "clinical-documents"),
+);
+fs.mkdirSync(clinicalDocumentRoot, { recursive: true });
 const allowedAttachments: Record<string, string> = {
   "application/pdf": ".pdf",
   "image/jpeg": ".jpg",
@@ -681,6 +686,7 @@ const medicalRecordInclude = {
       status: true,
       itemType: true,
       notes: true,
+      doctor: { select: { id: true, fullName: true, crm: true, rqe: true, specialty: true } },
       attendance: { select: { id: true, name: true } },
       procedure: { select: { id: true, name: true } },
       injectable: { select: { id: true, name: true, type: true } },
@@ -709,6 +715,14 @@ const medicalRecordInclude = {
   ultrasoundRequests: {
     orderBy: { requestedAt: "asc" as const },
     include: ultrasoundRequestInclude,
+  },
+  clinicalDocuments: {
+    orderBy: { issuedAt: "desc" as const },
+    include: {
+      issuedBy: { select: { id: true, fullName: true } },
+      cancelledBy: { select: { id: true, fullName: true } },
+      doctor: { select: { id: true, fullName: true, crm: true } },
+    },
   },
 };
 const examGroupInclude = {
@@ -742,8 +756,15 @@ function pdfMoney(value: unknown) {
 function certificateAttributes(pfx: Buffer, password: string) {
   const asn1 = forge.asn1.fromDer(pfx.toString("binary"));
   const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, false, password);
-  const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
-  const cert = bags[forge.pki.oids.certBag]?.[0]?.cert;
+  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || [];
+  const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || [];
+  const privateKey = keyBags[0]?.key;
+  const cert = privateKey
+    ? certBags.find((bag: any) =>
+        privateKey.n.compareTo(bag.cert.publicKey.n) === 0 &&
+        privateKey.e.compareTo(bag.cert.publicKey.e) === 0,
+      )?.cert
+    : null;
   if (!cert) throw new Error("Não foi possível ler o certificado digital.");
   const subject = cert.subject.attributes;
   const commonName = String(
@@ -768,7 +789,7 @@ function certificateAttributes(pfx: Buffer, password: string) {
 }
 async function getActiveCertificateDetails() {
   const certificate = await prisma.digitalCertificate.findFirst({
-    where: { active: true },
+    where: { active: true, doctorId: null, assignedUserId: null },
     orderBy: { createdAt: "desc" },
   });
   if (!certificate) return null;
@@ -800,6 +821,124 @@ async function signPdfWithActiveCertificate(pdfPath: string) {
   );
   fs.writeFileSync(pdfPath, signedPdf);
   return true;
+}
+function normalizePersonName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/\b(dr|dra|medica|medico)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+async function getDoctorCertificateDetails(doctorId: number, assignedUserId: number) {
+  const certificate = await prisma.digitalCertificate.findFirst({
+    where: { doctorId, assignedUserId, active: true },
+    include: { doctor: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!certificate?.doctor) return null;
+  const pfx = decryptSecret(certificate.pfxEncrypted);
+  const password = decryptSecret(certificate.passwordEncrypted).toString("utf8");
+  const attributes = certificateAttributes(pfx, password);
+  const now = new Date();
+  if (attributes.validFrom > now || attributes.validTo < now)
+    throw new Error("O certificado digital associado à médica está expirado ou ainda não é válido.");
+  if (normalizePersonName(attributes.name) !== normalizePersonName(certificate.doctor.fullName))
+    throw new Error("O titular do certificado não corresponde ao nome da médica cadastrada.");
+  return { ...attributes, certificate, pfx, password, doctor: certificate.doctor };
+}
+async function signPdfWithDoctorCertificate(pdfPath: string, details: any, reason: string) {
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  const placeholder = plainAddPlaceholder({
+    pdfBuffer,
+    reason,
+    name: details.name,
+    contactInfo: "MedClinic",
+    location: "Brasil",
+  });
+  const signedPdf = await new SignPdf().sign(
+    placeholder,
+    new P12Signer(details.pfx, { passphrase: details.password }),
+  );
+  fs.writeFileSync(pdfPath, signedPdf);
+}
+async function generateClinicalDocumentPdf(data: any, pdfPath: string) {
+  const { document, patient, doctor, clinic } = data;
+  const content = document.content as any;
+  const verifyBase = String(process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  const verifyUrl = new URL(
+    `/api/public/clinical-documents/verify/${document.validationCode}`,
+    verifyBase,
+  ).toString();
+  const qrBuffer = await QRCode.toBuffer(verifyUrl, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 96,
+  });
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margins: { top: 48, bottom: 52, left: 48, right: 48 } });
+    const stream = fs.createWriteStream(pdfPath);
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    doc.on("error", reject);
+    doc.pipe(stream);
+    const wine = "#741447";
+    const gray = "#706970";
+    const clinicName = clinic?.tradeName || clinic?.legalName || "Clínica";
+    doc.rect(0, 0, 595, 76).fill("#f8edf3");
+    doc.rect(0, 0, 595, 5).fill(wine);
+    doc.circle(64, 39, 21).fill(wine);
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18).text(String(clinicName).trim().charAt(0).toUpperCase(), 54, 28, { width: 20, align: "center" });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(19).text(clinicName, 96, 19, { width: 440, ellipsis: true });
+    doc.fillColor(gray).font("Helvetica").fontSize(8).text(clinic?.address || "Endereço não cadastrado", 98, 48, { width: 440, ellipsis: true });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(10).text(document.type === "RECEITA" ? "RECEITA MÉDICA" : "ATESTADO MÉDICO", 48, 100);
+    doc.fillColor(gray).font("Helvetica").fontSize(8).text(`Documento nº ${document.documentNumber}  ·  Emitido em ${pdfDateTime(document.issuedAt)}`, 48, 119);
+    doc.moveDown(2);
+    doc.fillColor(gray).font("Helvetica-Bold").fontSize(8).text("PACIENTE", 48);
+    doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(12).text(String(patient.fullName || "").toUpperCase());
+    if (patient.cpf) doc.fillColor(gray).font("Helvetica").fontSize(9).text(`CPF: ${patient.cpf}`);
+    doc.moveDown(1.2);
+
+    if (document.type === "RECEITA") {
+      doc.fillColor(wine).font("Helvetica-Bold").fontSize(10).text("Prescrição");
+      (content.items || []).forEach((item: any, index: number) => {
+        if (doc.y > 570) {
+          doc.addPage();
+          doc.fillColor(gray).font("Helvetica-Bold").fontSize(8).text(`${clinicName} · Documento ${document.documentNumber} (continuação)`, 48, 30, { width: 490 });
+          doc.y = 58;
+        }
+        doc.moveDown(0.7);
+        doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(10).text(`${index + 1}. ${item.medicationName} — ${item.presentation}`);
+        doc.fillColor(gray).font("Helvetica").fontSize(9).text(`Dose: ${item.dose}  ·  Via: ${item.route}`);
+        doc.text(`Posologia: ${item.posology}`);
+        doc.text(`Duração: ${item.duration}  ·  Quantidade: ${item.quantity}`);
+      });
+      if (content.instructions) {
+        doc.moveDown();
+        doc.fillColor("#29242a").font("Helvetica").fontSize(9).text(String(content.instructions), { width: 490 });
+      }
+    } else {
+      doc.fillColor(wine).font("Helvetica-Bold").fontSize(10).text(content.subtypeLabel || "Atestado");
+      doc.moveDown();
+      doc.fillColor("#29242a").font("Helvetica").fontSize(11).text(String(content.template || ""), { width: 490, lineGap: 5 });
+      if (content.cidAuthorized && content.cid) {
+        doc.moveDown();
+        doc.fillColor(gray).font("Helvetica").fontSize(9).text(`CID-10: ${content.cid}`);
+      }
+    }
+
+    if (doc.y > 620) doc.addPage();
+    const footerY = Math.max(doc.y + 36, 655);
+    doc.moveTo(48, footerY).lineTo(395, footerY).strokeColor("#b9a8b1").stroke();
+    doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(9).text(doctor.fullName, 48, footerY + 8, { width: 330, ellipsis: true });
+    doc.fillColor(gray).font("Helvetica").fontSize(8).text(`CRM ${doctor.crm}${doctor.rqe ? `  ·  RQE ${doctor.rqe}` : ""}`, 48, footerY + 23, { width: 330 });
+    doc.text(`${clinicName}  ·  ${clinic?.address || "Endereço não cadastrado"}`, 48, footerY + 36, { width: 340, height: 24, ellipsis: true });
+    doc.image(qrBuffer, 455, footerY + 1, { width: 76, height: 76 });
+    doc.fillColor(gray).fontSize(6.5).text(`Código de validação: ${document.validationCode}`, 48, footerY + 62, { width: 340 });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(6.5).text("Assinatura digital PAdES vinculada ao certificado cadastrado. Valide a cadeia de confiança no leitor de PDF.", 48, footerY + 74, { width: 390 });
+    doc.end();
+  });
 }
 const ultrasoundTypeLabels: Record<string, string> = {
   MAMAS: "USG de mamas — Mamas / axilas",
@@ -2030,6 +2169,301 @@ app.post(
   },
 );
 
+const prescriptionItemSchema = z.object({
+  medicationId: z.coerce.number().int().positive(),
+  dose: z.string().trim().min(1).max(100),
+  route: z.string().trim().min(1).max(60),
+  posology: z.string().trim().min(1).max(300),
+  duration: z.string().trim().min(1).max(80),
+  quantity: z.string().trim().min(1).max(80),
+});
+const clinicalDocumentIssueSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("RECEITA"),
+    items: z.array(prescriptionItemSchema).min(1).max(30),
+    instructions: z.string().trim().max(1200).optional().default(""),
+  }),
+  z.object({
+    type: z.literal("ATESTADO"),
+    subtype: z.enum(["COMPARECIMENTO", "AFASTAMENTO", "APTIDAO"]),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    daysAway: z.coerce.number().int().min(1).max(365).optional().nullable(),
+    entryTime: z.string().max(5).optional().default(""),
+    exitTime: z.string().max(5).optional().default(""),
+    template: z.string().trim().min(10).max(3000),
+    cidAuthorized: z.boolean().default(false),
+    cid: z.string().trim().max(20).optional().default(""),
+  }),
+]);
+
+app.get("/api/medication-catalog", auth, doctorOnly, async (req, res) => {
+  const search = String(req.query.search || "").trim();
+  res.json(await prisma.medicationCatalogItem.findMany({
+    where: {
+      active: true,
+      controlled: false,
+      ...(search ? { OR: [
+        { name: { contains: search } },
+        { presentation: { contains: search } },
+      ] } : {}),
+    },
+    orderBy: [{ name: "asc" }, { presentation: "asc" }],
+    take: 30,
+    select: { id: true, name: true, presentation: true },
+  }));
+});
+app.post("/api/medication-catalog", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const parsed = z.object({
+    name: z.string().trim().min(2).max(180),
+    presentation: z.string().trim().min(2).max(180),
+  }).safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: "Informe medicamento e apresentação válidos." });
+  try {
+    const item = await prisma.medicationCatalogItem.create({
+      data: { ...parsed.data, controlled: false, createdById: req.user!.id },
+      select: { id: true, name: true, presentation: true },
+    });
+    res.status(201).json(item);
+  } catch (error: any) {
+    if (error?.code === "P2002")
+      return res.status(409).json({ message: "Este medicamento e apresentação já constam no catálogo." });
+    throw error;
+  }
+});
+app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const medicalRecordId = routeId(req, res);
+  if (medicalRecordId === null) return;
+  const record = await prisma.medicalRecord.findUnique({
+    where: { id: medicalRecordId },
+    select: { patientId: true, appointment: { select: { id: true, patientId: true, doctorId: true } } },
+  });
+  if (!record?.appointment)
+    return res.json({ ready: false, message: "Salve o atendimento vinculado antes de emitir documentos." });
+  if (record.patientId !== record.appointment.patientId)
+    return res.status(409).json({ ready: false, message: "O paciente do prontuário não corresponde ao paciente do atendimento." });
+  try {
+    const certificate = await getDoctorCertificateDetails(record.appointment.doctorId, req.user!.id);
+    if (!certificate)
+      return res.json({ ready: false, message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite o cadastro de um certificado ICP-Brasil válido ao administrador." });
+    const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || "");
+    if (!publicBaseUrl)
+      return res.json({ ready: false, message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS para habilitar o QR code de validação." });
+    const publicBase = new URL(publicBaseUrl);
+    if (publicBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(publicBase.hostname))
+      return res.json({ ready: false, message: "PUBLIC_BASE_URL deve usar um endereço público HTTPS para validar o QR code." });
+    res.json({ ready: true, message: "Certificado da médica e verificação pública configurados. A cadeia de confiança deve ser validada no leitor de PDF." });
+  } catch (error: any) {
+    res.json({ ready: false, message: error?.message || "Não foi possível validar o certificado da médica." });
+  }
+});
+app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const medicalRecordId = routeId(req, res);
+  if (medicalRecordId === null) return;
+  const parsed = clinicalDocumentIssueSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: "Revise os campos obrigatórios do documento." });
+  const record = await prisma.medicalRecord.findUnique({
+    where: { id: medicalRecordId },
+    include: {
+      patient: { select: { id: true, fullName: true, cpf: true } },
+      appointment: { include: { doctor: true } },
+    },
+  });
+  if (!record || !record.appointment)
+    return res.status(400).json({ message: "O documento precisa estar vinculado a um prontuário de atendimento agendado." });
+  if (record.patientId !== record.appointment.patientId)
+    return res.status(409).json({ message: "O paciente do prontuário não corresponde ao paciente do atendimento." });
+  const doctor = record.appointment.doctor;
+  if (!doctor)
+    return res.status(400).json({ message: "O atendimento não possui médica cadastrada." });
+
+  let content: Record<string, any>;
+  let subtype: string;
+  let cidAuthorizedAt: Date | null = null;
+  if (parsed.data.type === "RECEITA") {
+    const ids = [...new Set(parsed.data.items.map((item) => item.medicationId))];
+    const medications = await prisma.medicationCatalogItem.findMany({
+      where: { id: { in: ids }, active: true, controlled: false },
+      select: { id: true, name: true, presentation: true },
+    });
+    if (medications.length !== ids.length)
+      return res.status(400).json({ message: "Receitas desta versão aceitam apenas medicamentos não controlados ativos no catálogo." });
+    const byId = new Map(medications.map((item) => [item.id, item]));
+    content = {
+      items: parsed.data.items.map((item) => ({
+        ...item,
+        medicationName: byId.get(item.medicationId)!.name,
+        presentation: byId.get(item.medicationId)!.presentation,
+      })),
+      instructions: parsed.data.instructions,
+    };
+    subtype = "NAO_CONTROLADA";
+  } else {
+    const value = parsed.data;
+    const attestationDate = new Date(`${value.date}T00:00:00.000Z`);
+    if (Number.isNaN(attestationDate.getTime()) || attestationDate.toISOString().slice(0, 10) !== value.date)
+      return res.status(400).json({ message: "Informe uma data válida para o atestado." });
+    if (value.subtype === "COMPARECIMENTO" && (!value.entryTime || !value.exitTime))
+      return res.status(400).json({ message: "Informe os horários de entrada e saída para o atestado de comparecimento." });
+    if (value.subtype === "COMPARECIMENTO" && (![value.entryTime, value.exitTime].every((time) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time))))
+      return res.status(400).json({ message: "Informe horários de entrada e saída válidos." });
+    if (value.subtype === "COMPARECIMENTO" && value.exitTime <= value.entryTime)
+      return res.status(400).json({ message: "O horário de saída deve ser posterior ao horário de entrada." });
+    if (value.subtype === "AFASTAMENTO" && !value.daysAway)
+      return res.status(400).json({ message: "Informe a quantidade de dias de afastamento." });
+    if (value.cid && !value.cidAuthorized)
+      return res.status(400).json({ message: "O CID só pode constar com autorização expressa do paciente." });
+    if (!value.cidAuthorized && /\bCID(?:-10)?\b/i.test(value.template))
+      return res.status(400).json({ message: "O texto menciona CID, mas a autorização do paciente não foi registrada." });
+    subtype = value.subtype;
+    const labels = { COMPARECIMENTO: "Declaração de comparecimento", AFASTAMENTO: "Atestado médico de afastamento", APTIDAO: "Atestado de saúde / aptidão" };
+    content = {
+      subtype: value.subtype,
+      subtypeLabel: labels[value.subtype],
+      date: value.date,
+      daysAway: value.daysAway || null,
+      entryTime: value.subtype === "COMPARECIMENTO" ? value.entryTime : "",
+      exitTime: value.subtype === "COMPARECIMENTO" ? value.exitTime : "",
+      template: value.template,
+      cidAuthorized: value.cidAuthorized,
+      cid: value.cidAuthorized ? value.cid : "",
+    };
+    cidAuthorizedAt = value.cidAuthorized ? new Date() : null;
+  }
+
+  let certificate: any;
+  try {
+    certificate = await getDoctorCertificateDetails(doctor.id, req.user!.id);
+  } catch (error: any) {
+    return res.status(409).json({ message: error.message || "Não foi possível validar o certificado da médica." });
+  }
+  if (!certificate)
+    return res.status(409).json({ message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro de um certificado ICP-Brasil válido antes de emitir." });
+  try {
+    const publicBase = String(process.env.PUBLIC_BASE_URL || "");
+    const parsedBase = new URL(publicBase);
+    if (parsedBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(parsedBase.hostname)) throw new Error();
+  } catch {
+    return res.status(409).json({ message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS do sistema para ativar a validação pelo QR code." });
+  }
+  const clinic = await prisma.clinic.findFirst({ orderBy: { id: "asc" } });
+  const issuedAt = new Date();
+  const validationCode = crypto.randomBytes(18).toString("hex").toUpperCase();
+  const pdfStorageKey = `${crypto.randomUUID()}.pdf`;
+  const pdfPath = path.join(clinicalDocumentRoot, pdfStorageKey);
+  let createdId: number | null = null;
+  try {
+    const issued = await prisma.$transaction(async (tx) => {
+      const created = await tx.clinicalDocument.create({
+        data: {
+          documentNumber: null,
+          validationCode,
+          type: parsed.data.type,
+          subtype,
+          status: "EMITIDO",
+          content: content as Prisma.InputJsonValue,
+          pdfStorageKey,
+          cidAuthorizedAt,
+          issuedAt,
+          medicalRecordId: record.id,
+          appointmentId: record.appointment!.id,
+          patientId: record.patientId,
+          doctorId: doctor.id,
+          issuedById: req.user!.id,
+          signatureCertificateId: certificate.certificate.id,
+        },
+      });
+      createdId = created.id;
+      const documentYear = new Intl.DateTimeFormat("en-US", { timeZone: clinicTimeZone, year: "numeric" }).format(issuedAt);
+      const documentNumber = `${parsed.data.type === "RECEITA" ? "RX" : "AT"}-${documentYear}-${String(created.id).padStart(6, "0")}`;
+      const document = await tx.clinicalDocument.update({
+        where: { id: created.id },
+        data: { documentNumber },
+      });
+      await generateClinicalDocumentPdf({ document, patient: record.patient, doctor, clinic }, pdfPath);
+      await signPdfWithDoctorCertificate(
+        pdfPath,
+        certificate,
+        parsed.data.type === "RECEITA" ? "Prescrição médica" : "Atestado médico",
+      );
+      return tx.clinicalDocument.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { issuedBy: { select: { id: true, fullName: true } }, doctor: { select: { id: true, fullName: true, crm: true } } },
+      });
+    }, { timeout: 60000, maxWait: 10000 });
+    res.status(201).json(issued);
+  } catch (error: any) {
+    await fs.promises.unlink(pdfPath).catch(() => undefined);
+    if (createdId) await prisma.clinicalDocument.delete({ where: { id: createdId } }).catch(() => undefined);
+    console.error("Falha ao emitir documento clínico:", error);
+    res.status(500).json({ message: "Não foi possível emitir e assinar o documento. Verifique o certificado digital e tente novamente." });
+  }
+});
+app.patch("/api/clinical-documents/:id/cancel", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const parsed = z.object({ reason: z.string().trim().min(5).max(1000) }).safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: "Informe o motivo do cancelamento (mínimo de 5 caracteres)." });
+  const existing = await prisma.clinicalDocument.findUnique({ where: { id }, select: { id: true, status: true, signatureCertificate: { select: { assignedUserId: true } } } });
+  if (!existing) return res.status(404).json({ message: "Documento não encontrado." });
+  if (existing.signatureCertificate.assignedUserId !== req.user!.id)
+    return res.status(403).json({ message: "Somente a conta médica vinculada ao certificado pode cancelar este documento." });
+  if (existing.status === "CANCELADO")
+    return res.status(409).json({ message: "Este documento já foi cancelado." });
+  const cancelledAt = new Date();
+  const update = await prisma.clinicalDocument.updateMany({
+    where: { id, status: "EMITIDO" },
+    data: { status: "CANCELADO", cancelledAt, cancelledById: req.user!.id, cancellationReason: parsed.data.reason },
+  });
+  if (update.count === 0)
+    return res.status(409).json({ message: "Este documento já foi cancelado." });
+  res.json(await prisma.clinicalDocument.findUniqueOrThrow({
+    where: { id },
+    include: { issuedBy: { select: { id: true, fullName: true } }, cancelledBy: { select: { id: true, fullName: true } }, doctor: { select: { id: true, fullName: true, crm: true } } },
+  }));
+});
+app.get("/api/clinical-documents/:id/pdf", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const document = await prisma.clinicalDocument.findUnique({ where: { id }, select: { pdfStorageKey: true, documentNumber: true, issuedById: true, signatureCertificate: { select: { assignedUserId: true } } } });
+  if (!document) return res.status(404).json({ message: "Documento não encontrado." });
+  if (document.issuedById !== req.user!.id && document.signatureCertificate.assignedUserId !== req.user!.id)
+    return res.status(403).json({ message: "Somente a conta médica autorizada pode abrir o PDF deste documento." });
+  const pdfPath = path.join(clinicalDocumentRoot, document.pdfStorageKey);
+  if (!fs.existsSync(pdfPath)) return res.status(410).json({ message: "O arquivo PDF deste documento não está disponível." });
+  res.type("application/pdf").sendFile(pdfPath, {
+    headers: { "Content-Disposition": `inline; filename="${document.documentNumber}.pdf"` },
+  });
+});
+app.get("/api/public/clinical-documents/verify/:code", async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase();
+  if (!/^[A-F0-9]{36}$/.test(code))
+    return res.status(400).json({ valid: false, message: "Código de validação inválido." });
+  const document = await prisma.clinicalDocument.findUnique({
+    where: { validationCode: code },
+    select: { id: true, documentNumber: true, validationCode: true, type: true, status: true, issuedAt: true, pdfStorageKey: true, doctor: { select: { fullName: true, crm: true } } },
+  });
+  if (!document) return res.status(404).json({ valid: false, message: "Documento não encontrado." });
+  const pdfExists = fs.existsSync(path.join(clinicalDocumentRoot, document.pdfStorageKey));
+  res.json({
+    registered: true,
+    valid: document.status === "EMITIDO" && pdfExists,
+    number: document.documentNumber,
+    type: document.type,
+    status: document.status,
+    issuedAt: document.issuedAt,
+    doctor: document.doctor.fullName,
+    crm: document.doctor.crm,
+    message: document.status === "CANCELADO"
+      ? "Código associado a um documento cancelado. Não utilize este documento."
+      : !pdfExists
+        ? "O registro foi localizado, mas o arquivo PDF não está disponível. Contate a clínica."
+        : "Código associado a um registro ativo. Verifique a assinatura digital do PDF no leitor de documentos.",
+  });
+});
+
 app.get(
   "/api/appointments/meta",
   auth,
@@ -2744,6 +3178,19 @@ app.post("/api/appointments/:id/attachments", auth, doctorOnly, appointmentAttac
 
 app.use("/api/admin", auth, adminOnly);
 
+app.get("/api/admin/clinical-document-doctors", async (_req, res) => {
+  res.json(await prisma.doctor.findMany({
+    orderBy: { fullName: "asc" },
+    select: { id: true, fullName: true, crm: true },
+  }));
+});
+app.get("/api/admin/clinical-document-users", async (_req, res) => {
+  res.json(await prisma.user.findMany({
+    where: { profile: Profile.MEDICO },
+    orderBy: { fullName: "asc" },
+    select: { id: true, fullName: true, login: true },
+  }));
+});
 app.get("/api/admin/digital-certificates", async (_req, res) => {
   res.json(
     await prisma.digitalCertificate.findMany({
@@ -2758,6 +3205,10 @@ app.get("/api/admin/digital-certificates", async (_req, res) => {
         validFrom: true,
         validTo: true,
         active: true,
+        doctorId: true,
+        doctor: { select: { id: true, fullName: true, crm: true } },
+        assignedUserId: true,
+        assignedUser: { select: { id: true, fullName: true, login: true } },
         createdAt: true,
         uploadedBy: { select: { fullName: true } },
       },
@@ -2770,17 +3221,33 @@ app.post(
   async (req: AuthRequest, res) => {
     const name = String(req.body?.name || "").trim();
     const password = String(req.body?.password || "");
-    if (!req.file || !name || !password)
+    const doctorId = Number(req.body?.doctorId);
+    const assignedUserId = Number(req.body?.assignedUserId);
+    if (!req.file || !name || !password || !Number.isInteger(doctorId) || doctorId <= 0 || !Number.isInteger(assignedUserId) || assignedUserId <= 0)
       return res.status(400).json({
-        message: "Informe o nome, a senha e o arquivo PFX/P12 do certificado.",
+        message: "Informe a médica, a conta médica autorizada, o nome, a senha e o arquivo PFX/P12.",
       });
     try {
       new P12Signer(req.file.buffer, { passphrase: password });
-      await prisma.digitalCertificate.updateMany({ data: { active: false } });
+      const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
+      if (!doctor) return res.status(400).json({ message: "Médica não encontrada." });
+      const assignedUser = await prisma.user.findFirst({ where: { id: assignedUserId, profile: Profile.MEDICO } });
+      if (!assignedUser) return res.status(400).json({ message: "Selecione uma conta com perfil Médico." });
+      const attributes = certificateAttributes(req.file.buffer, password);
+      if (normalizePersonName(attributes.name) !== normalizePersonName(doctor.fullName))
+        return res.status(400).json({ message: "O titular do certificado não corresponde ao nome da médica selecionada." });
+      await prisma.digitalCertificate.updateMany({ where: { doctorId }, data: { active: false } });
       const certificate = await prisma.digitalCertificate.create({
         data: {
           name,
           fileName: req.file.originalname,
+          doctorId,
+          assignedUserId,
+          subject: attributes.subject,
+          issuer: attributes.issuer,
+          serialNumber: attributes.serialNumber,
+          validFrom: attributes.validFrom,
+          validTo: attributes.validTo,
           pfxEncrypted: encryptSecret(req.file.buffer),
           passwordEncrypted: encryptSecret(password),
           active: true,
@@ -2792,6 +3259,8 @@ app.post(
           fileName: true,
           active: true,
           createdAt: true,
+          doctor: { select: { id: true, fullName: true, crm: true } },
+          assignedUser: { select: { id: true, fullName: true } },
         },
       });
       res.status(201).json(certificate);

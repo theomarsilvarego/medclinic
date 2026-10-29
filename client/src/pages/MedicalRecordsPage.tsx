@@ -30,6 +30,7 @@ import type { Row } from "../lib/app";
 import { API, request } from "../lib/app";
 import QRCode from "qrcode";
 import { AnamnesisAppointmentModal } from "./AnamnesisAppointmentModal";
+import { MedicalDocumentsArea } from "./MedicalDocumentsArea";
 
 type MedicalRecordsPageProps = {
   patientId: number | null;
@@ -2703,6 +2704,8 @@ type EncounterTab =
   | "exams"
   | "injectables"
   | "procedures"
+  | "prescriptions"
+  | "attestations"
   | "attachments";
 function RecordTimelineCard({
   record,
@@ -2740,6 +2743,7 @@ function RecordTimelineCard({
   const ultrasoundRequests: Row[] = record.ultrasoundRequests || [];
   const injectableRequests: Row[] = record.injectableRequests || [];
   const procedureRequests: Row[] = record.procedureRequests || [];
+  const clinicalDocuments: Row[] = record.clinicalDocuments || [];
   const standardProcedures = procedureRequests.filter(
     (item) => (item.procedure?.type || item.type) !== "DIAGNOSTICO_POR_IMAGEM",
   );
@@ -2753,6 +2757,8 @@ function RecordTimelineCard({
       examRequests.length + ultrasoundRequests.length + imageProcedures.length,
     injectables: injectableRequests.length,
     procedures: standardProcedures.length,
+    prescriptions: clinicalDocuments.filter((item) => item.type === "RECEITA").length,
+    attestations: clinicalDocuments.filter((item) => item.type === "ATESTADO").length,
     attachments: attachments.length,
   };
   const tabs: { id: EncounterTab; label: string; icon: React.ReactNode }[] = [
@@ -2764,6 +2770,8 @@ function RecordTimelineCard({
       label: "Procedimentos",
       icon: <ClipboardCheck size={16} />,
     },
+    { id: "prescriptions", label: "Receitas", icon: <FileText size={16} /> },
+    { id: "attestations", label: "Atestados", icon: <ClipboardCheck size={16} /> },
     { id: "attachments", label: "Anexos", icon: <Paperclip size={16} /> },
   ];
   const parsed = parseEvolution(record.conduct);
@@ -2974,6 +2982,34 @@ function RecordTimelineCard({
                 </section>
                 <section
                   role="tabpanel"
+                  id={`panel-${instanceId}-prescriptions`}
+                  aria-labelledby={`tab-${instanceId}-prescriptions`}
+                  hidden={activeTab !== "prescriptions"}
+                >
+                  <MedicalDocumentsArea
+                    record={record}
+                    tab="RECEITA"
+                    active={activeTab === "prescriptions"}
+                    canIssue={canCompose}
+                    onChanged={onChanged}
+                  />
+                </section>
+                <section
+                  role="tabpanel"
+                  id={`panel-${instanceId}-attestations`}
+                  aria-labelledby={`tab-${instanceId}-attestations`}
+                  hidden={activeTab !== "attestations"}
+                >
+                  <MedicalDocumentsArea
+                    record={record}
+                    tab="ATESTADO"
+                    active={activeTab === "attestations"}
+                    canIssue={canCompose}
+                    onChanged={onChanged}
+                  />
+                </section>
+                <section
+                  role="tabpanel"
                   id={`panel-${instanceId}-attachments`}
                   aria-labelledby={`tab-${instanceId}-attachments`}
                   hidden={activeTab !== "attachments"}
@@ -3082,6 +3118,7 @@ export function MedicalRecordsPage({
             "ultrasoundRequests",
             "injectableRequests",
             "procedureRequests",
+            "clinicalDocuments",
             "attachments",
           ] as const) {
             if (Array.isArray(record[collection]))

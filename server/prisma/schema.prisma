@@ -30,6 +30,10 @@ model User {
   ultrasoundRequests  UltrasoundRequest[]      @relation("UltrasoundRequestAuthor")
   uploadedCertificates DigitalCertificate[]    @relation("DigitalCertificateUploader")
   appointmentAttachments AppointmentAttachment[] @relation("AppointmentAttachmentUploader")
+  heldCertificates DigitalCertificate[] @relation("DigitalCertificateHolder")
+  issuedClinicalDocuments ClinicalDocument[] @relation("ClinicalDocumentIssuer")
+  cancelledClinicalDocuments ClinicalDocument[] @relation("ClinicalDocumentCanceller")
+  medicationCatalogItems MedicationCatalogItem[]
 
   @@map("users")
 }
@@ -57,6 +61,8 @@ model Doctor {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   appointments Appointment[]
+  digitalCertificates DigitalCertificate[]
+  clinicalDocuments ClinicalDocument[]
 
   @@map("doctors")
 }
@@ -213,6 +219,7 @@ model Patient {
   ultrasoundRequests    UltrasoundRequest[]
   appointmentAttachments AppointmentAttachment[]
   anamneses             PatientAnamnesis[]
+  clinicalDocuments     ClinicalDocument[]
 
   @@index([fullName])
   @@index([cpf])
@@ -271,6 +278,7 @@ model Appointment {
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
   medicalRecords  MedicalRecord[]
+  clinicalDocuments ClinicalDocument[]
   attachments     AppointmentAttachment[]
   anamnesis       PatientAnamnesis?
 
@@ -318,6 +326,7 @@ model MedicalRecord {
   injectableRequests InjectableRequest[]
   procedureRequests ProcedureRequest[]
   ultrasoundRequests UltrasoundRequest[]
+  clinicalDocuments ClinicalDocument[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
@@ -517,11 +526,80 @@ model DigitalCertificate {
   pfxEncrypted      String   @map("pfx_encrypted") @db.LongText
   passwordEncrypted String   @map("password_encrypted") @db.Text
   active            Boolean  @default(true)
+  doctorId          Int?     @map("doctor_id")
+  assignedUserId    Int?     @map("assigned_user_id")
   uploadedById      Int      @map("uploaded_by_id")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   uploadedBy        User     @relation("DigitalCertificateUploader", fields: [uploadedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  doctor            Doctor?  @relation(fields: [doctorId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  assignedUser      User?    @relation("DigitalCertificateHolder", fields: [assignedUserId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  clinicalDocuments ClinicalDocument[]
 
   @@index([active])
+  @@index([doctorId, active])
+  @@index([assignedUserId, active])
   @@map("digital_certificates")
+}
+
+
+model MedicationCatalogItem {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(180)
+  presentation String   @db.VarChar(180)
+  active       Boolean  @default(true)
+  controlled   Boolean  @default(false)
+  createdById  Int      @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdBy    User     @relation(fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([name, presentation])
+  @@index([active, controlled, name])
+  @@map("medication_catalog_items")
+}
+
+enum ClinicalDocumentType {
+  RECEITA
+  ATESTADO
+}
+
+enum ClinicalDocumentStatus {
+  EMITIDO
+  CANCELADO
+}
+
+model ClinicalDocument {
+  id                     Int                    @id @default(autoincrement())
+  documentNumber         String?                @unique @map("document_number") @db.VarChar(32)
+  validationCode         String                 @unique @map("validation_code") @db.VarChar(64)
+  type                   ClinicalDocumentType
+  subtype                String                 @db.VarChar(40)
+  status                 ClinicalDocumentStatus @default(EMITIDO)
+  content                Json
+  pdfStorageKey          String                 @unique @map("pdf_storage_key") @db.VarChar(255)
+  cidAuthorizedAt        DateTime?              @map("cid_authorized_at") @db.DateTime(3)
+  issuedAt               DateTime               @default(now()) @map("issued_at") @db.DateTime(3)
+  medicalRecordId        Int                    @map("medical_record_id")
+  appointmentId          Int                    @map("appointment_id")
+  patientId              Int                    @map("patient_id")
+  doctorId               Int                    @map("doctor_id")
+  issuedById             Int                    @map("issued_by_id")
+  signatureCertificateId Int                    @map("signature_certificate_id")
+  cancelledAt            DateTime?              @map("cancelled_at") @db.DateTime(3)
+  cancelledById          Int?                   @map("cancelled_by_id")
+  cancellationReason     String?                @map("cancellation_reason") @db.Text
+  medicalRecord          MedicalRecord          @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  appointment            Appointment            @relation(fields: [appointmentId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  patient                Patient                @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  doctor                 Doctor                 @relation(fields: [doctorId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  issuedBy               User                   @relation("ClinicalDocumentIssuer", fields: [issuedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  cancelledBy            User?                  @relation("ClinicalDocumentCanceller", fields: [cancelledById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  signatureCertificate   DigitalCertificate    @relation(fields: [signatureCertificateId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([medicalRecordId, issuedAt])
+  @@index([appointmentId, issuedAt])
+  @@index([patientId, issuedAt])
+  @@index([doctorId, issuedAt])
+  @@map("clinical_documents")
 }
