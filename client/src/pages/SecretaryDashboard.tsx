@@ -612,7 +612,7 @@ export function SecretaryDashboard() {
                 <h2 id="secretary-billing-confirm-title">
                   Faturar selecionadas
                 </h2>
-                <span>Revise os itens e confirme a forma de pagamento.</span>
+                <span>Revise os itens e defina a forma prevista. A venda e o recebível serão criados como pendentes; a entrada no caixa só ocorre ao confirmar o pagamento.</span>
               </div>
               <button
                 className="icon-button"
@@ -791,6 +791,7 @@ export function SecretaryDashboard() {
                       ? ` · ${installments}x`
                       : ""}
                   </small>
+                  <small className="secretary-summary-only-note">O faturamento não confirma pagamento nem movimenta caixa.</small>
                 </div>
               </div>
             </div>
@@ -811,7 +812,7 @@ export function SecretaryDashboard() {
               >
                 {billingSelected
                   ? "Faturando…"
-                  : `Confirmar faturamento · ${money(billingTotal)}`}
+                  : `Gerar venda e recebível · ${money(billingTotal)}`}
               </button>
             </footer>
           </section>

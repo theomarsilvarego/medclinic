@@ -34,6 +34,13 @@ model User {
   issuedClinicalDocuments ClinicalDocument[] @relation("ClinicalDocumentIssuer")
   cancelledClinicalDocuments ClinicalDocument[] @relation("ClinicalDocumentCanceller")
   medicationCatalogItems MedicationCatalogItem[]
+  financialSalesCreated FinancialSale[] @relation("FinancialSaleCreator")
+  financialPayablesCreated FinancialPayable[] @relation("FinancialPayableCreator")
+  financialReceivablePaymentsCreated FinancialReceivablePayment[] @relation("FinancialReceivablePaymentCreator")
+  financialPayablePaymentsCreated FinancialPayablePayment[] @relation("FinancialPayablePaymentCreator")
+  financialMovementsCreated FinancialMovement[] @relation("FinancialMovementCreator")
+  cashSessionsOpened CashSession[] @relation("CashSessionOpener")
+  cashSessionsClosed CashSession[] @relation("CashSessionCloser")
 
   @@map("users")
 }
@@ -63,6 +70,7 @@ model Doctor {
   appointments Appointment[]
   digitalCertificates DigitalCertificate[]
   clinicalDocuments ClinicalDocument[]
+  financialSales FinancialSale[]
 
   @@map("doctors")
 }
@@ -142,6 +150,7 @@ model Supplier {
   address   String   @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  financialPayables FinancialPayable[]
 
   @@index([name])
   @@index([cnpj])
@@ -219,8 +228,9 @@ model Patient {
   ultrasoundRequests    UltrasoundRequest[]
   appointmentAttachments AppointmentAttachment[]
   anamneses             PatientAnamnesis[]
-  clinicalDocuments     ClinicalDocument[]
+  clinicalDocuments    ClinicalDocument[]
   crmTreatments         CrmTreatment[]
+  financialSales        FinancialSale[]
 
   @@index([fullName])
   @@index([cpf])
@@ -282,6 +292,7 @@ model Appointment {
   clinicalDocuments ClinicalDocument[]
   attachments     AppointmentAttachment[]
   anamnesis       PatientAnamnesis?
+  financialSales  FinancialSale[]
 
   @@unique([doctorId, appointmentDate, scheduledTime])
   @@index([appointmentDate, scheduledTime])
@@ -654,4 +665,278 @@ model ClinicalDocument {
   @@index([patientId, issuedAt])
   @@index([doctorId, issuedAt])
   @@map("clinical_documents")
+}
+
+enum FinancialAccountType {
+  CASH
+  BANK
+  OTHER
+}
+
+enum FinancialStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELED
+}
+
+enum FinancialPaymentMethod {
+  PIX
+  DEBIT_CARD
+  CREDIT_CARD
+  CASH
+  BANK_TRANSFER
+  OTHER
+}
+
+enum FinancialMovementType {
+  ENTRADA
+  SAIDA
+  TRANSFERENCIA_ENTRADA
+  TRANSFERENCIA_SAIDA
+  SUPRIMENTO
+  SANGRIA
+  ABERTURA
+  AJUSTE_ENTRADA
+  AJUSTE_SAIDA
+  ESTORNO_ENTRADA
+  ESTORNO_SAIDA
+}
+
+enum CashSessionStatus {
+  ABERTA
+  FECHADA
+}
+
+model FinancialAccount {
+  id                    Int                  @id @default(autoincrement())
+  name                  String               @db.VarChar(120)
+  type                  FinancialAccountType
+  openingBalance        Decimal              @default(0) @map("opening_balance") @db.Decimal(12, 2)
+  active                Boolean              @default(true)
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+  movements             FinancialMovement[]
+  receivablePayments    FinancialReceivablePayment[]
+  payablePayments       FinancialPayablePayment[]
+  cashSessions          CashSession[]
+
+  @@index([type, active])
+  @@map("financial_accounts")
+}
+
+model FinancialSale {
+  id                  Int                  @id @default(autoincrement())
+  code                String               @unique @db.VarChar(36)
+  serviceDescription  String               @map("service_description") @db.VarChar(255)
+  patientId           Int                  @map("patient_id")
+  professionalId      Int?                 @map("professional_id")
+  professionalName    String               @map("professional_name") @db.VarChar(180)
+  appointmentId       Int?                 @map("appointment_id")
+  saleDate            DateTime             @map("sale_date") @db.Date
+  grossAmount         Decimal              @map("gross_amount") @db.Decimal(12, 2)
+  discountAmount      Decimal              @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  totalAmount         Decimal              @map("total_amount") @db.Decimal(12, 2)
+  status              FinancialStatus      @default(PENDING)
+  idempotencyKey      String               @unique @map("idempotency_key") @db.VarChar(100)
+  createdById         Int                  @map("created_by_id")
+  canceledAt          DateTime?            @map("canceled_at") @db.DateTime(3)
+  cancellationReason  String?              @map("cancellation_reason") @db.Text
+  createdAt           DateTime             @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.DateTime(3)
+  patient             Patient              @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  professional        Doctor?              @relation(fields: [professionalId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  appointment         Appointment?         @relation(fields: [appointmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  createdBy           User                 @relation("FinancialSaleCreator", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  items               FinancialSaleItem[]
+  receivable          FinancialReceivable?
+
+  @@index([saleDate, status])
+  @@index([patientId, saleDate])
+  @@index([professionalId, saleDate])
+  @@map("financial_sales")
+}
+
+model FinancialSaleItem {
+  id          Int           @id @default(autoincrement())
+  saleId      Int           @map("sale_id")
+  sourceType  String?       @map("source_type") @db.VarChar(32)
+  sourceId    Int?          @map("source_id")
+  sourceKey   String?       @unique @map("source_key") @db.VarChar(80)
+  description String        @db.VarChar(255)
+  amount      Decimal       @db.Decimal(12, 2)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  sale        FinancialSale @relation(fields: [saleId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([saleId])
+  @@index([sourceType, sourceId])
+  @@map("financial_sale_items")
+}
+
+model FinancialReceivable {
+  id                     Int                             @id @default(autoincrement())
+  saleId                 Int                             @unique @map("sale_id")
+  totalAmount            Decimal                         @map("total_amount") @db.Decimal(12, 2)
+  paidAmount             Decimal                         @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  dueDate                DateTime                        @map("due_date") @db.Date
+  installmentCount       Int                             @default(1) @map("installment_count")
+  preferredPaymentMethod FinancialPaymentMethod?         @map("preferred_payment_method")
+  status                 FinancialStatus                @default(PENDING)
+  sale                   FinancialSale                  @relation(fields: [saleId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  installments           FinancialReceivableInstallment[]
+  payments               FinancialReceivablePayment[]
+
+  @@index([dueDate, status])
+  @@map("financial_receivables")
+}
+
+model FinancialReceivableInstallment {
+  id            Int                @id @default(autoincrement())
+  receivableId  Int                @map("receivable_id")
+  number        Int
+  dueDate       DateTime           @map("due_date") @db.Date
+  amount        Decimal            @db.Decimal(12, 2)
+  paidAmount    Decimal            @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  status        FinancialStatus    @default(PENDING)
+  receivable    FinancialReceivable @relation(fields: [receivableId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  payments      FinancialReceivablePayment[]
+  allocations   FinancialReceivableAllocation[]
+
+  @@unique([receivableId, number])
+  @@index([dueDate, status])
+  @@map("financial_receivable_installments")
+}
+
+model FinancialReceivablePayment {
+  id             Int                           @id @default(autoincrement())
+  receivableId   Int                           @map("receivable_id")
+  installmentId  Int?                          @map("installment_id")
+  accountId      Int                           @map("account_id")
+  amount         Decimal                       @db.Decimal(12, 2)
+  reversedAmount Decimal                       @default(0) @map("reversed_amount") @db.Decimal(12, 2)
+  paymentDate    DateTime                      @map("payment_date") @db.Date
+  method         FinancialPaymentMethod
+  idempotencyKey String                        @unique @map("idempotency_key") @db.VarChar(100)
+  createdById    Int                           @map("created_by_id")
+  createdAt      DateTime                      @default(now()) @map("created_at") @db.DateTime(3)
+  receivable     FinancialReceivable           @relation(fields: [receivableId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  installment    FinancialReceivableInstallment? @relation(fields: [installmentId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  account        FinancialAccount             @relation(fields: [accountId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdBy      User                          @relation("FinancialReceivablePaymentCreator", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  movement       FinancialMovement?
+  allocations    FinancialReceivableAllocation[]
+
+  @@index([receivableId, paymentDate])
+  @@index([accountId, paymentDate])
+  @@map("financial_receivable_payments")
+}
+
+model FinancialReceivableAllocation {
+  id            Int                          @id @default(autoincrement())
+  paymentId     Int                          @map("payment_id")
+  installmentId Int                          @map("installment_id")
+  amount        Decimal                      @db.Decimal(12, 2)
+  reversedAmount Decimal                     @default(0) @map("reversed_amount") @db.Decimal(12, 2)
+  payment       FinancialReceivablePayment   @relation(fields: [paymentId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  installment   FinancialReceivableInstallment @relation(fields: [installmentId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([paymentId, installmentId])
+  @@index([installmentId])
+  @@map("financial_receivable_allocations")
+}
+
+model FinancialPayable {
+  id                  Int                        @id @default(autoincrement())
+  description         String                     @db.VarChar(255)
+  category            String                     @db.VarChar(100)
+  supplierId          Int                        @map("supplier_id")
+  amount              Decimal                    @db.Decimal(12, 2)
+  paidAmount          Decimal                    @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  dueDate             DateTime                   @map("due_date") @db.Date
+  status              FinancialStatus            @default(PENDING)
+  idempotencyKey      String                     @unique @map("idempotency_key") @db.VarChar(100)
+  createdById         Int                        @map("created_by_id")
+  canceledAt          DateTime?                  @map("canceled_at") @db.DateTime(3)
+  cancellationReason  String?                    @map("cancellation_reason") @db.Text
+  createdAt           DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime                   @updatedAt @map("updated_at") @db.DateTime(3)
+  supplier            Supplier                   @relation(fields: [supplierId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdBy           User                       @relation("FinancialPayableCreator", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  payments            FinancialPayablePayment[]
+
+  @@index([dueDate, status])
+  @@index([supplierId, dueDate])
+  @@map("financial_payables")
+}
+
+model FinancialPayablePayment {
+  id             Int                  @id @default(autoincrement())
+  payableId      Int                  @map("payable_id")
+  accountId      Int                  @map("account_id")
+  amount         Decimal              @db.Decimal(12, 2)
+  reversedAmount Decimal              @default(0) @map("reversed_amount") @db.Decimal(12, 2)
+  paymentDate    DateTime             @map("payment_date") @db.Date
+  method         FinancialPaymentMethod
+  idempotencyKey String               @unique @map("idempotency_key") @db.VarChar(100)
+  createdById    Int                  @map("created_by_id")
+  createdAt      DateTime             @default(now()) @map("created_at") @db.DateTime(3)
+  payable        FinancialPayable     @relation(fields: [payableId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  account        FinancialAccount     @relation(fields: [accountId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdBy      User                 @relation("FinancialPayablePaymentCreator", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  movement       FinancialMovement?
+
+  @@index([payableId, paymentDate])
+  @@index([accountId, paymentDate])
+  @@map("financial_payable_payments")
+}
+
+model FinancialMovement {
+  id                    Int                         @id @default(autoincrement())
+  accountId             Int                         @map("account_id")
+  type                  FinancialMovementType
+  amount                Decimal                     @db.Decimal(12, 2)
+  movementDate          DateTime                    @map("movement_date") @db.Date
+  description           String                      @db.VarChar(255)
+  originType            String                      @map("origin_type") @db.VarChar(40)
+  originId              Int?                        @map("origin_id")
+  transferGroupId       String?                     @map("transfer_group_id") @db.VarChar(36)
+  idempotencyKey        String                      @unique @map("idempotency_key") @db.VarChar(120)
+  receivablePaymentId   Int?                        @unique @map("receivable_payment_id")
+  payablePaymentId      Int?                        @unique @map("payable_payment_id")
+  reversalOfId          Int?                        @map("reversal_of_id")
+  createdById           Int                         @map("created_by_id")
+  createdAt             DateTime                    @default(now()) @map("created_at") @db.DateTime(3)
+  account               FinancialAccount           @relation(fields: [accountId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdBy             User                       @relation("FinancialMovementCreator", fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  receivablePayment     FinancialReceivablePayment? @relation(fields: [receivablePaymentId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  payablePayment        FinancialPayablePayment?    @relation(fields: [payablePaymentId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  reversalOf            FinancialMovement?          @relation("FinancialMovementReversals", fields: [reversalOfId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  reversals             FinancialMovement[]         @relation("FinancialMovementReversals")
+
+  @@index([accountId, movementDate])
+  @@index([originType, originId])
+  @@index([transferGroupId])
+  @@map("financial_movements")
+}
+
+model CashSession {
+  id                    Int               @id @default(autoincrement())
+  accountId             Int               @map("account_id")
+  status                CashSessionStatus @default(ABERTA)
+  openingAmount         Decimal           @map("opening_amount") @db.Decimal(12, 2)
+  closingAmount         Decimal?          @map("closing_amount") @db.Decimal(12, 2)
+  expectedClosingAmount Decimal?          @map("expected_closing_amount") @db.Decimal(12, 2)
+  difference            Decimal?          @db.Decimal(12, 2)
+  openedAt              DateTime          @default(now()) @map("opened_at") @db.DateTime(3)
+  closedAt              DateTime?         @map("closed_at") @db.DateTime(3)
+  openSessionKey        String?           @unique @map("open_session_key") @db.VarChar(32)
+  openedById            Int               @map("opened_by_id")
+  closedById            Int?              @map("closed_by_id")
+  account               FinancialAccount  @relation(fields: [accountId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  openedBy              User              @relation("CashSessionOpener", fields: [openedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  closedBy              User?             @relation("CashSessionCloser", fields: [closedById], references: [id], onUpdate: Cascade, onDelete: SetNull)
+
+  @@index([accountId, openedAt])
+  @@index([status, openedAt])
+  @@map("cash_sessions")
 }

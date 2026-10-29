@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -12,158 +12,225 @@ import {
   Landmark,
   Plus,
   Receipt,
+  RefreshCw,
   Search,
   ShoppingCart,
   Wallet,
   X,
 } from "lucide-react";
-import type { ModuleKey } from "../lib/app";
-import { money } from "../lib/app";
+import type { ModuleKey, Row } from "../lib/app";
+import { money, request } from "../lib/app";
 
-type FinancialPageProps = { module: Extract<ModuleKey, "finance" | "cash" | "accounts" | "sales"> };
-type Entry = { id: number; description: string; person: string; dueDate: string; status: string; value: number; kind?: string; method?: string };
+type FinancialModule = Extract<ModuleKey, "finance" | "cash" | "accounts" | "sales">;
+type FormMode = "movement" | "account" | "open-session" | "sale" | "payable";
+type PaymentTarget = { kind: "receivable" | "payable"; id: number; description: string; balance: number; idempotencyKey?: string };
+type Entry = { id: number; description: string; person: string; date: string; status: string; value: number; paid?: number; balance?: number; kind?: string; method?: string; raw: Row };
 
-const pageConfig = {
-  finance: {
-    eyebrow: "GESTÃO FINANCEIRA",
-    title: "Financeiro",
-    description: "Acompanhe o resultado da clínica e organize as movimentações financeiras.",
-    icon: CircleDollarSign,
-    action: "Novo lançamento",
-    empty: "Nenhum lançamento financeiro neste período.",
-    headers: ["Descrição", "Categoria", "Competência", "Status", "Valor"],
-  },
-  cash: {
-    eyebrow: "GESTÃO FINANCEIRA",
-    title: "Caixa",
-    description: "Controle entradas, saídas e o saldo das contas da clínica.",
-    icon: Wallet,
-    action: "Abrir caixa",
-    empty: "Nenhuma movimentação registrada no caixa.",
-    headers: ["Descrição", "Forma de pagamento", "Data", "Tipo", "Valor"],
-  },
-  accounts: {
-    eyebrow: "GESTÃO FINANCEIRA",
-    title: "Contas a pagar e receber",
-    description: "Gerencie compromissos, recebimentos e prazos em um só lugar.",
-    icon: Receipt,
-    action: "Nova conta",
-    empty: "Nenhuma conta encontrada para os filtros selecionados.",
-    headers: ["Descrição", "Pessoa ou empresa", "Vencimento", "Status", "Valor"],
-  },
-  sales: {
-    eyebrow: "GESTÃO FINANCEIRA",
-    title: "Vendas",
-    description: "Registre vendas de serviços e acompanhe os recebimentos da clínica.",
-    icon: ShoppingCart,
-    action: "Nova venda",
-    empty: "Nenhuma venda registrada neste período.",
-    headers: ["Venda", "Cliente", "Data", "Pagamento", "Total"],
-  },
-} as const;
-
-const initialEntries: Record<FinancialPageProps["module"], Entry[]> = {
-  finance: [],
-  cash: [],
-  accounts: [],
-  sales: [],
+const pageConfig: Record<FinancialModule, { eyebrow: string; title: string; description: string; icon: React.ComponentType<{ size?: number }>; action: string; empty: string; headers: string[] }> = {
+  finance: { eyebrow: "GESTÃO FINANCEIRA", title: "Financeiro", description: "Acompanhe vendas, recebimentos, despesas e saldos por conta.", icon: CircleDollarSign, action: "", empty: "Ainda não há vendas ou movimentações financeiras.", headers: ["Origem", "Paciente / origem", "Data", "Status", "Valor"] },
+  cash: { eyebrow: "GESTÃO FINANCEIRA", title: "Caixa", description: "Controle entradas e saídas efetivas, contas físicas e bancárias e sessões de caixa.", icon: Wallet, action: "Nova movimentação", empty: "Nenhuma movimentação registrada.", headers: ["Descrição", "Conta", "Data", "Tipo", "Valor"] },
+  accounts: { eyebrow: "GESTÃO FINANCEIRA", title: "Contas a pagar e receber", description: "Acompanhe vencimentos, parcelas, baixas e saldos pendentes.", icon: Receipt, action: "Nova despesa", empty: "Nenhuma conta encontrada.", headers: ["Descrição", "Pessoa / fornecedor", "Vencimento", "Status", "Saldo"] },
+  sales: { eyebrow: "GESTÃO FINANCEIRA", title: "Vendas", description: "Registre serviços comercializados e acompanhe as contas a receber vinculadas.", icon: ShoppingCart, action: "Nova venda", empty: "Nenhuma venda registrada.", headers: ["Venda", "Paciente", "Data", "Status", "Total"] },
 };
+const statusLabel: Record<string, string> = { PENDING: "Pendente", PARTIAL: "Parcial", PAID: "Pago", CANCELED: "Cancelado" };
+const methodLabel: Record<string, string> = { PIX: "Pix", DEBIT_CARD: "Débito", CREDIT_CARD: "Crédito", CASH: "Dinheiro", BANK_TRANSFER: "Transferência", OTHER: "Outro" };
+const movementLabel: Record<string, string> = { ENTRADA: "Entrada", SAIDA: "Saída", TRANSFERENCIA_ENTRADA: "Transferência recebida", TRANSFERENCIA_SAIDA: "Transferência enviada", SUPRIMENTO: "Suprimento", SANGRIA: "Sangria", ABERTURA: "Abertura", AJUSTE_ENTRADA: "Ajuste de entrada", AJUSTE_SAIDA: "Ajuste de saída", ESTORNO_ENTRADA: "Estorno recebido", ESTORNO_SAIDA: "Estorno pago" };
+const localDate = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; };
+const makeIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `mc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const displayDate = (value?: string) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—";
+const getError = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir a operação.";
 
-export function FinancialPage({ module }: FinancialPageProps) {
+export function FinancialPage({ module }: { module: FinancialModule }) {
   const config = pageConfig[module];
   const Icon = config.icon;
-  const [entries, setEntries] = useState<Entry[]>(initialEntries[module]);
+  const [sales, setSales] = useState<Row[]>([]);
+  const [receivables, setReceivables] = useState<Row[]>([]);
+  const [payables, setPayables] = useState<Row[]>([]);
+  const [movements, setMovements] = useState<Row[]>([]);
+  const [accounts, setAccounts] = useState<Row[]>([]);
+  const [suppliers, setSuppliers] = useState<Row[]>([]);
+  const [patients, setPatients] = useState<Row[]>([]);
+  const [doctors, setDoctors] = useState<Row[]>([]);
+  const [sessions, setSessions] = useState<Row[]>([]);
+  const [summary, setSummary] = useState<Row>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [period, setPeriod] = useState("30");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("TODOS");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ description: "", person: "", value: "", dueDate: "", kind: "Entrada", method: "Pix" });
+  const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [accountsTab, setAccountsTab] = useState<"receber" | "pagar">("receber");
+  const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [settlement, setSettlement] = useState<PaymentTarget | null>(null);
+  const [form, setForm] = useState({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: "", accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: "", toAccountId: "", closingAmount: "", idempotencyKey: makeIdempotencyKey() });
 
-  const periodStart = Date.now() - Number(period) * 24 * 60 * 60 * 1000;
-  const periodEntries = entries.filter((entry) => new Date(`${entry.dueDate}T23:59:59`).getTime() >= periodStart);
-  const filteredEntries = useMemo(
-    () => periodEntries.filter((entry) => {
-      const matchesQuery = `${entry.description} ${entry.person}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-      const matchesStatus = status === "TODOS" || entry.status === status;
-      return matchesQuery && matchesStatus;
-    }),
-    [periodEntries, query, status],
-  );
-  const isCash = module === "cash";
-  const isAccounts = module === "accounts";
-  const isSales = module === "sales";
-  const isOutgoing = (entry: Entry) => entry.kind === "Saída" || entry.kind === "A pagar";
-  const inflow = periodEntries.reduce((sum, entry) => sum + (isOutgoing(entry) ? 0 : entry.value), 0);
-  const outflow = periodEntries.reduce((sum, entry) => sum + (isOutgoing(entry) ? entry.value : 0), 0);
-  const total = isSales ? inflow : inflow - outflow;
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const promises: Promise<any>[] = [request(`/financial/summary?days=${period}`), request("/financial/accounts")];
+      if (module === "sales" || module === "finance") promises.push(request("/financial/sales"));
+      if (module === "accounts") promises.push(request("/financial/receivables"), request("/financial/payables"), request("/admin/suppliers"), request("/financial/cash-sessions"));
+      if (module === "cash") promises.push(request("/financial/movements"), request("/financial/cash-sessions"));
+      if (module === "sales") promises.push(request("/patients"), request("/admin/doctors"));
+      const results = await Promise.all(promises);
+      let index = 0;
+      setSummary(results[index++] || {});
+      setAccounts(results[index++] || []);
+      if (module === "sales" || module === "finance") setSales(results[index++] || []);
+      if (module === "accounts") {
+        setReceivables(results[index++] || []);
+        setPayables(results[index++] || []);
+        setSuppliers(results[index++] || []);
+        setSessions(results[index++] || []);
+      }
+      if (module === "cash") {
+        setMovements(results[index++] || []);
+        setSessions(results[index++] || []);
+      }
+      if (module === "sales") {
+        setPatients(results[index++] || []);
+        setDoctors(results[index++] || []);
+      }
+    } catch (cause) {
+      setError(getError(cause));
+    } finally {
+      setLoading(false);
+    }
+  }, [module, period]);
 
-  function openForm() {
-    setForm({ description: "", person: "", value: "", dueDate: "", kind: isCash ? "Entrada" : "A receber", method: "Pix" });
-    setShowForm(true);
+  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    if (settlement && !settlement.idempotencyKey)
+      setSettlement({ ...settlement, idempotencyKey: makeIdempotencyKey() });
+  }, [settlement]);
+
+  const entries = useMemo<Entry[]>(() => {
+    if (module === "sales" || module === "finance") return sales.map((row) => ({ id: row.id, description: `${row.code} · ${row.serviceDescription}`, person: row.patient?.fullName || "—", date: row.saleDate, status: statusLabel[row.status] || row.status, value: Number(row.totalAmount || 0), paid: Number(row.receivable?.paidAmount || 0), balance: Math.max(0, Number(row.totalAmount || 0) - Number(row.receivable?.paidAmount || 0)), kind: "Venda", raw: row }));
+    if (module === "accounts") {
+      const rows = accountsTab === "receber" ? receivables : payables;
+      return rows.map((row) => {
+        const isReceivable = accountsTab === "receber";
+        const total = Number(isReceivable ? row.totalAmount : row.amount || 0);
+        const paid = Number(row.paidAmount || 0);
+        const status = statusLabel[row.status] || row.status;
+        const lastPayment = row.payments?.[0];
+        const person = isReceivable ? row.sale?.patient?.fullName || "—" : row.supplier?.name || row.supplier?.legalName || "—";
+        const latestPayment = lastPayment ? ` · ${methodLabel[lastPayment.method] || lastPayment.method} ${displayDate(lastPayment.paymentDate)}` : "";
+        return { id: row.id, description: isReceivable ? `${row.sale?.code || "Venda"} · ${row.sale?.serviceDescription || "Serviço"}` : row.description, person: `${person}${latestPayment}`, date: row.dueDate, status, value: total, paid, balance: Math.max(0, total - paid), kind: isReceivable ? "A receber" : "A pagar", raw: row };
+      });
+    }
+    return movements.map((row) => ({ id: row.id, description: row.description, person: row.account?.name || "—", date: row.movementDate, status: movementLabel[row.type] || row.type, value: Number(row.amount || 0), kind: row.type, method: row.originType, raw: row }));
+  }, [accountsTab, module, movements, payables, receivables, sales]);
+
+  const periodStart = Date.now() - Number(period) * 86_400_000;
+  const filtered = useMemo(() => entries.filter((entry) => {
+    const matchesText = `${entry.description} ${entry.person}`.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
+    const date = new Date(`${String(entry.date).slice(0, 10)}T23:59:59`).getTime();
+    const matchesPeriod = !Number.isNaN(date) && date >= periodStart;
+    const matchesStatus = statusFilter === "TODOS" || entry.status === statusFilter;
+    return matchesText && matchesPeriod && matchesStatus;
+  }), [entries, periodStart, query, statusFilter]);
+
+  const totalSales = Number(summary.salesTotal || 0);
+  const cashIn = Number(summary.cashIn || 0);
+  const cashOut = Number(summary.cashOut || 0);
+  const currentBalance = (summary.accounts || []).reduce((sum: number, account: Row) => sum + Number(account.balance || 0), 0);
+  const mainTotal = module === "sales" ? totalSales : module === "cash" ? currentBalance : module === "accounts" ? Number(accountsTab === "receber" ? summary.receivablesOutstanding : summary.payablesOutstanding || 0) : Number(summary.netCashFlow || 0);
+  const outstandingCount = entries.filter((entry) => entry.status === "Pendente" || entry.status === "Parcial").length;
+
+  function openForm(mode: FormMode) {
+    setError("");
+    setForm({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: String(accounts[0]?.id || ""), accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: String(accounts[0]?.id || ""), toAccountId: String(accounts[1]?.id || ""), closingAmount: "", idempotencyKey: makeIdempotencyKey() });
+    setFormMode(mode);
   }
-
-  function saveEntry(event: React.FormEvent) {
+  async function submitForm(event: React.FormEvent) {
     event.preventDefault();
-    const value = Number(form.value.replace(",", "."));
-    if (!form.description.trim() || !value || value < 0) return;
-    setEntries((current) => [{
-      id: Date.now(),
-      description: form.description.trim(),
-      person: form.person.trim() || "Não informado",
-      dueDate: form.dueDate || new Date().toISOString().slice(0, 10),
-      status: isCash ? "Confirmado" : "Pendente",
-      value,
-      kind: form.kind,
-      method: form.method,
-    }, ...current]);
-    setShowForm(false);
+    setSaving(true); setError("");
+    try {
+      if (formMode === "account") await request("/financial/accounts", { method: "POST", body: JSON.stringify({ name: form.description, type: form.accountType, openingBalance: Number(form.openingAmount || 0) }) });
+      if (formMode === "open-session") await request("/financial/cash-sessions/open", { method: "POST", body: JSON.stringify({ accountId: Number(form.accountId), openingAmount: Number(form.openingAmount || 0) }) });
+      if (formMode === "movement") {
+        const body = form.kind === "TRANSFERENCIA"
+          ? { kind: form.kind, fromAccountId: Number(form.fromAccountId), toAccountId: Number(form.toAccountId), amount: Number(form.value), movementDate: form.date, description: form.description, idempotencyKey: form.idempotencyKey }
+          : { kind: form.kind, accountId: Number(form.accountId), amount: Number(form.value), movementDate: form.date, description: form.description, idempotencyKey: form.idempotencyKey };
+        await request("/financial/movements", { method: "POST", body: JSON.stringify(body) });
+      }
+      if (formMode === "sale") await request("/financial/sales", { method: "POST", body: JSON.stringify({ serviceDescription: form.description, patientId: Number(form.patientId), professionalId: Number(form.professionalId), saleDate: form.date, dueDate: form.dueDate, amount: Number(form.value), discountAmount: Number(form.discountAmount || 0), installments: Number(form.installments), paymentMethod: form.method, idempotencyKey: form.idempotencyKey }) });
+      if (formMode === "payable") await request("/financial/payables", { method: "POST", body: JSON.stringify({ description: form.description, category: form.category, supplierId: Number(form.supplierId), amount: Number(form.value), dueDate: form.dueDate, idempotencyKey: form.idempotencyKey }) });
+      setFormMode(null); await reload();
+    } catch (cause) { setError(getError(cause)); }
+    finally { setSaving(false); }
+  }
+  async function submitSettlement(event: React.FormEvent) {
+    event.preventDefault();
+    if (!settlement) return;
+    setSaving(true); setError("");
+    try {
+      const endpoint = settlement.kind === "receivable" ? "receivables" : "payables";
+      await request(`/financial/${endpoint}/${settlement.id}/payments`, { method: "POST", body: JSON.stringify({ amount: Number(form.value), accountId: Number(form.accountId), paymentDate: form.date, method: form.method, idempotencyKey: settlement.idempotencyKey }) });
+      setSettlement(null); await reload();
+    } catch (cause) { setError(getError(cause)); }
+    finally { setSaving(false); }
+  }
+  async function closeSession(session: Row) {
+    const counted = window.prompt("Informe o valor contado no fechamento do caixa:");
+    if (counted === null) return;
+    const value = Number(counted.replace(",", "."));
+    if (!Number.isFinite(value) || value < 0) { setError("Informe um valor válido para fechar o caixa."); return; }
+    setError("");
+    try { await request(`/financial/cash-sessions/${session.id}/close`, { method: "POST", body: JSON.stringify({ closingAmount: value }) }); await reload(); }
+    catch (cause) { setError(getError(cause)); }
   }
 
-  return (
-    <>
-      <div className="page-heading financial-heading">
-        <div>
-          <p className="eyebrow">{config.eyebrow}</p>
-          <h1>{config.title}</h1>
-          <p className="muted">{config.description}</p>
-        </div>
-        <button className="primary" type="button" onClick={openForm}>
-          <Plus size={17} /> {config.action}
-        </button>
+  return <>
+    <div className="page-heading financial-heading">
+      <div><p className="eyebrow">{config.eyebrow}</p><h1>{config.title}</h1><p className="muted">{config.description}</p></div>
+      <div className="financial-actions">
+        {module === "sales" && <button className="primary" type="button" onClick={() => openForm("sale")}><Plus size={17} /> Nova venda</button>}
+        {module === "accounts" && <button className="primary" type="button" onClick={() => openForm("payable")}><Plus size={17} /> Nova despesa</button>}
+        {module === "cash" && <><button className="secondary" type="button" onClick={() => openForm("account")}><Landmark size={16} /> Nova conta</button><button className="secondary" type="button" onClick={() => openForm("open-session")}><Wallet size={16} /> Abrir caixa</button><button className="primary" type="button" onClick={() => openForm("movement")}><Plus size={17} /> Nova movimentação</button></>}
+        <button className="icon-button" type="button" onClick={() => void reload()} aria-label="Atualizar dados financeiros" title="Atualizar"><RefreshCw size={17} /></button>
       </div>
+    </div>
+    {error && <div className="error page-error" role="alert">{error}</div>}
 
-      <section className="financial-summary" aria-label="Resumo financeiro">
-        <article className="financial-summary-card financial-summary-main">
-          <span className="financial-summary-icon"><Icon size={20} /></span>
-          <div><small>{isCash ? "Saldo atual" : isSales ? "Vendas no período" : "Total no período"}</small><strong>{money(total)}</strong></div>
-          <span className="financial-summary-trend"><ArrowUpRight size={14} /> 0,0%</span>
-        </article>
-        <article className="financial-summary-card"><span className="financial-summary-icon soft-green"><ArrowDownLeft size={19} /></span><div><small>Entradas</small><strong>{money(inflow)}</strong></div></article>
-        <article className="financial-summary-card"><span className="financial-summary-icon soft-red"><ArrowUpRight size={19} /></span><div><small>Saídas</small><strong>{money(outflow)}</strong></div></article>
-        <article className="financial-summary-card"><span className="financial-summary-icon soft-gold"><Clock3 size={19} /></span><div><small>{isAccounts ? "Em aberto" : "Pendências"}</small><strong>{periodEntries.filter((entry) => entry.status === "Pendente").length}</strong></div></article>
-      </section>
+    <section className="financial-summary" aria-label="Resumo financeiro">
+      <article className="financial-summary-card financial-summary-main"><span className="financial-summary-icon"><Icon size={20} /></span><div><small>{module === "sales" ? "Vendas no período" : module === "cash" ? "Saldo total em contas" : module === "accounts" ? accountsTab === "receber" ? "Saldo a receber" : "Saldo a pagar" : "Fluxo de caixa líquido"}</small><strong>{loading ? "—" : money(mainTotal)}</strong></div></article>
+      <article className="financial-summary-card"><span className="financial-summary-icon soft-green"><ArrowDownLeft size={19} /></span><div><small>Entradas realizadas</small><strong>{loading ? "—" : money(cashIn)}</strong></div></article>
+      <article className="financial-summary-card"><span className="financial-summary-icon soft-red"><ArrowUpRight size={19} /></span><div><small>Saídas realizadas</small><strong>{loading ? "—" : money(cashOut)}</strong></div></article>
+      <article className="financial-summary-card"><span className="financial-summary-icon soft-gold"><Clock3 size={19} /></span><div><small>{module === "accounts" ? "Em aberto" : "Pendências"}</small><strong>{loading ? "—" : module === "accounts" ? outstandingCount : Number(summary.receivablesOpenCount || 0) + Number(summary.payablesOpenCount || 0)}</strong></div></article>
+    </section>
 
-      <section className="financial-panel">
-        <div className="financial-toolbar">
-          <label className="financial-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar lançamento..." /></label>
-          <label className="financial-filter"><CalendarDays size={15} /><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select></label>
-          <label className="financial-filter"><Filter size={15} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="TODOS">Todos os status</option><option value="Pendente">Pendentes</option><option value="Confirmado">Confirmados</option></select></label>
-        </div>
-        <div className="financial-table-wrap">
-          {filteredEntries.length === 0 ? (
-            <div className="financial-empty"><span><Icon size={25} /></span><strong>{config.empty}</strong><p>Use o botão “{config.action}” para começar a registrar informações.</p><button className="secondary" type="button" onClick={openForm}><FilePlus2 size={16} /> {config.action}</button></div>
-          ) : (
-            <table className="financial-table"><thead><tr>{config.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{filteredEntries.map((entry) => <tr key={entry.id}><td><strong>{entry.description}</strong></td><td>{isCash ? entry.method : isSales ? entry.person : isAccounts ? entry.person : entry.kind || "Geral"}</td><td>{new Date(`${entry.dueDate}T12:00:00`).toLocaleDateString("pt-BR")}</td><td>{isCash ? <span className={`financial-status ${entry.kind === "Saída" ? "pending" : "confirmed"}`}>{entry.kind}</span> : isSales ? entry.method : <span className={`financial-status ${entry.status === "Pendente" ? "pending" : "confirmed"}`}>{entry.status}</span>}</td><td><strong>{money(entry.value)}</strong></td></tr>)}</tbody></table>
-          )}
-        </div>
-      </section>
+    {module === "cash" && <section className="financial-shortcuts" aria-label="Saldos de contas">{(summary.accounts || []).length ? (summary.accounts as Row[]).map((account) => <div key={account.id}><Landmark size={18} /><div><strong>{account.name}</strong><small>{account.type === "CASH" ? "Caixa físico" : account.type === "BANK" ? "Conta bancária" : "Outra conta"} · Saldo {money(Number(account.balance || 0))}</small></div></div>) : <div><Landmark size={18} /><div><strong>Cadastre uma conta financeira</strong><small>Separe caixa físico, bancos e outras contas.</small></div></div>}</section>}
+    {module === "cash" && sessions.filter((session) => session.status === "ABERTA").map((session) => <div className="success page-success" role="status" key={session.id}>Caixa aberto · {session.account?.name} · Abertura {money(Number(session.openingAmount || 0))}<button className="secondary" type="button" onClick={() => void closeSession(session)}>Fechar caixa</button></div>)}
 
-      <div className="financial-shortcuts">
-        <div><Landmark size={18} /><div><strong>Contas e formas de recebimento</strong><small>Configure bancos, cartões e meios de pagamento utilizados pela clínica.</small></div></div>
-        <div><CreditCard size={18} /><div><strong>Conciliação e fechamento</strong><small>Confira os lançamentos antes de fechar o período financeiro.</small></div></div>
+    <section className="financial-panel">
+      {module === "accounts" && <div className="financial-toolbar"><div className="financial-tabs" role="tablist" aria-label="Tipo de conta"><button type="button" className={accountsTab === "receber" ? "active" : ""} onClick={() => setAccountsTab("receber")}>A receber ({receivables.length})</button><button type="button" className={accountsTab === "pagar" ? "active" : ""} onClick={() => setAccountsTab("pagar")}>A pagar ({payables.length})</button></div></div>}
+      <div className="financial-toolbar">
+        <label className="financial-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar lançamento..." /></label>
+        <label className="financial-filter"><CalendarDays size={15} /><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="365">Últimos 12 meses</option></select></label>
+        <label className="financial-filter"><Filter size={15} /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="TODOS">Todos os status</option><option value="Pendente">Pendentes</option><option value="Parcial">Parciais</option><option value="Pago">Pagos</option><option value="Cancelado">Cancelados</option></select></label>
       </div>
+      <div className="financial-table-wrap">
+        {loading ? <div className="financial-empty" role="status">Carregando dados financeiros…</div> : filtered.length === 0 ? <div className="financial-empty"><span><Icon size={25} /></span><strong>{config.empty}</strong><p>Os dados desta tela são carregados do razão financeiro.</p>{module === "sales" && <button className="secondary" type="button" onClick={() => openForm("sale")}><FilePlus2 size={16} /> Nova venda</button>}</div> : <table className="financial-table"><thead><tr>{config.headers.map((header) => <th key={header}>{header}</th>)}{(module === "accounts" || module === "cash") && <th>Ações</th>}</tr></thead><tbody>{filtered.map((entry) => <tr key={`${entry.kind}-${entry.id}`}><td><strong>{entry.description}</strong>{module === "accounts" && entry.paid ? <small className="financial-row-subtitle">Pago {money(entry.paid)} de {money(entry.value)}</small> : null}</td><td>{entry.person}</td><td>{displayDate(entry.date)}</td><td><span className={`financial-status ${entry.status === "Pago" || entry.status === "Entrada" || entry.status === "Suprimento" ? "confirmed" : entry.status === "Cancelado" || entry.status === "Saída" || entry.status === "Sangria" ? "pending" : "pending"}`}>{entry.status}</span></td><td><strong>{money(module === "accounts" ? Number(entry.balance || 0) : entry.value)}</strong></td>{(module === "accounts" || module === "cash") && <td>{module === "accounts" && entry.balance! > 0 && (entry.status === "Pendente" || entry.status === "Parcial") ? <button className="secondary financial-row-action" type="button" onClick={() => { setSettlement({ kind: accountsTab === "receber" ? "receivable" : "payable", id: entry.id, description: entry.description, balance: Number(entry.balance) }); setForm({ ...form, value: String(Number(entry.balance).toFixed(2)), accountId: String(accounts[0]?.id || ""), date: localDate(), method: "PIX" }); }}>Baixar</button> : module === "cash" ? <small>{entry.raw.originType || "—"}</small> : "—"}</td>}</tr>)}</tbody></table>}
+      </div>
+    </section>
 
-      {showForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowForm(false)}><section className="modal financial-form-modal" role="dialog" aria-modal="true" aria-labelledby="financial-form-title"><div className="modal-header"><div><p className="eyebrow">NOVO REGISTRO</p><h2 id="financial-form-title">{config.action}</h2></div><button className="icon-button" type="button" onClick={() => setShowForm(false)} aria-label="Fechar"><X size={19} /></button></div><form onSubmit={saveEntry}><label>Descrição<input required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder={isSales ? "Ex.: Consulta particular" : "Ex.: Fornecedor ou lançamento"} /></label><label>{isSales ? "Cliente" : "Pessoa ou empresa"}<input value={form.person} onChange={(event) => setForm({ ...form, person: event.target.value })} placeholder="Nome" /></label><div className="financial-form-grid"><label>Valor<input required type="number" min="0.01" step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} placeholder="0,00" /></label><label>{isCash ? "Data" : "Vencimento"}<input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label></div>{(isCash || isAccounts) && <label>{isCash ? "Tipo de movimentação" : "Natureza da conta"}<select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>{isCash ? <><option>Entrada</option><option>Saída</option></> : <><option>A receber</option><option>A pagar</option></>}</select></label>}{(isCash || isSales) && <label>Forma de pagamento<select value={form.method} onChange={(event) => setForm({ ...form, method: event.target.value })}><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Dinheiro</option></select></label>}<div className="modal-footer"><button type="button" className="secondary" onClick={() => setShowForm(false)}>Cancelar</button><button type="submit" className="primary"><Check size={16} /> Salvar registro</button></div></form></section></div>}
-    </>
-  );
+    {formMode && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setFormMode(null)}><section className="modal financial-form-modal" role="dialog" aria-modal="true" aria-labelledby="financial-form-title"><div className="modal-header"><div><p className="eyebrow">NOVO REGISTRO</p><h2 id="financial-form-title">{formMode === "sale" ? "Nova venda" : formMode === "payable" ? "Nova conta a pagar" : formMode === "account" ? "Nova conta financeira" : formMode === "open-session" ? "Abertura de caixa" : "Nova movimentação"}</h2></div><button className="icon-button" type="button" onClick={() => setFormMode(null)} aria-label="Fechar"><X size={19} /></button></div>
+      <form onSubmit={submitForm}>
+        {(formMode === "sale" || formMode === "payable" || formMode === "movement" || formMode === "account") && <label>{formMode === "sale" ? "Serviço comercializado" : formMode === "payable" ? "Descrição da despesa" : formMode === "account" ? "Nome da conta" : "Descrição da movimentação"}<input required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>}
+        {formMode === "sale" && <><label>Paciente<select required value={form.patientId} onChange={(event) => setForm({ ...form, patientId: event.target.value })}><option value="">Selecione</option>{patients.map((row) => <option key={row.id} value={row.id}>{row.fullName}</option>)}</select></label><label>Profissional<select required value={form.professionalId} onChange={(event) => setForm({ ...form, professionalId: event.target.value })}><option value="">Selecione</option>{doctors.map((row) => <option key={row.id} value={row.id}>{row.fullName}</option>)}</select></label></>}
+        {formMode === "payable" && <><label>Categoria<input required value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} placeholder="Ex.: aluguel, material, serviços" /></label><label>Fornecedor<select required value={form.supplierId} onChange={(event) => setForm({ ...form, supplierId: event.target.value })}><option value="">Selecione</option>{suppliers.map((row) => <option key={row.id} value={row.id}>{row.name || row.legalName}</option>)}</select></label></>}
+        {formMode === "account" && <label>Tipo de conta<select value={form.accountType} onChange={(event) => setForm({ ...form, accountType: event.target.value })}><option value="CASH">Caixa físico</option><option value="BANK">Conta bancária</option><option value="OTHER">Outra conta financeira</option></select></label>}
+        {(formMode === "sale" || formMode === "payable") && <div className="financial-form-grid"><label>{formMode === "sale" ? "Data da venda" : "Valor"}{formMode === "sale" ? <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /> : <input required type="number" min="0.01" step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} />}</label><label>{formMode === "sale" ? "Valor" : "Vencimento"}{formMode === "sale" ? <input required type="number" min="0.01" step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} /> : <input required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} />}</label></div>}
+        {formMode === "sale" && <><div className="financial-form-grid"><label>Desconto<input type="number" min="0" step="0.01" value={form.discountAmount} onChange={(event) => setForm({ ...form, discountAmount: event.target.value })} /></label><label>Vencimento<input required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label></div><div className="financial-form-grid"><label>Parcelas<select value={form.installments} onChange={(event) => setForm({ ...form, installments: event.target.value })}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}x</option>)}</select></label><label>Forma prevista<select value={form.method} onChange={(event) => setForm({ ...form, method: event.target.value })}><option value="PIX">Pix</option><option value="DEBIT_CARD">Débito</option><option value="CREDIT_CARD">Crédito</option><option value="CASH">Dinheiro</option><option value="BANK_TRANSFER">Transferência</option></select></label></div></>}
+        {formMode === "account" && <label>Saldo inicial<input type="number" min="0" step="0.01" value={form.openingAmount} onChange={(event) => setForm({ ...form, openingAmount: event.target.value })} /></label>}
+        {formMode === "open-session" && <><label>Conta física<select required value={form.accountId} onChange={(event) => setForm({ ...form, accountId: event.target.value })}><option value="">Selecione</option>{accounts.filter((item) => item.type === "CASH").map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>Valor de abertura<input required type="number" min="0" step="0.01" value={form.openingAmount} onChange={(event) => setForm({ ...form, openingAmount: event.target.value })} /></label></>}
+        {formMode === "movement" && <><label>Tipo<select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}><option value="SUPRIMENTO">Suprimento</option><option value="SANGRIA">Sangria</option><option value="TRANSFERENCIA">Transferência entre contas</option><option value="AJUSTE_ENTRADA">Ajuste de entrada</option><option value="AJUSTE_SAIDA">Ajuste de saída</option></select></label>{form.kind === "TRANSFERENCIA" ? <div className="financial-form-grid"><label>Conta de origem<select required value={form.fromAccountId} onChange={(event) => setForm({ ...form, fromAccountId: event.target.value })}>{accounts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label><label>Conta de destino<select required value={form.toAccountId} onChange={(event) => setForm({ ...form, toAccountId: event.target.value })}>{accounts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label></div> : <label>Conta<select required value={form.accountId} onChange={(event) => setForm({ ...form, accountId: event.target.value })}><option value="">Selecione</option>{accounts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>}<div className="financial-form-grid"><label>Valor<input required type="number" min="0.01" step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} /></label><label>Data<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label></div></>}
+        <div className="modal-footer"><button type="button" className="secondary" onClick={() => setFormMode(null)}>Cancelar</button><button type="submit" className="primary" disabled={saving}><Check size={16} />{saving ? "Salvando…" : "Salvar registro"}</button></div>
+      </form></section></div>}
+
+    {settlement && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setSettlement(null)}><section className="modal financial-form-modal" role="dialog" aria-modal="true" aria-labelledby="financial-settlement-title"><div className="modal-header"><div><p className="eyebrow">BAIXA FINANCEIRA</p><h2 id="financial-settlement-title">{settlement.kind === "receivable" ? "Registrar recebimento" : "Registrar pagamento"}</h2><small>{settlement.description} · Saldo {money(settlement.balance)}</small></div><button className="icon-button" type="button" onClick={() => setSettlement(null)} aria-label="Fechar"><X size={19} /></button></div><form onSubmit={submitSettlement}><label>Valor recebido/pago<input required type="number" min="0.01" max={settlement.balance} step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} /></label><label>Conta de destino/origem<select required value={form.accountId} onChange={(event) => setForm({ ...form, accountId: event.target.value })}><option value="">Selecione</option>{accounts.map((row) => <option key={row.id} value={row.id}>{row.name} · {row.type === "CASH" ? "Caixa" : row.type === "BANK" ? "Banco" : "Outra"}</option>)}</select></label><div className="financial-form-grid"><label>Data do pagamento<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label><label>Forma<select value={form.method} onChange={(event) => setForm({ ...form, method: event.target.value })}><option value="PIX">Pix</option><option value="DEBIT_CARD">Débito</option><option value="CREDIT_CARD">Crédito</option><option value="CASH">Dinheiro</option><option value="BANK_TRANSFER">Transferência</option><option value="OTHER">Outro</option></select></label></div><div className="modal-footer"><button type="button" className="secondary" onClick={() => setSettlement(null)}>Cancelar</button><button type="submit" className="primary" disabled={saving}><Check size={16} />{saving ? "Processando…" : "Confirmar baixa"}</button></div></form></section></div>}
+  </>;
 }

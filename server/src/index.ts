@@ -12,6 +12,7 @@ import {
   CrmCategory,
   CrmProductType,
   CrmStatus,
+  FinancialPaymentMethod,
   InjectableType,
   Prisma,
   ProcedureType,
@@ -26,6 +27,7 @@ import { P12Signer } from "@signpdf/signer-p12";
 import { z } from "zod";
 import QRCode from "qrcode";
 import forge from "node-forge";
+import { createFinancialRouter, createSalesFromRequests } from "./financial.routes.js";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -397,6 +399,9 @@ const secretaryBillingSchema = z.object({
       }),
     )
     .min(1, "Selecione ao menos uma solicitação."),
+  paymentMethod: z.nativeEnum(FinancialPaymentMethod).optional(),
+  discountPercent: z.coerce.number().min(0).max(5).default(0),
+  installments: z.coerce.number().int().min(1).max(12).default(1),
 });
 const crmTreatmentSchema = z.object({
   patientId: z.coerce.number().int().positive(),
@@ -2949,45 +2954,34 @@ app.post(
   "/api/secretary/dashboard/billing",
   auth,
   secretaryOnly,
-  async (req, res) => {
+  async (req: AuthRequest, res) => {
     const parsed = secretaryBillingSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ message: "Selecione ao menos uma solicitação." });
-    const grouped = new Map<string, number[]>();
-    parsed.data.items.forEach(({ kind, id }) => {
-      const ids = grouped.get(kind) || [];
-      if (!ids.includes(id)) ids.push(id);
-      grouped.set(kind, ids);
-    });
-    const updates = await Promise.all([
-      grouped.has("EXAME")
-        ? prisma.examRequest.updateMany({
-            where: { id: { in: grouped.get("EXAME") } },
-            data: { billingStatus: "FATURADO" },
-          })
-        : null,
-      grouped.has("ULTRASSOM")
-        ? prisma.ultrasoundRequest.updateMany({
-            where: { id: { in: grouped.get("ULTRASSOM") } },
-            data: { billingStatus: "FATURADO" },
-          })
-        : null,
-      grouped.has("INJETAVEL")
-        ? prisma.injectableRequest.updateMany({
-            where: { id: { in: grouped.get("INJETAVEL") } },
-            data: { billingStatus: "FATURADO" },
-          })
-        : null,
-      grouped.has("PROCEDIMENTO")
-        ? prisma.procedureRequest.updateMany({
-            where: { id: { in: grouped.get("PROCEDIMENTO") } },
-            data: { billingStatus: "FATURADO" },
-          })
-        : null,
-    ]);
-    res.json({
-      updated: updates.reduce((total, result) => total + (result?.count || 0), 0),
-    });
+    const paymentMethod = parsed.data.paymentMethod;
+    if (parsed.data.discountPercent > 0 && paymentMethod !== FinancialPaymentMethod.PIX && paymentMethod !== FinancialPaymentMethod.CASH)
+      return res.status(400).json({ message: "O desconto de 5% está disponível somente para Pix ou dinheiro." });
+    if (parsed.data.installments > 1 && paymentMethod !== FinancialPaymentMethod.CREDIT_CARD)
+      return res.status(400).json({ message: "Parcelamento está disponível somente para cartão de crédito." });
+    const billingSaleDate = new Date(`${clinicTodayDate()}T00:00:00.000Z`);
+    try {
+      const sales = await createSalesFromRequests(
+        prisma,
+        req.user!.id,
+        parsed.data.items,
+        paymentMethod,
+        parsed.data.discountPercent,
+        parsed.data.installments,
+        billingSaleDate,
+      );
+      res.status(201).json({
+        updated: parsed.data.items.length,
+        sales: sales.map((sale) => ({ id: sale.id, code: sale.code, totalAmount: sale.totalAmount, receivableId: sale.receivable?.id })),
+      });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ message: error.message });
+      throw error;
+    }
   },
 );
 
@@ -3207,6 +3201,7 @@ app.post("/api/appointments/:id/attachments", auth, doctorOnly, appointmentAttac
 });
 
 app.use("/api/admin", auth, adminOnly);
+app.use("/api/financial", auth, adminOnly, createFinancialRouter(prisma));
 
 function crmStatusForDoseCount(count: number): CrmStatus {
   if (count >= 3) return CrmStatus.CONCLUIDO;
