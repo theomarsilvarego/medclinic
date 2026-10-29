@@ -17,6 +17,8 @@ export async function submitAppointment(data: Row, appointmentId?: number) {
       data.itemType === "INJETAVEL" ? Number(data.injectableId) : null,
     status: data.status || "AGENDADO",
     notes: data.notes || "",
+    requestKind: data.requestKind || null,
+    requestId: data.requestId ? Number(data.requestId) : null,
   };
   const form = new FormData();
   Object.entries(payload).forEach(([key, value]) => {

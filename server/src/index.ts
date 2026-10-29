@@ -413,6 +413,8 @@ const appointmentSchema = z.object({
   injectableId: z.coerce.number().int().positive().nullable().optional(),
   status: z.nativeEnum(AppointmentStatus).default(AppointmentStatus.AGENDADO),
   notes: z.string().optional().nullable(),
+  requestKind: z.enum(["EXAME", "ULTRASSOM", "INJETAVEL", "PROCEDIMENTO"]).nullable().optional(),
+  requestId: z.coerce.number().int().positive().nullable().optional(),
 });
 
 const anamnesisText = z.string().trim().max(2000);
@@ -1237,22 +1239,35 @@ async function validateAppointmentInsurance(
 }
 
 function appointmentData(data: z.infer<typeof appointmentSchema>) {
-  const isAttendance = data.itemType === AppointmentItemType.ATENDIMENTO;
-  const isProcedure = data.itemType === AppointmentItemType.PROCEDIMENTO;
-  const isInjectable = data.itemType === AppointmentItemType.INJETAVEL;
-  if (isAttendance && !data.attendanceId)
+  const { requestKind: _requestKind, requestId: _requestId, ...appointment } = data;
+  const isAttendance = appointment.itemType === AppointmentItemType.ATENDIMENTO;
+  const isProcedure = appointment.itemType === AppointmentItemType.PROCEDIMENTO;
+  const isInjectable = appointment.itemType === AppointmentItemType.INJETAVEL;
+  if (isAttendance && !appointment.attendanceId)
     throw new Error("Selecione um atendimento.");
-  if (isProcedure && !data.procedureId)
+  if (isProcedure && !appointment.procedureId)
     throw new Error("Selecione um procedimento.");
-  if (isInjectable && !data.injectableId)
+  if (isInjectable && !appointment.injectableId)
     throw new Error("Selecione um produto injetável.");
   return {
-    ...data,
-    appointmentDate: new Date(`${data.appointmentDate}T00:00:00.000Z`),
-    attendanceId: isAttendance ? data.attendanceId : null,
-    procedureId: isProcedure ? data.procedureId : null,
-    injectableId: isInjectable ? data.injectableId : null,
+    ...appointment,
+    appointmentDate: new Date(`${appointment.appointmentDate}T00:00:00.000Z`),
+    attendanceId: isAttendance ? appointment.attendanceId : null,
+    procedureId: isProcedure ? appointment.procedureId : null,
+    injectableId: isInjectable ? appointment.injectableId : null,
   };
+}
+async function markClinicalRequestScheduled(
+  kind: z.infer<typeof appointmentSchema>["requestKind"],
+  id: number | null | undefined,
+  patientId: number,
+) {
+  if (!kind || !id) return;
+  const where = { id, patientId };
+  if (kind === "EXAME") await prisma.examRequest.updateMany({ where, data: { schedulingStatus: "AGENDADO" } });
+  if (kind === "ULTRASSOM") await prisma.ultrasoundRequest.updateMany({ where, data: { schedulingStatus: "AGENDADO" } });
+  if (kind === "INJETAVEL") await prisma.injectableRequest.updateMany({ where, data: { schedulingStatus: "AGENDADO" } });
+  if (kind === "PROCEDIMENTO") await prisma.procedureRequest.updateMany({ where, data: { schedulingStatus: "AGENDADO" } });
 }
 async function clinicalRequestRecord(id: number) {
   const record = await prisma.medicalRecord.findUnique({
@@ -2913,7 +2928,7 @@ app.get(
             pdfPath: null,
           })),
         ]),
-      })),
+      })).filter((appointment) => appointment.requests.length > 0),
     );
   },
 );
@@ -3028,6 +3043,7 @@ app.post("/api/appointments", auth, appointmentManage, appointmentFormUpload.fie
       appointment.appointmentDate,
       req.user!.id,
     );
+    await markClinicalRequestScheduled(parsed.data.requestKind, parsed.data.requestId, appointment.patientId);
     await persistAppointmentAttachments(
       appointment.id,
       appointment.patientId,
@@ -3079,6 +3095,7 @@ app.put("/api/appointments/:id", auth, appointmentManage, appointmentFormUpload.
       appointment.appointmentDate,
       req.user!.id,
     );
+    await markClinicalRequestScheduled(parsed.data.requestKind, parsed.data.requestId, appointment.patientId);
     await persistAppointmentAttachments(
       appointment.id,
       appointment.patientId,

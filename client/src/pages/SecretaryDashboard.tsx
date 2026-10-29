@@ -111,7 +111,7 @@ export function SecretaryDashboard() {
     }
   }
 
-  async function openAppointment(patient: PatientSummary, visit: Visit) {
+  async function openAppointment(patient: PatientSummary, visit: Visit, item?: RequestItem) {
     setError("");
     setScheduleSuccess("");
     try {
@@ -140,6 +140,8 @@ export function SecretaryDashboard() {
         itemType: "ATENDIMENTO",
         patientId: selectedPatient.id,
         insuranceId: insuranceId ? String(insuranceId) : "",
+        requestKind: item?.kind || null,
+        requestId: item?.id || null,
       });
     } catch (cause: any) {
       setError(cause.message || "Não foi possível abrir o novo agendamento.");
@@ -160,6 +162,7 @@ export function SecretaryDashboard() {
       );
       setAppointmentDraft(null);
       setAppointmentMeta(null);
+      await load();
     } catch (cause: any) {
       setError(cause.message || "Não foi possível salvar o agendamento.");
     } finally {
@@ -199,7 +202,7 @@ export function SecretaryDashboard() {
         else summary.total += Number(item.amount);
       });
     });
-    return [...grouped.values()];
+    return [...grouped.values()].filter((patient) => patient.requests.length > 0);
   }, [visits]);
 
   const filteredPatients = useMemo(() => {
@@ -551,7 +554,7 @@ export function SecretaryDashboard() {
                                 type="button"
                                 title="Abrir novo agendamento"
                                 aria-label={`Abrir novo agendamento para ${patient.fullName}`}
-                                onClick={() => void openAppointment(patient, visit)}
+                                onClick={() => void openAppointment(patient, visit, item)}
                               >
                                 <CalendarPlus size={17} />
                               </button>
