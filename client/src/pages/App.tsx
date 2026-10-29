@@ -32,7 +32,6 @@ export function App() {
   const [module, setModule] = useState<ModuleKey>("overview");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [createAppointmentSignal, setCreateAppointmentSignal] = useState(0);
   const [recordPatientId, setRecordPatientId] = useState<number | null>(null);
   const [recordAppointmentId, setRecordAppointmentId] = useState<number | null>(null);
   const [allowNewRecord, setAllowNewRecord] = useState(false);
@@ -51,11 +50,6 @@ export function App() {
   function logout() {
     localStorage.removeItem("medclinic_token");
     setUser(null);
-  }
-  function openNewAppointment() {
-    setCreateAppointmentSignal((value) => value + 1);
-    setModule("appointments");
-    setMobileMenu(false);
   }
   return (
     <div className={sidebarCollapsed ? "shell sidebar-collapsed" : "shell"}>
@@ -185,18 +179,18 @@ export function App() {
         </header>
         <main className="main">
           {module === "overview" ? (
-            <Dashboard setModule={setModule} user={user} onScheduleRequest={openNewAppointment} />
+            <Dashboard setModule={setModule} user={user} />
           ) : module === "reports" ? (
             user.profile === "ADMINISTRADOR" ? (
               <ReportsPage />
             ) : (
-              <Dashboard setModule={setModule} user={user} onScheduleRequest={openNewAppointment} />
+              <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "certificates" ? (
             user.profile === "ADMINISTRADOR" ? (
               <CertificateSettingsPage />
             ) : (
-              <Dashboard setModule={setModule} user={user} onScheduleRequest={openNewAppointment} />
+              <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "doctor-day" ? (
             user.profile === "MEDICO" ? (
@@ -215,7 +209,7 @@ export function App() {
                 }}
               />
             ) : (
-              <Dashboard setModule={setModule} user={user} onScheduleRequest={openNewAppointment} />
+              <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "medical-records" ? (
             user.profile === "MEDICO" ? (
@@ -232,20 +226,16 @@ export function App() {
                 }}
               />
             ) : (
-              <Dashboard setModule={setModule} user={user} onScheduleRequest={openNewAppointment} />
+              <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "exam-groups" ? (
             user.profile === "MEDICO" ? (
               <ExamGroupsPage />
             ) : (
-              <Dashboard setModule={setModule} user={user} onScheduleRequest={openNewAppointment} />
+              <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "appointments" ? (
-            <AppointmentsPage
-              user={user}
-              createSignal={createAppointmentSignal}
-              onCreateSignalConsumed={() => setCreateAppointmentSignal(0)}
-            />
+            <AppointmentsPage user={user} />
           ) : (
             <CrudPage
               module={module}

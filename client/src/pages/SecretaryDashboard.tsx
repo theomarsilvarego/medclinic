@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { API, money, request } from "../lib/app";
 import type { Row } from "../lib/app";
+import { submitAppointment } from "../lib/appointments";
+import { AppointmentModal } from "./AppointmentModal";
 
 type RequestItem = {
   id: number;
@@ -30,7 +32,7 @@ type Visit = {
   date: string;
   time: string;
   patient: { id: number; fullName: string };
-  insurance: { name: string };
+  insurance: { id: number; name: string };
   doctor: { fullName: string };
   requests: RequestItem[];
 };
@@ -67,7 +69,7 @@ function schedulingStatusLabel(status: RequestItem["schedulingStatus"]) {
 function localDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
+export function SecretaryDashboard() {
   const today = localDate(new Date());
   const [visits, setVisits] = useState<Visit[]>([]);
   const [date, setDate] = useState(today);
@@ -85,6 +87,10 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [billingSelected, setBillingSelected] = useState(false);
   const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [appointmentDraft, setAppointmentDraft] = useState<Row | null>(null);
+  const [appointmentMeta, setAppointmentMeta] = useState<any>(null);
+  const [appointmentSaving, setAppointmentSaving] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState("");
   const [billingItemKeys, setBillingItemKeys] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
   const [discountEnabled, setDiscountEnabled] = useState(false);
@@ -102,6 +108,62 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
       setError(cause.message || "Não foi possível carregar os atendimentos.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function openAppointment(patient: PatientSummary, visit: Visit) {
+    setError("");
+    setScheduleSuccess("");
+    try {
+      const metadata = await request("/appointments/meta");
+      const selectedPatient = (metadata.patients || []).find(
+        (item: Row) => Number(item.id) === Number(patient.id),
+      );
+      if (!selectedPatient)
+        throw new Error("Não foi possível carregar o cadastro da paciente.");
+
+      const insuranceId = visit.insurance?.id || selectedPatient.insuranceCode;
+      const insurances = metadata.insurances || [];
+      const hasVisitInsurance = insurances.some(
+        (item: Row) => Number(item.id) === Number(insuranceId),
+      );
+      const modalInsurances =
+        insuranceId && !hasVisitInsurance && visit.insurance?.name
+          ? [...insurances, { ...visit.insurance, active: false, fromAttendedVisit: true }]
+          : insurances;
+
+      setAppointmentMeta({ ...metadata, insurances: modalInsurances });
+      setAppointmentDraft({
+        appointmentDate: today,
+        scheduledTime: "08:00",
+        status: "AGENDADO",
+        itemType: "ATENDIMENTO",
+        patientId: selectedPatient.id,
+        insuranceId: insuranceId ? String(insuranceId) : "",
+      });
+    } catch (cause: any) {
+      setError(cause.message || "Não foi possível abrir o novo agendamento.");
+    }
+  }
+
+  async function saveAppointment(data: Row) {
+    setAppointmentSaving(true);
+    setError("");
+    setScheduleSuccess("");
+    try {
+      await submitAppointment(data);
+      const patientName = appointmentMeta?.patients?.find(
+        (item: Row) => Number(item.id) === Number(data.patientId),
+      )?.fullName;
+      setScheduleSuccess(
+        `Agendamento de ${patientName || "paciente"} criado para ${dateLabel(String(data.appointmentDate))} às ${data.scheduledTime}.`,
+      );
+      setAppointmentDraft(null);
+      setAppointmentMeta(null);
+    } catch (cause: any) {
+      setError(cause.message || "Não foi possível salvar o agendamento.");
+    } finally {
+      setAppointmentSaving(false);
     }
   }
 
@@ -320,9 +382,14 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
         </div>
       </div>
 
-      {error && (
+      {error && !appointmentDraft && (
         <div className="error page-error" role="alert">
           {error}
+        </div>
+      )}
+      {scheduleSuccess && (
+        <div className="success page-success" role="status">
+          {scheduleSuccess}
         </div>
       )}
 
@@ -483,8 +550,8 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
                               <button
                                 type="button"
                                 title="Abrir novo agendamento"
-                                aria-label={`Agendar para ${patient.fullName}; formulário em branco`}
-                                onClick={onSchedule}
+                                aria-label={`Abrir novo agendamento para ${patient.fullName}`}
+                                onClick={() => void openAppointment(patient, visit)}
                               >
                                 <CalendarPlus size={17} />
                               </button>
@@ -897,6 +964,21 @@ export function SecretaryDashboard({ onSchedule }: { onSchedule: () => void }) {
             </footer>
           </section>
         </div>
+      )}
+      {appointmentDraft && appointmentMeta && (
+        <AppointmentModal
+          initial={appointmentDraft}
+          meta={appointmentMeta}
+          date={String(appointmentDraft.appointmentDate || date)}
+          onClose={() => {
+            setError("");
+            setAppointmentDraft(null);
+            setAppointmentMeta(null);
+          }}
+          onSave={saveAppointment}
+          saving={appointmentSaving}
+          saveError={error}
+        />
       )}
     </>
   );

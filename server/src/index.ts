@@ -2326,7 +2326,7 @@ app.get(
         ],
         include: {
           patient: { select: { id: true, fullName: true } },
-          insurance: { select: { name: true } },
+          insurance: { select: { id: true, name: true } },
           doctor: { select: { fullName: true } },
           medicalRecords: {
             orderBy: { recordDate: "desc" },

@@ -5049,7 +5049,8 @@ tr:last-child td {
 }
 .appointment-inline-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0 22px;
 }
 .appointment-notes-field {

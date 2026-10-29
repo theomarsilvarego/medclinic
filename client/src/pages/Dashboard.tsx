@@ -17,18 +17,12 @@ import { SecretaryDashboard } from "./SecretaryDashboard";
 export function Dashboard({
   setModule,
   user,
-  onScheduleRequest,
 }: {
   setModule: (m: ModuleKey) => void;
   user: any;
-  onScheduleRequest?: () => void;
 }) {
   if (user.profile === "SECRETARIA")
-    return (
-      <SecretaryDashboard
-        onSchedule={onScheduleRequest || (() => setModule("appointments"))}
-      />
-    );
+    return <SecretaryDashboard />;
   const horaAtual = new Date().getHours();
 
   const saudacao =

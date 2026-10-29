@@ -34,12 +34,16 @@ export function AppointmentModal({
   date,
   onClose,
   onSave,
+  saving = false,
+  saveError = "",
 }: {
   initial: Row;
   meta: any;
   date: string;
   onClose: () => void;
   onSave: (data: Row) => void;
+  saving?: boolean;
+  saveError?: string;
 }) {
   const [data, setData] = useState<Row>({ ...initial });
   const [patientSearch, setPatientSearch] = useState("");
@@ -81,13 +85,10 @@ export function AppointmentModal({
     )
       ? [selectedPatient, ...filteredPatients]
       : filteredPatients;
-  const formattedDate = new Date(`${date}T12:00:00`).toLocaleDateString(
+  const appointmentDate = String(data.appointmentDate || date).slice(0, 10);
+  const formattedDate = new Date(`${appointmentDate}T12:00:00`).toLocaleDateString(
     "pt-BR",
-    {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-    },
+    { weekday: "long", day: "2-digit", month: "long" },
   );
   const fileSize = (bytes: number) =>
     bytes < 1024 * 1024
@@ -131,6 +132,7 @@ export function AppointmentModal({
       !data.patientId && "Paciente",
       !data.doctorId && "Médico",
       !data.insuranceId && "Convênio",
+      !appointmentDate && "Dia",
       itemType === "ATENDIMENTO" && !data.attendanceId && "Atendimento",
       itemType === "PROCEDIMENTO" && !data.procedureId && "Procedimento",
       itemType === "INJETAVEL" && !data.injectableId && "Produto injetável",
@@ -164,12 +166,17 @@ export function AppointmentModal({
               </span>
             </div>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Fechar">
+          <button className="icon-button" onClick={onClose} aria-label="Fechar" disabled={saving}>
             <X size={21} />
           </button>
         </div>
 
         <div className="modal-fields appointment-modal-fields">
+          {saveError && (
+            <div className="error" role="alert">
+              {saveError}
+            </div>
+          )}
           <section className="appointment-section appointment-people-section">
             <label className="appointment-patient-field">
               <div className="appointment-patient-picker">
@@ -262,7 +269,11 @@ export function AppointmentModal({
                 <option value="">Selecione o convênio</option>
                 {meta.insurances.map((x: Row) => (
                   <option key={x.id} value={x.id}>
-                    {x.name}{x.active === false ? " (inativo; vínculo atual da paciente)" : ""}
+                    {x.name}{x.active === false
+                      ? x.fromAttendedVisit
+                        ? " (convênio do atendimento selecionado)"
+                        : " (inativo; vínculo atual da paciente)"
+                      : ""}
                   </option>
                 ))}
               </select>
@@ -421,18 +432,16 @@ export function AppointmentModal({
             )}
             <div className="appointment-inline-fields">
               <label>
-                <select
-                  value={data.status || "AGENDADO"}
-                  onChange={(e) => update("status", e.target.value)}
-                >
-                  <option value="AGENDADO">Agendado</option>
-                  <option value="CONFIRMADO">Confirmado</option>
-                  <option value="EM_ATENDIMENTO">Em atendimento</option>
-                  <option value="ATENDIDO">Atendido</option>
-                  <option value="FALTOU">Faltou</option>
-                </select>
+                <span>Dia</span>
+                <input
+                  type="date"
+                  required
+                  value={appointmentDate}
+                  onChange={(event) => update("appointmentDate", event.target.value)}
+                />
               </label>
               <label>
+                <span>Horário</span>
                 <select
                   value={data.scheduledTime || "08:00"}
                   onChange={(e) => update("scheduledTime", e.target.value)}
@@ -442,6 +451,19 @@ export function AppointmentModal({
                     const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
                     return <option key={time}>{time}</option>;
                   })}
+                </select>
+              </label>
+              <label>
+                <span>Situação</span>
+                <select
+                  value={data.status || "AGENDADO"}
+                  onChange={(e) => update("status", e.target.value)}
+                >
+                  <option value="AGENDADO">Agendado</option>
+                  <option value="CONFIRMADO">Confirmado</option>
+                  <option value="EM_ATENDIMENTO">Em atendimento</option>
+                  <option value="ATENDIDO">Atendido</option>
+                  <option value="FALTOU">Faltou</option>
                 </select>
               </label>
             </div>
@@ -610,11 +632,11 @@ export function AppointmentModal({
         </div>
 
         <div className="modal-footer appointment-modal-footer">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" onClick={onClose} disabled={saving}>
             Cancelar
           </button>
-          <button className="primary" onClick={save}>
-            Salvar agendamento
+          <button className="primary" onClick={save} disabled={saving}>
+            {saving ? "Salvando…" : "Salvar agendamento"}
           </button>
         </div>
       </div>

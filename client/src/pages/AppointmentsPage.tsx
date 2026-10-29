@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, QrCode } from "lucide-react";
 import type { Row } from "../lib/app";
 import { request } from "../lib/app";
+import { submitAppointment } from "../lib/appointments";
 import { AppointmentModal } from "./AppointmentModal";
 import { AnamnesisAppointmentModal } from "./AnamnesisAppointmentModal";
 
@@ -30,12 +31,8 @@ function isEligibleAppointment(row: Row) {
 
 export function AppointmentsPage({
   user,
-  createSignal = 0,
-  onCreateSignalConsumed,
 }: {
   user: any;
-  createSignal?: number;
-  onCreateSignalConsumed?: () => void;
 }) {
   const canManage =
     user.profile === "ADMINISTRADOR" || user.profile === "SECRETARIA";
@@ -72,12 +69,12 @@ export function AppointmentsPage({
     year: "numeric",
   });
 
-  async function load() {
+  async function load(targetDate = date) {
     setLoading(true);
     setError("");
     try {
       const [day, metadata] = await Promise.all([
-        request(`/appointments?date=${date}`),
+        request(`/appointments?date=${targetDate}`),
         meta.patients.length
           ? Promise.resolve(meta)
           : request("/appointments/meta"),
@@ -105,13 +102,6 @@ export function AppointmentsPage({
     setModalOpen(true);
   }
 
-  useEffect(() => {
-    if (createSignal > 0) {
-      openNew("08:00");
-      onCreateSignalConsumed?.();
-    }
-  }, [createSignal, onCreateSignalConsumed]);
-
   function openEdit(row: Row) {
     setEditing(row);
     setModalOpen(true);
@@ -125,47 +115,12 @@ export function AppointmentsPage({
 
   async function save(data: Row) {
     try {
-      const payload = {
-        appointmentDate: date,
-        scheduledTime: data.scheduledTime,
-        patientId: Number(data.patientId),
-        doctorId: Number(data.doctorId),
-        insuranceId: Number(data.insuranceId),
-        itemType: data.itemType || "ATENDIMENTO",
-        attendanceId:
-          data.itemType === "ATENDIMENTO" ? Number(data.attendanceId) : null,
-        procedureId:
-          data.itemType === "PROCEDIMENTO" ? Number(data.procedureId) : null,
-        injectableId:
-          data.itemType === "INJETAVEL" ? Number(data.injectableId) : null,
-        status: data.status || "AGENDADO",
-        notes: data.notes || "",
-      };
-      const form = new FormData();
-      Object.entries(payload).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== "")
-          form.append(key, String(value));
-      });
-      if (editing?.id) form.append("id", String(editing.id));
-      const exams = (data.examUploads || []) as {
-        examType: string;
-        examDate: string;
-        file: File;
-      }[];
-      form.append(
-        "examMetadata",
-        JSON.stringify(
-          exams.map(({ examType, examDate }) => ({ examType, examDate })),
-        ),
-      );
-      exams.forEach(({ file }) => form.append("examFiles", file));
-      await request(`/appointments${editing?.id ? `/${editing.id}` : ""}`, {
-        method: editing?.id ? "PUT" : "POST",
-        body: form,
-      });
+      const appointmentDate = String(data.appointmentDate || date).slice(0, 10);
+      await submitAppointment({ ...data, appointmentDate }, editing?.id);
       setModalOpen(false);
       setEditing(null);
-      await load();
+      if (appointmentDate !== date) setDate(appointmentDate);
+      else await load(appointmentDate);
     } catch (cause: any) {
       setError(cause.message);
     }
