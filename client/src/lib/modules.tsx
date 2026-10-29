@@ -17,18 +17,17 @@ export const modules: { key: ModuleKey; label: string; icon: React.ReactNode; si
   { key: 'injectables', label: 'Injetáveis', singular: 'injetável', icon: <Syringe size={18}/> },
   { key: 'suppliers', label: 'Fornecedores', singular: 'fornecedor', icon: <Factory size={18}/> },
   { key: 'reports', label: 'Relatórios', singular: 'relatório', icon: <FileBarChart size={18}/> },
+  { key: 'finance', label: 'Financeiro', singular: 'lançamento financeiro', icon: <CircleDollarSign size={18}/> },
+  { key: 'cash', label: 'Caixa', singular: 'movimentação de caixa', icon: <Wallet size={18}/> },
+  { key: 'accounts', label: 'Contas a pagar e receber', singular: 'conta', icon: <Receipt size={18}/> },
+  { key: 'sales', label: 'Vendas', singular: 'venda', icon: <ShoppingCart size={18}/> },
 ];
 
 export const menuGroups: { label: string; icon: React.ReactNode; keys: ModuleKey[]; plannedItems?: { label: string; icon: React.ReactNode }[] }[] = [
   { label: 'GESTÃO CLÍNICA', icon: <Building2 size={16}/>, keys: ['patients', 'medical-records', 'exam-groups', 'attendances', 'appointments', 'doctors', 'insurances', 'clinic'] },
   { label: 'CADASTROS E CONFIGURAÇÕES', icon: <ClipboardList size={16}/>, keys: ['users', 'procedures', 'exam-types', 'certificates'] },
   { label: 'PROCEDIMENTOS E INSUMOS', icon: <Syringe size={16}/>, keys: ['injectables', 'suppliers'] },
-  { label: 'GESTÃO ADMINISTRATIVA E FINANCEIRA — RECOMENDADO', icon: <ChartNoAxesCombined size={16}/>, keys: ['reports'], plannedItems: [
-    { label: 'Financeiro', icon: <CircleDollarSign size={18}/> },
-    { label: 'Caixa', icon: <Wallet size={18}/> },
-    { label: 'Contas a pagar e receber', icon: <Receipt size={18}/> },
-    { label: 'Vendas', icon: <ShoppingCart size={18}/> },
-  ] },
+  { label: 'GESTÃO ADMINISTRATIVA E FINANCEIRA', icon: <ChartNoAxesCombined size={16}/>, keys: ['reports', 'finance', 'cash', 'accounts', 'sales'] },
 ];
 
-export function canAccessModule(profile: string, key: ModuleKey) { const normalizedProfile = String(profile || '').toUpperCase(); if (key === 'patients') return ['ADMINISTRADOR', 'MEDICO', 'SECRETARIA'].includes(normalizedProfile); if (key === 'medical-records' || key === 'exam-groups') return normalizedProfile === 'MEDICO'; if (key === 'certificates' || key === 'reports') return normalizedProfile === 'ADMINISTRADOR'; return normalizedProfile === 'ADMINISTRADOR' || (key === 'appointments' && normalizedProfile === 'SECRETARIA'); }
+export function canAccessModule(profile: string, key: ModuleKey) { const normalizedProfile = String(profile || '').toUpperCase(); if (key === 'patients') return ['ADMINISTRADOR', 'MEDICO', 'SECRETARIA'].includes(normalizedProfile); if (key === 'medical-records' || key === 'exam-groups') return normalizedProfile === 'MEDICO'; if (key === 'certificates' || key === 'reports' || key === 'finance' || key === 'cash' || key === 'accounts' || key === 'sales') return normalizedProfile === 'ADMINISTRADOR'; return normalizedProfile === 'ADMINISTRADOR' || (key === 'appointments' && normalizedProfile === 'SECRETARIA'); }

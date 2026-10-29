@@ -26,6 +26,7 @@ import { MedicalRecordsPage } from "./MedicalRecordsPage";
 import { ExamGroupsPage } from "./ExamGroupsPage";
 import { CertificateSettingsPage } from "./CertificateSettingsPage";
 import { ReportsPage } from "./ReportsPage";
+import { FinancialPage } from "./FinancialPage";
 
 export function App() {
   const [user, setUser] = useState<any>(null);
@@ -51,6 +52,7 @@ export function App() {
     localStorage.removeItem("medclinic_token");
     setUser(null);
   }
+  const normalizedProfile = String(user.profile || "").toUpperCase();
   return (
     <div className={sidebarCollapsed ? "shell sidebar-collapsed" : "shell"}>
       <aside
@@ -181,14 +183,20 @@ export function App() {
           {module === "overview" ? (
             <Dashboard setModule={setModule} user={user} />
           ) : module === "reports" ? (
-            user.profile === "ADMINISTRADOR" ? (
+            normalizedProfile === "ADMINISTRADOR" ? (
               <ReportsPage />
             ) : (
               <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "certificates" ? (
-            user.profile === "ADMINISTRADOR" ? (
+            normalizedProfile === "ADMINISTRADOR" ? (
               <CertificateSettingsPage />
+            ) : (
+              <Dashboard setModule={setModule} user={user} />
+            )
+          ) : ["finance", "cash", "accounts", "sales"].includes(module) ? (
+            normalizedProfile === "ADMINISTRADOR" ? (
+              <FinancialPage module={module as "finance" | "cash" | "accounts" | "sales"} />
             ) : (
               <Dashboard setModule={setModule} user={user} />
             )

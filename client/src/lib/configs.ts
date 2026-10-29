@@ -10,6 +10,10 @@ export const configs: Record<
     | "appointments"
     | "certificates"
     | "reports"
+    | "finance"
+    | "cash"
+    | "accounts"
+    | "sales"
   >,
   {
     path: string;
