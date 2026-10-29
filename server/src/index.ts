@@ -9,6 +9,9 @@ import path from "node:path";
 import {
   AppointmentItemType,
   AppointmentStatus,
+  CrmCategory,
+  CrmProductType,
+  CrmStatus,
   InjectableType,
   Prisma,
   ProcedureType,
@@ -395,6 +398,16 @@ const secretaryBillingSchema = z.object({
     )
     .min(1, "Selecione ao menos uma solicitação."),
 });
+const crmTreatmentSchema = z.object({
+  patientId: z.coerce.number().int().positive(),
+  productType: z.nativeEnum(CrmProductType),
+  productId: z.coerce.number().int().positive(),
+  category: z.nativeEnum(CrmCategory),
+  status: z.nativeEnum(CrmStatus).optional(),
+  doseDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de dose inválida.")).default([]),
+  observation: z.string().trim().max(4000).nullable().optional(),
+});
+const crmStatusSchema = z.object({ status: z.nativeEnum(CrmStatus) });
 
 const appointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
@@ -3194,6 +3207,118 @@ app.post("/api/appointments/:id/attachments", auth, doctorOnly, appointmentAttac
 });
 
 app.use("/api/admin", auth, adminOnly);
+
+function crmStatusForDoseCount(count: number): CrmStatus {
+  if (count >= 3) return CrmStatus.CONCLUIDO;
+  if (count === 2) return CrmStatus.EM_ANDAMENTO;
+  return CrmStatus.INICIADO;
+}
+function normalizeCrmDoseDates(values: string[]) {
+  return [...new Set(values)].sort().map((value) => new Date(`${value}T00:00:00.000Z`));
+}
+async function crmProduct(productType: CrmProductType, productId: number) {
+  if (productType === CrmProductType.INJETAVEL) {
+    const product = await prisma.injectable.findUnique({ where: { id: productId }, select: { id: true, name: true } });
+    return product;
+  }
+  return prisma.procedure.findFirst({ where: { id: productId, active: true }, select: { id: true, name: true } });
+}
+const crmTreatmentInclude = {
+  patient: { select: { id: true, fullName: true, phone: true } },
+  doses: { orderBy: { doseDate: "asc" as const }, select: { id: true, doseDate: true } },
+} as const;
+function serializeCrmTreatment(item: any) {
+  return {
+    ...item,
+    doseDates: item.doses.map((dose: any) => String(dose.doseDate).slice(0, 10)),
+    doseCount: item.doses.length,
+  };
+}
+
+app.get("/api/admin/crm/catalog", async (_req, res) => {
+  const [patients, injectables, procedures] = await Promise.all([
+    prisma.patient.findMany({ orderBy: { fullName: "asc" }, select: { id: true, fullName: true, phone: true } }),
+    prisma.injectable.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, type: true } }),
+    prisma.procedure.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true } }),
+  ]);
+  res.json({ patients, injectables, procedures });
+});
+app.get("/api/admin/crm/treatments", async (_req, res) => {
+  const treatments = await prisma.crmTreatment.findMany({ orderBy: [{ updatedAt: "desc" }, { id: "desc" }], include: crmTreatmentInclude });
+  res.json(treatments.map(serializeCrmTreatment));
+});
+app.post("/api/admin/crm/treatments", async (req, res) => {
+  const parsed = crmTreatmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Preencha paciente, produto, categoria e as datas das doses corretamente." });
+  const [patient, product] = await Promise.all([
+    prisma.patient.findUnique({ where: { id: parsed.data.patientId }, select: { id: true } }),
+    crmProduct(parsed.data.productType, parsed.data.productId),
+  ]);
+  if (!patient) return res.status(400).json({ message: "Paciente não encontrado." });
+  if (!product) return res.status(400).json({ message: "Produto ou processo não encontrado ou inativo." });
+  const doseDates = normalizeCrmDoseDates(parsed.data.doseDates);
+  const treatment = await prisma.crmTreatment.create({
+    data: {
+      patientId: patient.id,
+      productType: parsed.data.productType,
+      productId: product.id,
+      productName: product.name,
+      category: parsed.data.category,
+      status: crmStatusForDoseCount(doseDates.length),
+      observation: parsed.data.observation || null,
+      doses: { create: doseDates.map((doseDate) => ({ doseDate })) },
+    },
+    include: crmTreatmentInclude,
+  });
+  res.status(201).json(serializeCrmTreatment(treatment));
+});
+app.put("/api/admin/crm/treatments/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const parsed = crmTreatmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Preencha paciente, produto, categoria e as datas das doses corretamente." });
+  const [patient, product, existing] = await Promise.all([
+    prisma.patient.findUnique({ where: { id: parsed.data.patientId }, select: { id: true } }),
+    crmProduct(parsed.data.productType, parsed.data.productId),
+    prisma.crmTreatment.findUnique({ where: { id }, select: { id: true } }),
+  ]);
+  if (!existing) return res.status(404).json({ message: "Atendimento CRM não encontrado." });
+  if (!patient) return res.status(400).json({ message: "Paciente não encontrado." });
+  if (!product) return res.status(400).json({ message: "Produto ou processo não encontrado ou inativo." });
+  const doseDates = normalizeCrmDoseDates(parsed.data.doseDates);
+  const treatment = await prisma.$transaction(async (tx) => {
+    await tx.crmDose.deleteMany({ where: { treatmentId: id } });
+    return tx.crmTreatment.update({
+      where: { id },
+      data: {
+        patientId: patient.id,
+        productType: parsed.data.productType,
+        productId: product.id,
+        productName: product.name,
+        category: parsed.data.category,
+        status: crmStatusForDoseCount(doseDates.length),
+        observation: parsed.data.observation || null,
+        doses: { create: doseDates.map((doseDate) => ({ doseDate })) },
+      },
+      include: crmTreatmentInclude,
+    });
+  });
+  res.json(serializeCrmTreatment(treatment));
+});
+app.patch("/api/admin/crm/treatments/:id/status", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const parsed = crmStatusSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Status de CRM inválido." });
+  const treatment = await prisma.crmTreatment.update({ where: { id }, data: { status: parsed.data.status }, include: crmTreatmentInclude });
+  res.json(serializeCrmTreatment(treatment));
+});
+app.delete("/api/admin/crm/treatments/:id", async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.crmTreatment.delete({ where: { id } });
+  res.status(204).send();
+});
 
 app.get("/api/admin/clinical-document-doctors", async (_req, res) => {
   res.json(await prisma.doctor.findMany({

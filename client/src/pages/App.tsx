@@ -27,6 +27,7 @@ import { ExamGroupsPage } from "./ExamGroupsPage";
 import { CertificateSettingsPage } from "./CertificateSettingsPage";
 import { ReportsPage } from "./ReportsPage";
 import { FinancialPage } from "./FinancialPage";
+import { CrmPage } from "./CrmPage";
 
 export function App() {
   const [user, setUser] = useState<any>(null);
@@ -200,6 +201,8 @@ export function App() {
             ) : (
               <Dashboard setModule={setModule} user={user} />
             )
+          ) : module === "crm" ? (
+            normalizedProfile === "ADMINISTRADOR" ? <CrmPage /> : <Dashboard setModule={setModule} user={user} />
           ) : module === "doctor-day" ? (
             user.profile === "MEDICO" ? (
               <DoctorAgendaPage

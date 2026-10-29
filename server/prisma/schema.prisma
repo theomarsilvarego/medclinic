@@ -220,6 +220,7 @@ model Patient {
   appointmentAttachments AppointmentAttachment[]
   anamneses             PatientAnamnesis[]
   clinicalDocuments     ClinicalDocument[]
+  crmTreatments         CrmTreatment[]
 
   @@index([fullName])
   @@index([cpf])
@@ -511,6 +512,57 @@ model ProcedureRequest {
   @@index([patientId])
   @@index([requestedById])
   @@map("procedure_requests")
+}
+
+enum CrmCategory {
+  VACINAS
+  VITAMINAS
+  PROTOCOLOS
+  MEDICACOES
+  LASER_INTIMO
+  CLAREAMENTO_INTIMO
+  MANUTENCAO_LASER
+}
+
+enum CrmStatus {
+  INICIADO
+  EM_ANDAMENTO
+  CONCLUIDO
+}
+
+enum CrmProductType {
+  INJETAVEL
+  PROCEDIMENTO
+}
+
+model CrmTreatment {
+  id            Int            @id @default(autoincrement())
+  patientId     Int            @map("patient_id")
+  productType   CrmProductType  @map("product_type")
+  productId     Int            @map("product_id")
+  productName   String         @map("product_name") @db.VarChar(160)
+  category      CrmCategory
+  status        CrmStatus       @default(INICIADO)
+  observation   String?         @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  patient       Patient         @relation(fields: [patientId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  doses         CrmDose[]
+
+  @@index([patientId])
+  @@index([status])
+  @@map("crm_treatments")
+}
+
+model CrmDose {
+  id          Int          @id @default(autoincrement())
+  treatmentId Int          @map("treatment_id")
+  doseDate    DateTime     @map("dose_date") @db.Date
+  createdAt   DateTime     @default(now()) @map("created_at")
+  treatment   CrmTreatment @relation(fields: [treatmentId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  @@index([treatmentId, doseDate])
+  @@map("crm_doses")
 }
 
 

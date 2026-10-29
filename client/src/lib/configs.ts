@@ -14,6 +14,7 @@ export const configs: Record<
     | "cash"
     | "accounts"
     | "sales"
+    | "crm"
   >,
   {
     path: string;
