@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { CalendarDays, Check, Plus, X } from "lucide-react";
 
 type Status = "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
@@ -73,6 +73,19 @@ export function CrmTreatmentModal({
   onUpdateDose,
   onRemoveDose,
 }: Props) {
+  const [patientSearch, setPatientSearch] = useState("");
+  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
+  const normalizedPatientSearch = patientSearch.trim().toLocaleLowerCase("pt-BR");
+  const filteredPatients = catalog.patients.filter((patient) =>
+    !normalizedPatientSearch || patient.fullName.toLocaleLowerCase("pt-BR").includes(normalizedPatientSearch),
+  );
+  const selectedPatient = catalog.patients.find(
+    (patient) => Number(patient.id) === Number(form.patientId),
+  );
+  const patientOptions = selectedPatient && !filteredPatients.some(
+    (patient) => Number(patient.id) === Number(selectedPatient.id),
+  ) ? [selectedPatient, ...filteredPatients] : filteredPatients;
+
   return (
     <div className="modal-backdrop appointment-backdrop">
       <div className="modal appointment-modal crm-treatment-modal">
@@ -97,20 +110,48 @@ export function CrmTreatmentModal({
             {error && <div className="error" role="alert">{error}</div>}
 
             <section className="appointment-section crm-treatment-section">
-              <label className="crm-field-full">
+              <label className="appointment-patient-field crm-field-full">
                 Paciente
-                <select
-                  required
-                  value={form.patientId}
-                  onChange={(event) => onUpdateForm("patientId", event.target.value)}
-                >
-                  <option value="">Selecione o paciente</option>
-                  {catalog.patients.map((patient) => (
-                    <option value={patient.id} key={patient.id}>
-                      {patient.fullName}
-                    </option>
-                  ))}
-                </select>
+                <div className="appointment-patient-picker">
+                  <input
+                    className="appointment-patient-search"
+                    type="search"
+                    required={!form.patientId}
+                    value={patientSearch || selectedPatient?.fullName || ""}
+                    onFocus={() => setPatientPickerOpen(true)}
+                    onBlur={() => setTimeout(() => setPatientPickerOpen(false), 120)}
+                    onChange={(event) => {
+                      setPatientSearch(event.target.value);
+                      setPatientPickerOpen(true);
+                      if (!event.target.value) onUpdateForm("patientId", "");
+                    }}
+                    placeholder="Buscar paciente por nome"
+                    aria-label="Buscar paciente por nome"
+                    aria-expanded={patientPickerOpen}
+                    aria-autocomplete="list"
+                  />
+                  {patientPickerOpen && (
+                    <div className="appointment-patient-options" role="listbox">
+                      {patientOptions.length ? patientOptions.map((patient) => (
+                        <button
+                          type="button"
+                          key={patient.id}
+                          className={Number(form.patientId) === Number(patient.id) ? "selected" : ""}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            onUpdateForm("patientId", String(patient.id));
+                            setPatientSearch(patient.fullName);
+                            setPatientPickerOpen(false);
+                          }}
+                        >
+                          {patient.fullName}
+                        </button>
+                      )) : (
+                        <span className="appointment-patient-empty">Nenhum paciente encontrado.</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </label>
             </section>
 
