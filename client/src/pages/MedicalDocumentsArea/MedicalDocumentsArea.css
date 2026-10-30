@@ -53,11 +53,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--line);
+  /* border: 1px solid var(--line);
   border-radius: 9px;
   background: #fff;
   padding: 10px 12px;
-  color: #9a8790;
+  color: #9a8790; */
 }
 .medical-document-search:focus-within {
   border-color: var(--rose);

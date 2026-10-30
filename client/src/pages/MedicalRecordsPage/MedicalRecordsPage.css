@@ -1936,7 +1936,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  min-height: 82px;
+  /* min-height: 82px; */
   padding: 17px 16px;
   border: 1px solid #eadde2;
   border-radius: 13px;
@@ -2609,7 +2609,7 @@
 }
 .injectable-selected-list .injectable-row,
 .procedure-selected-list .procedure-row {
-  flex: 1 1 300px;
+  /* flex: 1 1 300px; */
   border-radius: 10px;
 }
 
@@ -2799,10 +2799,10 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 6px 8px 6px 11px;
+  /* padding: 6px 8px 6px 11px;
   border: 1px solid #e7cbd3;
   border-radius: 999px;
-  background: #fff7f9;
+  background: #fff7f9; */
 }
 .injectable-selection-line .injectable-row-name {
   flex: 1;
@@ -2818,7 +2818,7 @@
   flex: 0 1 340px;
   min-height: 46px;
   border: 1px solid #e7cbd3;
-  border-radius: 999px;
+  /* border-radius: 999px; */
   background: #fff7f9;
 }
 .procedure-selected-list {

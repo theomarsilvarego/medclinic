@@ -668,14 +668,6 @@ function UltrasoundRequestsArea({
                     </span>
                     <span>
                       <strong>{item.name}</strong>
-                      <small>
-                        {requested
-                          ? "Já solicitado neste prontuário"
-                          : Number(item.value || 0).toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                      </small>
                     </span>
                   </button>
                 );
@@ -1434,10 +1426,10 @@ function InjectableRequestsArea({
                 </div>
               </div>
               <span className="injectable-status">Aguardando aplicação</span>
-              <small className="injectable-audit">
+              {/* <small className="injectable-audit">
                 Por: {item.requestedBy?.fullName || "Médico"} ·{" "}
                 {new Date(item.requestedAt).toLocaleDateString("pt-BR")}
-              </small>
+              </small> */}
             </div>
           ))}
         </div>
@@ -1646,10 +1638,10 @@ function ProcedureRequestsArea({
                 </div>
               </div>
               <span className="procedure-status">Aguardando agendamento</span>
-              <small className="procedure-audit">
+              {/* <small className="procedure-audit">
                 Por: {item.requestedBy?.fullName || "Médico"} ·{" "}
                 {new Date(item.requestedAt).toLocaleDateString("pt-BR")}
-              </small>
+              </small> */}
             </div>
           ))}
         </div>
@@ -2661,10 +2653,6 @@ function ClinicalEvolutionEditor({
 
   return (
     <div className="clinical-evolution-editor">
-      <p className="clinical-field-mapping-note">
-        A evolução é serializada no campo Conduta já existente, mantendo
-        compatibilidade sem alterar a API.
-      </p>
       <div className="clinical-evolution-fields">
         <GrowingTextarea
           label="Conduta"
@@ -2758,8 +2746,10 @@ function RecordTimelineCard({
       examRequests.length + ultrasoundRequests.length + imageProcedures.length,
     injectables: injectableRequests.length,
     procedures: standardProcedures.length,
-    prescriptions: clinicalDocuments.filter((item) => item.type === "RECEITA").length,
-    attestations: clinicalDocuments.filter((item) => item.type === "ATESTADO").length,
+    prescriptions: clinicalDocuments.filter((item) => item.type === "RECEITA")
+      .length,
+    attestations: clinicalDocuments.filter((item) => item.type === "ATESTADO")
+      .length,
     attachments: attachments.length,
   };
   const tabs: { id: EncounterTab; label: string; icon: React.ReactNode }[] = [
@@ -2772,7 +2762,11 @@ function RecordTimelineCard({
       icon: <ClipboardCheck size={16} />,
     },
     { id: "prescriptions", label: "Receitas", icon: <FileText size={16} /> },
-    { id: "attestations", label: "Atestados", icon: <ClipboardCheck size={16} /> },
+    {
+      id: "attestations",
+      label: "Atestados",
+      icon: <ClipboardCheck size={16} />,
+    },
     { id: "attachments", label: "Anexos", icon: <Paperclip size={16} /> },
   ];
   const parsed = parseEvolution(record.conduct);
