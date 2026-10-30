@@ -508,7 +508,8 @@ export function CrmPage() {
                 <X size={19} />
               </button>
             </header>
-            <form onSubmit={save} className="crm-form">
+            <form id="crm-treatment-form" onSubmit={save} className="crm-form">
+              <div className="crm-modal-body">
               <label className="crm-field-full">
                 Paciente
                 <select
@@ -650,21 +651,27 @@ export function CrmPage() {
                 />
               </label>
               {error && <div className="error">{error}</div>}
-              <footer className="modal-footer">
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => setModalOpen(false)}
-                  disabled={saving}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="primary" disabled={saving}>
-                  <Check size={16} />{" "}
-                  {saving ? "Salvando…" : "Salvar atendimento"}
-                </button>
-              </footer>
+              </div>
             </form>
+            <footer className="modal-footer">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="crm-treatment-form"
+                className="primary"
+                disabled={saving}
+              >
+                <Check size={16} />{" "}
+                {saving ? "Salvando…" : "Salvar atendimento"}
+              </button>
+            </footer>
           </section>
         </div>
       )}

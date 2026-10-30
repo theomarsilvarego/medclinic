@@ -8771,7 +8771,13 @@ tr:last-child td {
 .crm-modal {
   width: min(660px, 100%);
   max-height: min(92vh, 850px);
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.crm-modal .modal-header {
+  flex: 0 0 auto;
+  padding: 18px 22px 14px;
 }
 .crm-modal .modal-header span {
   display: block;
@@ -8780,15 +8786,25 @@ tr:last-child td {
   font-size: 12px;
 }
 .crm-form {
+  display: block;
+  min-height: 0;
+}
+.crm-modal-body {
   display: grid;
-  gap: 16px;
-  padding: 22px 25px 0;
+  gap: 12px;
+  max-height: min(62vh, 575px);
+  overflow-y: auto;
+  padding: 16px 22px 4px;
+}
+.crm-modal .modal-footer {
+  flex: 0 0 auto;
+  padding: 12px 22px 14px;
 }
 .crm-form label,
 .crm-section-heading label {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
   color: #55474d;
   font-size: 12px;
   font-weight: 800;
@@ -8801,7 +8817,7 @@ tr:last-child td {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fffdfd;
-  padding: 11px 12px;
+  padding: 9px 11px;
   color: var(--ink);
   font: inherit;
   font-weight: 500;
@@ -8822,7 +8838,7 @@ tr:last-child td {
   gap: 14px;
 }
 .crm-dose-section {
-  padding: 15px;
+  padding: 12px;
   border: 1px solid #eadcdf;
   border-radius: 12px;
   background: #fffafb;
@@ -8861,7 +8877,7 @@ tr:last-child td {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #8e727c;
   font-size: 11px;
 }
@@ -8892,8 +8908,8 @@ tr:last-child td {
   .crm-form-grid {
     grid-template-columns: 1fr;
   }
-  .crm-form {
-    padding: 18px 17px 0;
+  .crm-modal-body {
+    padding: 14px 17px 2px;
   }
   .crm-modal .modal-header {
     padding: 18px 17px;
