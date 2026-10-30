@@ -272,42 +272,58 @@
   line-height: 1.45;
 }
 .financial-form-modal {
-  width: min(520px, calc(100vw - 28px));
-}
-.financial-form-modal form {
-  padding: 20px 22px 0;
-}
-.financial-form-modal label {
+  width: min(900px, calc(100vw - 40px));
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-bottom: 16px;
-  color: #4f474b;
-  font-size: 13px;
-  font-weight: 700;
 }
-.financial-form-modal input,
-.financial-form-modal select {
+.financial-form-modal .financial-form {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+.financial-form-modal .financial-form-fields {
+  flex: 1 1 auto;
+  max-height: calc(90vh - 150px);
+}
+.financial-form-modal .financial-form-section {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.financial-form-modal .financial-form-section h3 {
+  grid-column: 1 / -1;
+}
+.financial-form-modal .financial-form-section label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: #53494d;
+  font-size: 12px;
+  font-weight: 800;
+}
+.financial-form-modal .financial-form-section label input,
+.financial-form-modal .financial-form-section label select {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  min-height: 44px;
   padding: 11px 12px;
+  border: 1px solid #e3dfe0;
+  border-radius: 10px;
   background: #fff;
   color: var(--ink);
-  outline: 0;
+  font-size: 13px;
+  font-weight: 500;
 }
-.financial-form-modal input:focus,
-.financial-form-modal select:focus {
-  border-color: var(--rose);
-  box-shadow: 0 0 0 4px #f4e7ea;
+.financial-form-modal .financial-form-section label input:focus-visible,
+.financial-form-modal .financial-form-section label select:focus-visible {
+  border-color: #a9556e;
+  outline: 3px solid #f4e7ea;
+  outline-offset: 1px;
 }
 .financial-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 13px;
-}
-.financial-form-modal .modal-footer {
-  margin: 6px -22px 0;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 22px;
 }
 @media (max-width: 900px) {
   .financial-summary {
@@ -345,6 +361,14 @@
   }
   .financial-form-grid {
     grid-template-columns: 1fr;
-    gap: 0;
+  }
+  .financial-form-modal {
+    width: calc(100vw - 24px);
+  }
+  .financial-form-modal .financial-form-fields {
+    max-height: calc(100vh - 150px);
+  }
+  .financial-form-modal .financial-form-section {
+    grid-template-columns: 1fr;
   }
 }
