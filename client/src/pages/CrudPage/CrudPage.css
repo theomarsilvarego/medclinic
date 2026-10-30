@@ -44,3 +44,93 @@
   height: 16px;
   accent-color: var(--brand);
 }
+
+
+/* Non-patient CRUD dialogs use the appointment modal's framed, responsive layout. */
+.crud-entry-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(700px, 100%);
+  max-height: min(92vh, 850px);
+  overflow: hidden;
+}
+.crud-entry-modal .appointment-modal-header {
+  flex: 0 0 auto;
+  padding: 23px 25px 18px;
+}
+.crud-entry-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 25px;
+  background: var(--paper);
+}
+.crud-entry-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 17px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(75, 50, 55, 0.025);
+}
+.crud-entry-section > * {
+  min-width: 0;
+}
+.crud-entry-section label {
+  margin-bottom: 16px;
+  color: #53494d;
+  font-size: 12px;
+  font-weight: 800;
+}
+.crud-entry-section label input,
+.crud-entry-section label select,
+.crud-entry-section label textarea {
+  min-height: 44px;
+  padding: 11px 12px;
+  border-color: #e3dfe0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.crud-entry-section label textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+.crud-entry-section .modal-field-full-width {
+  grid-column: 1 / -1;
+}
+.crud-entry-modal .appointment-modal-footer {
+  flex: 0 0 auto;
+  padding: 18px 25px;
+}
+@media (max-width: 620px) {
+  .crud-entry-modal {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+  .crud-entry-modal .appointment-modal-header {
+    padding: 18px 17px;
+  }
+  .crud-entry-fields {
+    padding: 16px 17px;
+  }
+  .crud-entry-section {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+    border-radius: 15px;
+  }
+  .crud-entry-modal .appointment-modal-footer {
+    flex-wrap: wrap;
+    padding: 14px 17px;
+  }
+  .crud-entry-modal .appointment-modal-footer button {
+    flex: 1;
+    min-width: 0;
+  }
+}

@@ -253,12 +253,12 @@ export function Modal({
       }}
     >
       <div
-        className={`modal${isPatientForm ? " patient-modal" : ""}`}
+        className={`modal${isPatientForm ? " patient-modal" : " appointment-modal crud-entry-modal"}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        <div className="modal-header">
+        <div className={`modal-header${isPatientForm ? "" : " appointment-modal-header"}`}>
           <div>
             <p className="eyebrow">CADASTRO</p>
             <h2 id="modal-title">{title}</h2>
@@ -387,57 +387,57 @@ export function Modal({
             ))}
           </div>
         ) : (
-          <div className="modal-fields">
-            {fields.map((field) =>
-              field.type === "file" ? (
-                <label
-                  key={field.key}
-                  data-field-key={field.key}
-                  className={`modal-form-field${field.fullWidth ? " modal-field-full-width" : ""}`}
-                >
-                  <span>{field.label}</span>
-                  <div className="patient-photo-picker">
-                    <div
-                      className="patient-photo-preview"
-                      onPointerDown={startDragging}
-                      onPointerMove={dragPhoto}
-                      onPointerUp={stopDragging}
-                      onPointerCancel={stopDragging}
-                    >
-                      {preview ? (
-                        <img
-                          src={preview}
-                          alt="Prévia enquadrada da foto do paciente"
-                          style={{ objectPosition: `${offsetX}% ${offsetY}%` }}
+          <div className="modal-fields appointment-modal-fields crud-entry-fields">
+            <section className="appointment-section crud-entry-section">
+              {fields.map((field) =>
+                field.type === "file" ? (
+                  <label
+                    key={field.key}
+                    data-field-key={field.key}
+                    className={`modal-form-field${field.fullWidth ? " modal-field-full-width" : ""}`}
+                  >
+                    <span>{field.label}</span>
+                    <div className="patient-photo-picker">
+                      <div
+                        className="patient-photo-preview"
+                        onPointerDown={startDragging}
+                        onPointerMove={dragPhoto}
+                        onPointerUp={stopDragging}
+                        onPointerCancel={stopDragging}
+                      >
+                        {preview ? (
+                          <img
+                            src={preview}
+                            alt="Prévia enquadrada da foto do paciente"
+                            style={{ objectPosition: `${offsetX}% ${offsetY}%` }}
+                          />
+                        ) : (
+                          <ImagePlus size={28} />
+                        )}
+                      </div>
+                      <div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          onChange={(event) => handlePhoto(event.target.files?.[0])}
                         />
-                      ) : (
-                        <ImagePlus size={28} />
-                      )}
+                        <small>
+                          {preview
+                            ? "Arraste a foto dentro da thumb para enquadrar."
+                            : "JPG ou PNG, até 10 MB."}
+                        </small>
+                      </div>
                     </div>
-                    <div>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png"
-                        onChange={(event) =>
-                          handlePhoto(event.target.files?.[0])
-                        }
-                      />
-                      <small>
-                        {preview
-                          ? "Arraste a foto dentro da thumb para enquadrar."
-                          : "JPG ou PNG, até 10 MB."}
-                      </small>
-                    </div>
-                  </div>
-                </label>
-              ) : (
-                renderField(field)
-              ),
-            )}
+                  </label>
+                ) : (
+                  renderField(field)
+                ),
+              )}
+            </section>
           </div>
         )}
-        <div className="modal-footer">
+        <div className={`modal-footer${isPatientForm ? "" : " appointment-modal-footer"}`}>
           <button className="secondary" type="button" onClick={onClose}>
             Cancelar
           </button>
