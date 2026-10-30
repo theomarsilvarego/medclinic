@@ -3148,7 +3148,7 @@
 .appointment-modal,
 .appointment-modal-fields,
 .appointment-section {
-  width: 100%;
+  /* width: 100%; */
   min-width: 0;
 }
 .appointment-modal-fields {
