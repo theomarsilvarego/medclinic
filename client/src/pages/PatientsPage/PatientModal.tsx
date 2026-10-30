@@ -15,7 +15,7 @@ type FormField = {
 
 const patientSectionOrder = ["Dados pessoais", "Contato", "Saúde"];
 
-export function Modal({
+export function PatientModal({
   title,
   fields,
   initial,
@@ -35,10 +35,7 @@ export function Modal({
   const [offsetY, setOffsetY] = useState(50);
   const dragPoint = useRef<{ x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isPatientForm = fields.some(
-    (field) => field.key === "allergies" || field.key === "insuranceCode",
-  );
-  const isEditingPatient = isPatientForm && Boolean(initial.id);
+  const isEditingPatient = Boolean(initial.id);
   const photoField = fields.find((field) => field.key === "photo");
   const insuranceField = fields.find((field) => field.key === "insuranceCode");
   const patientSections = useMemo(
@@ -253,16 +250,16 @@ export function Modal({
       }}
     >
       <div
-        className={`modal${isPatientForm ? " patient-modal" : " appointment-modal crud-entry-modal"}`}
+        className="modal patient-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        <div className={`modal-header${isPatientForm ? "" : " appointment-modal-header"}`}>
+        <div className="modal-header">
           <div>
             <p className="eyebrow">CADASTRO</p>
             <h2 id="modal-title">{title}</h2>
-            <span className="modal-identification-code" aria-label="Código do modal A003">A003</span>
+            <span className="modal-identification-code" aria-label="Código do modal A013">A013</span>
           </div>
           <button
             className="icon-button"
@@ -273,7 +270,6 @@ export function Modal({
             <X size={19} />
           </button>
         </div>
-        {isPatientForm ? (
           <div className="modal-fields patient-form-fields">
             {photoField && (
               <div className="patient-photo-toolbar">
@@ -386,58 +382,7 @@ export function Modal({
               </section>
             ))}
           </div>
-        ) : (
-          <div className="modal-fields appointment-modal-fields crud-entry-fields">
-            <section className="appointment-section crud-entry-section">
-              {fields.map((field) =>
-                field.type === "file" ? (
-                  <label
-                    key={field.key}
-                    data-field-key={field.key}
-                    className={`modal-form-field${field.fullWidth ? " modal-field-full-width" : ""}`}
-                  >
-                    <span>{field.label}</span>
-                    <div className="patient-photo-picker">
-                      <div
-                        className="patient-photo-preview"
-                        onPointerDown={startDragging}
-                        onPointerMove={dragPhoto}
-                        onPointerUp={stopDragging}
-                        onPointerCancel={stopDragging}
-                      >
-                        {preview ? (
-                          <img
-                            src={preview}
-                            alt="Prévia enquadrada da foto do paciente"
-                            style={{ objectPosition: `${offsetX}% ${offsetY}%` }}
-                          />
-                        ) : (
-                          <ImagePlus size={28} />
-                        )}
-                      </div>
-                      <div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png"
-                          onChange={(event) => handlePhoto(event.target.files?.[0])}
-                        />
-                        <small>
-                          {preview
-                            ? "Arraste a foto dentro da thumb para enquadrar."
-                            : "JPG ou PNG, até 10 MB."}
-                        </small>
-                      </div>
-                    </div>
-                  </label>
-                ) : (
-                  renderField(field)
-                ),
-              )}
-            </section>
-          </div>
-        )}
-        <div className={`modal-footer${isPatientForm ? "" : " appointment-modal-footer"}`}>
+        <div className="modal-footer">
           <button className="secondary" type="button" onClick={onClose}>
             Cancelar
           </button>

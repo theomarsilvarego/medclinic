@@ -19,7 +19,16 @@ import { canAccessModule, menuGroups, modules } from "../../lib/modules";
 import { profileLabel, request } from "../../lib/app";
 import { Login } from "../Login/Login";
 import { Dashboard } from "../Dashboard/Dashboard";
-import { CrudPage } from "../CrudPage/CrudPage";
+import { PatientsPage } from "../PatientsPage/PatientsPage";
+import { AttendancesPage } from "../AttendancesPage/AttendancesPage";
+import { UsersPage } from "../UsersPage/UsersPage";
+import { ClinicPage } from "../ClinicPage/ClinicPage";
+import { DoctorsPage } from "../DoctorsPage/DoctorsPage";
+import { InsurancesPage } from "../InsurancesPage/InsurancesPage";
+import { ProceduresPage } from "../ProceduresPage/ProceduresPage";
+import { InjectablesPage } from "../InjectablesPage/InjectablesPage";
+import { SuppliersPage } from "../SuppliersPage/SuppliersPage";
+import { ExamTypesPage } from "../ExamTypesPage/ExamTypesPage";
 import { AppointmentsPage } from "../AppointmentsPage/AppointmentsPage";
 import { DoctorAgendaPage } from "../DoctorAgendaPage/DoctorAgendaPage";
 import { MedicalRecordsPage } from "../MedicalRecordsPage/MedicalRecordsPage";
@@ -248,9 +257,8 @@ export function App() {
             )
           ) : module === "appointments" ? (
             <AppointmentsPage user={user} />
-          ) : (
-            <CrudPage
-              module={module}
+          ) : module === "patients" ? (
+            <PatientsPage
               profile={user.profile}
               onOpenPatientRecords={(patientId) => {
                 setRecordPatientId(patientId);
@@ -259,7 +267,16 @@ export function App() {
                 setModule("medical-records");
               }}
             />
-          )}
+          ) : module === "attendances" ? <AttendancesPage />
+          : module === "users" ? <UsersPage />
+          : module === "clinic" ? <ClinicPage />
+          : module === "doctors" ? <DoctorsPage />
+          : module === "insurances" ? <InsurancesPage />
+          : module === "procedures" ? <ProceduresPage />
+          : module === "injectables" ? <InjectablesPage />
+          : module === "suppliers" ? <SuppliersPage />
+          : module === "exam-types" ? <ExamTypesPage />
+          : <Dashboard setModule={setModule} user={user} />}
         </main>
       </div>
     </div>
