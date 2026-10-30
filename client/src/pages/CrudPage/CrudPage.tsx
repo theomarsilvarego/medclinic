@@ -12,6 +12,7 @@ import { getRowId, request } from "../../lib/app";
 import { getStateFromPhone } from "../../lib/brazilian-ddd";
 import { configs } from "../../lib/configs";
 import { Modal } from "./Modal";
+import "./CrudPage.css";
 
 type CrudPageProps = {
   module: ModuleKey;

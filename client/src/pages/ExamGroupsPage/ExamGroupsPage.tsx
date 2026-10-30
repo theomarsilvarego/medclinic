@@ -6,10 +6,12 @@ import {
   Plus,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { money, request } from "../../lib/app";
+import { ExamGroupValuesModal } from "./ExamGroupValuesModal";
+import { ExamGroupFormModal } from "./ExamGroupFormModal";
 import type { Row } from "../../lib/app";
+import "./ExamGroupsPage.css";
 
 type ExamGroup = Row & { items?: Row[] };
 
@@ -220,140 +222,14 @@ export function ExamGroupsPage() {
         )}
       </section>
 
-      {viewingGroup && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget && setViewingGroup(null)
-          }
-        >
-          <section
-            className="exam-group-values-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="exam-group-values-title"
-          >
-            <div className="modal-header">
-              <div>
-                <p className="eyebrow">CONFIGURAÇÃO MÉDICA</p>
-                <h2 id="exam-group-values-title">Tipos de exames</h2>
-                <span className="exam-group-values-subtitle">{viewingGroup.name}</span>
-              </div>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setViewingGroup(null)}
-                aria-label="Fechar relação de exames"
-              >
-                <X size={19} />
-              </button>
-            </div>
-            <div className="exam-group-values-content">
-              <div className="exam-group-values-table" role="table" aria-label={`Tipos de exames do grupo ${viewingGroup.name}`}>
-                <div className="exam-group-values-row exam-group-values-head" role="row">
-                  <span role="columnheader">Tipo de exame</span>
-                  <span role="columnheader">Valor nota</span>
-                  <span role="columnheader">Valor</span>
-                </div>
-                {viewingItems.map((item) => (
-                  <div className="exam-group-values-row" role="row" key={item.id}>
-                    <span role="cell">
-                      {item.examType?.code ? `${item.examType.code} · ` : ""}
-                      {item.examType?.name || "Exame"}
-                    </span>
-                    <strong role="cell">{money(Number(item.examType?.invoiceValue || 0))}</strong>
-                    <strong role="cell">{money(Number(item.examType?.value || 0))}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="exam-group-values-footer">
-              <strong>Total</strong>
-              <strong>{money(invoiceTotal)}</strong>
-              <strong>{money(valueTotal)}</strong>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="secondary" onClick={() => setViewingGroup(null)}>
-                Fechar
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      {viewingGroup && <ExamGroupValuesModal group={viewingGroup} onClose={() => setViewingGroup(null)} />}
 
-      {editing && (
-        <div className="modal-backdrop">
-          <form className="exam-group-modal" onSubmit={save}>
-            <div className="modal-header">
-              <div>
-                <p className="eyebrow">CONFIGURAÇÃO MÉDICA</p>
-                <h2>{editing.id ? "Editar grupo" : "Novo grupo de exames"}</h2>
-              </div>
-              <button type="button" className="icon-button" onClick={() => setEditing(null)}>
-                <X size={19} />
-              </button>
-            </div>
-            <div className="exam-group-form">
-              <label>
-                Nome do grupo
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Ex.: Check-up anual"
-                />
-              </label>
-              <div className="exam-picker-head">
-                <div>
-                  <strong>Exames do grupo</strong>
-                  <small>Selecione um ou mais tipos cadastrados.</small>
-                </div>
-                <span>{selectedIds.length} selecionado(s)</span>
-              </div>
-              <label className="exam-search">
-                <Search size={15} />
-                <input
-                  value={examSearch}
-                  onChange={(event) => setExamSearch(event.target.value)}
-                  placeholder="Pesquisar exame por código ou nome..."
-                />
-              </label>
-              <div className="exam-picker">
-                {filteredExams.length === 0 ? (
-                  <span className="exam-picker-empty">Nenhum tipo de exame disponível.</span>
-                ) : (
-                  filteredExams.map((exam) => (
-                    <label
-                      className={selectedIds.includes(Number(exam.id)) ? "exam-option selected" : "exam-option"}
-                      key={exam.id}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(Number(exam.id))}
-                        onChange={() => toggleExam(Number(exam.id))}
-                      />
-                      <span>
-                        <strong>{exam.name}</strong>
-                        <small>
-                          {exam.code} · {money(Number(exam.value || 0))}
-                        </small>
-                      </span>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="secondary" onClick={() => setEditing(null)}>
-                Cancelar
-              </button>
-              <button type="submit" className="primary" disabled={saving}>
-                {saving ? "Salvando…" : "Salvar grupo"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {editing && <ExamGroupFormModal
+        editing={editing} name={name} selectedIds={selectedIds} examSearch={examSearch}
+        saving={saving} error={error} filteredExams={filteredExams}
+        onClose={() => setEditing(null)} onSave={save} onNameChange={setName}
+        onSearchChange={setExamSearch} onToggleExam={toggleExam}
+      />}
     </>
   );
 }

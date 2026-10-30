@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, HeartPulse, LoaderCircle, ShieldCheck } from "lucide-react";
 import { API } from "../../lib/app";
 import "./anamnesis.css";
+import "./AnamnesisPage.css";
 
 type Answers = {
   orderNumber: string;

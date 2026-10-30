@@ -14,6 +14,7 @@ import {
 import type { ModuleKey } from "../../lib/app";
 import { profileGreeting } from "../../lib/app";
 import { SecretaryDashboard } from "../SecretaryDashboard/SecretaryDashboard";
+import "./Dashboard.css";
 export function Dashboard({
   setModule,
   user,

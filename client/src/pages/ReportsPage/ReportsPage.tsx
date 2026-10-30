@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Download, FileSpreadsheet, FileText, LoaderCircle, RefreshCw } from "lucide-react";
 import { getStateFromPhone } from "../../lib/brazilian-ddd";
 import { money, request, type Row } from "../../lib/app";
+import "./ReportsPage.css";
 
 type ReportColumn = { key: string; label: string; value: (row: Row) => unknown };
 type ReportDefinition = { id: string; title: string; description: string; endpoint: (date: string) => string; columns: ReportColumn[]; dateFilter?: boolean };

@@ -7,9 +7,10 @@ import {
   Plus,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { request } from "../../lib/app";
+import { CrmTreatmentModal } from "./CrmTreatmentModal";
+import "./CrmPage.css";
 
 type Status = "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
 type ProductType = "INJETAVEL" | "PROCEDIMENTO";
@@ -476,204 +477,21 @@ export function CrmPage() {
         </div>
       )}
       {modalOpen && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget &&
-            !saving &&
-            setModalOpen(false)
-          }
-        >
-          <section
-            className="modal crm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="crm-modal-title"
-          >
-            <header className="modal-header">
-              <div>
-                <p className="eyebrow">CRM · ATENDIMENTO</p>
-                <h2 id="crm-modal-title">
-                  {editing ? "Editar atendimento" : "Novo atendimento"}
-                </h2>
-                <span>Registre cada dose ou sessão do paciente.</span>
-              </div>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setModalOpen(false)}
-                disabled={saving}
-                aria-label="Fechar"
-              >
-                <X size={19} />
-              </button>
-            </header>
-            <form id="crm-treatment-form" onSubmit={save} className="crm-form">
-              <div className="crm-modal-body">
-              <label className="crm-field-full">
-                Paciente
-                <select
-                  required
-                  value={form.patientId}
-                  onChange={(event) =>
-                    updateForm("patientId", event.target.value)
-                  }
-                >
-                  <option value="">Selecione o paciente</option>
-                  {catalog.patients.map((patient) => (
-                    <option value={patient.id} key={patient.id}>
-                      {patient.fullName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="crm-form-grid">
-                <label>
-                  Tipo
-                  <select
-                    value={form.productType}
-                    onChange={(event) =>
-                      changeProductType(event.target.value as ProductType)
-                    }
-                  >
-                    <option value="INJETAVEL">Injetável</option>
-                    <option value="PROCEDIMENTO">
-                      Processo / procedimento
-                    </option>
-                  </select>
-                </label>
-                <label>
-                  Produto / processo
-                  <select
-                    required
-                    value={form.productId}
-                    onChange={(event) =>
-                      updateForm("productId", event.target.value)
-                    }
-                  >
-                    <option value="">Selecione</option>
-                    {products.map((product) => (
-                      <option
-                        value={product.id}
-                        key={`${form.productType}-${product.id}`}
-                      >
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="crm-form-grid">
-                <label>
-                  Categoria
-                  <select
-                    value={form.category}
-                    onChange={(event) =>
-                      updateForm("category", event.target.value as Category)
-                    }
-                  >
-                    {categories.map((item) => (
-                      <option value={item.value} key={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Status
-                  <select
-                    value={form.status}
-                    onChange={(event) =>
-                      updateForm("status", event.target.value as Status)
-                    }
-                  >
-                    {statuses.map((item) => (
-                      <option value={item.value} key={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="crm-dose-section">
-                <div className="crm-section-heading">
-                  <label>Doses / sessões</label>
-                  <span>
-                    {form.doseDates.filter(Boolean).length} registrada(s)
-                  </span>
-                </div>
-                {form.doseDates.map((date, index) => (
-                  <div className="crm-dose-row" key={`dose-${index}`}>
-                    <CalendarDays size={18} />
-                    <input
-                      type="date"
-                      required
-                      // Converte a data para o formato YYYY-MM-DD que o input exige
-                      value={
-                        date ? new Date(date).toISOString().slice(0, 10) : ""
-                      }
-                      onChange={(event) =>
-                        updateDose(index, event.target.value)
-                      }
-                      aria-label={`Data da dose ${index + 1}`}
-                    />
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={() => removeDose(index)}
-                      aria-label={`Remover dose ${index + 1}`}
-                    >
-                      <X size={17} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="secondary crm-add-dose"
-                  onClick={addDose}
-                >
-                  <Plus size={16} /> Adicionar dose
-                </button>
-                <p className="crm-dose-rule">
-                  <Check size={14} /> 1 dose: Iniciado · 2 doses: Em andamento ·
-                  3 ou mais: Concluído
-                </p>
-              </div>
-              <label className="crm-field-full">
-                Observação
-                <textarea
-                  rows={4}
-                  value={form.observation}
-                  onChange={(event) =>
-                    updateForm("observation", event.target.value)
-                  }
-                  placeholder="Inclua orientações ou observações do atendimento"
-                />
-              </label>
-              {error && <div className="error">{error}</div>}
-              </div>
-            </form>
-            <footer className="modal-footer">
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setModalOpen(false)}
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                form="crm-treatment-form"
-                className="primary"
-                disabled={saving}
-              >
-                <Check size={16} />{" "}
-                {saving ? "Salvando…" : "Salvar atendimento"}
-              </button>
-            </footer>
-          </section>
-        </div>
+        <CrmTreatmentModal
+          editing={Boolean(editing)}
+          form={form}
+          catalog={catalog}
+          products={products}
+          saving={saving}
+          error={error}
+          onClose={() => setModalOpen(false)}
+          onSave={save}
+          onUpdateForm={updateForm}
+          onChangeProductType={changeProductType}
+          onAddDose={addDose}
+          onUpdateDose={updateDose}
+          onRemoveDose={removeDose}
+        />
       )}
     </>
   );

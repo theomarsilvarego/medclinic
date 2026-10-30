@@ -28,6 +28,7 @@ import { CertificateSettingsPage } from "../CertificateSettingsPage/CertificateS
 import { ReportsPage } from "../ReportsPage/ReportsPage";
 import { FinancialPage } from "../FinancialPage/FinancialPage";
 import { CrmPage } from "../CrmPage/CrmPage";
+import "./App.css";
 
 export function App() {
   const [user, setUser] = useState<any>(null);

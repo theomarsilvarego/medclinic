@@ -5,6 +5,7 @@ import { request } from "../../lib/app";
 import { submitAppointment } from "../../lib/appointments";
 import { AppointmentModal } from "../../components/appointments/AppointmentModal";
 import { AnamnesisAppointmentModal } from "../../components/anamnesis/AnamnesisAppointmentModal";
+import "./AppointmentsPage.css";
 
 function localDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;

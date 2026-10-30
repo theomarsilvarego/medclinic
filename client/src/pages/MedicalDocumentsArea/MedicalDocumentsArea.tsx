@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FileCheck2, FileText, Plus, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import type { Row } from "../../lib/app";
 import { API, request } from "../../lib/app";
+import "./MedicalDocumentsArea.css";
 
 type Medication = { id: number; name: string; presentation: string };
 type PrescriptionItem = Medication & {

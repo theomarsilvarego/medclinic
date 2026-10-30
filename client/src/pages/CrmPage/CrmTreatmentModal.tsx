@@ -1,0 +1,258 @@
+import React from "react";
+import { CalendarDays, Check, Plus, X } from "lucide-react";
+
+type Status = "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
+type ProductType = "INJETAVEL" | "PROCEDIMENTO";
+type Category =
+  | "VACINAS"
+  | "VITAMINAS"
+  | "PROTOCOLOS"
+  | "MEDICACOES"
+  | "LASER_INTIMO"
+  | "CLAREAMENTO_INTIMO"
+  | "MANUTENCAO_LASER";
+type FormState = {
+  patientId: string;
+  productType: ProductType;
+  productId: string;
+  category: Category;
+  status: Status;
+  doseDates: string[];
+  observation: string;
+};
+type Catalog = {
+  patients: { id: number; fullName: string; phone?: string | null }[];
+  injectables: { id: number; name: string; type: string }[];
+  procedures: { id: number; name: string; type?: string | null }[];
+};
+type Product = { id: number; name: string; detail: string };
+
+const categories: { value: Category; label: string }[] = [
+  { value: "VACINAS", label: "Vacinas" },
+  { value: "VITAMINAS", label: "Vitaminas" },
+  { value: "PROTOCOLOS", label: "Protocolos" },
+  { value: "MEDICACOES", label: "Medicações" },
+  { value: "LASER_INTIMO", label: "Laser íntimo" },
+  { value: "CLAREAMENTO_INTIMO", label: "Clareamento íntimo" },
+  { value: "MANUTENCAO_LASER", label: "Manutenção Laser" },
+];
+const statuses: { value: Status; label: string }[] = [
+  { value: "INICIADO", label: "Iniciado" },
+  { value: "EM_ANDAMENTO", label: "Em andamento" },
+  { value: "CONCLUIDO", label: "Concluído" },
+];
+
+type Props = {
+  editing: boolean;
+  form: FormState;
+  catalog: Catalog;
+  products: Product[];
+  saving: boolean;
+  error: string;
+  onClose: () => void;
+  onSave: (event: React.FormEvent) => void;
+  onUpdateForm: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+  onChangeProductType: (value: ProductType) => void;
+  onAddDose: () => void;
+  onUpdateDose: (index: number, value: string) => void;
+  onRemoveDose: (index: number) => void;
+};
+
+export function CrmTreatmentModal({
+  editing,
+  form,
+  catalog,
+  products,
+  saving,
+  error,
+  onClose,
+  onSave,
+  onUpdateForm,
+  onChangeProductType,
+  onAddDose,
+  onUpdateDose,
+  onRemoveDose,
+}: Props) {
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) =>
+        event.target === event.currentTarget && !saving && onClose()
+      }
+    >
+      <section
+        className="modal crm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="crm-modal-title"
+      >
+        <header className="modal-header">
+          <div>
+            <p className="eyebrow">CRM · ATENDIMENTO</p>
+            <h2 id="crm-modal-title">
+              {editing ? "Editar atendimento" : "Novo atendimento"}
+            </h2>
+            <span>Registre cada dose ou sessão do paciente.</span>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Fechar"
+          >
+            <X size={19} />
+          </button>
+        </header>
+        <form id="crm-treatment-form" onSubmit={onSave} className="crm-form">
+          <div className="crm-modal-body">
+            <label className="crm-field-full">
+              Paciente
+              <select
+                required
+                value={form.patientId}
+                onChange={(event) => onUpdateForm("patientId", event.target.value)}
+              >
+                <option value="">Selecione o paciente</option>
+                {catalog.patients.map((patient) => (
+                  <option value={patient.id} key={patient.id}>
+                    {patient.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="crm-form-grid">
+              <label>
+                Tipo
+                <select
+                  value={form.productType}
+                  onChange={(event) =>
+                    onChangeProductType(event.target.value as ProductType)
+                  }
+                >
+                  <option value="INJETAVEL">Injetável</option>
+                  <option value="PROCEDIMENTO">Processo / procedimento</option>
+                </select>
+              </label>
+              <label>
+                Produto / processo
+                <select
+                  required
+                  value={form.productId}
+                  onChange={(event) => onUpdateForm("productId", event.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {products.map((product) => (
+                    <option
+                      value={product.id}
+                      key={`${form.productType}-${product.id}`}
+                    >
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="crm-form-grid">
+              <label>
+                Categoria
+                <select
+                  value={form.category}
+                  onChange={(event) =>
+                    onUpdateForm("category", event.target.value as Category)
+                  }
+                >
+                  {categories.map((item) => (
+                    <option value={item.value} key={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Status
+                <select
+                  value={form.status}
+                  onChange={(event) =>
+                    onUpdateForm("status", event.target.value as Status)
+                  }
+                >
+                  {statuses.map((item) => (
+                    <option value={item.value} key={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="crm-dose-section">
+              <div className="crm-section-heading">
+                <label>Doses / sessões</label>
+                <span>{form.doseDates.filter(Boolean).length} registrada(s)</span>
+              </div>
+              {form.doseDates.map((date, index) => (
+                <div className="crm-dose-row" key={`dose-${index}`}>
+                  <CalendarDays size={18} />
+                  <input
+                    type="date"
+                    required
+                    // Converte a data para o formato YYYY-MM-DD que o input exige
+                    value={date ? new Date(date).toISOString().slice(0, 10) : ""}
+                    onChange={(event) => onUpdateDose(index, event.target.value)}
+                    aria-label={`Data da dose ${index + 1}`}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => onRemoveDose(index)}
+                    aria-label={`Remover dose ${index + 1}`}
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="secondary crm-add-dose"
+                onClick={onAddDose}
+              >
+                <Plus size={16} /> Adicionar dose
+              </button>
+              <p className="crm-dose-rule">
+                <Check size={14} /> 1 dose: Iniciado · 2 doses: Em andamento · 3 ou mais: Concluído
+              </p>
+            </div>
+            <label className="crm-field-full">
+              Observação
+              <textarea
+                rows={4}
+                value={form.observation}
+                onChange={(event) => onUpdateForm("observation", event.target.value)}
+                placeholder="Inclua orientações ou observações do atendimento"
+              />
+            </label>
+            {error && <div className="error">{error}</div>}
+          </div>
+        </form>
+        <footer className="modal-footer">
+          <button
+            type="button"
+            className="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="crm-treatment-form"
+            className="primary"
+            disabled={saving}
+          >
+            <Check size={16} /> {saving ? "Salvando…" : "Salvar atendimento"}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}

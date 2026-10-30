@@ -7,12 +7,15 @@ import {
   FileText,
   RefreshCw,
   Search,
-  X,
 } from "lucide-react";
 import { API, money, request } from "../../lib/app";
 import type { Row } from "../../lib/app";
 import { submitAppointment } from "../../lib/appointments";
 import { AppointmentModal } from "../../components/appointments/AppointmentModal";
+import { BillingModal } from "./BillingModal";
+import { BillingDetailsModal } from "./BillingDetailsModal";
+import { RequestDetailsModal } from "./RequestDetailsModal";
+import "./SecretaryDashboard.css";
 
 type RequestItem = {
   id: number;
@@ -592,383 +595,29 @@ export function SecretaryDashboard() {
       )}
 
       {billingModalOpen && (
-        <div
-          className="modal-backdrop secretary-modal-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget &&
-            !billingSelected &&
-            setBillingModalOpen(false)
-          }
-        >
-          <section
-            className="modal secretary-billing-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="secretary-billing-confirm-title"
-          >
-            <header className="modal-header secretary-dialog-header">
-              <div>
-                <p className="eyebrow">COBRANÇA · CONFIRMAÇÃO</p>
-                <h2 id="secretary-billing-confirm-title">
-                  Faturar selecionadas
-                </h2>
-                <span>Revise os itens e defina a forma prevista. A venda e o recebível serão criados como pendentes; a entrada no caixa só ocorre ao confirmar o pagamento.</span>
-              </div>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => setBillingModalOpen(false)}
-                disabled={billingSelected}
-                aria-label="Fechar faturamento"
-              >
-                <X size={18} />
-              </button>
-            </header>
-            <div className="secretary-billing-dialog-content">
-              <div className="secretary-billing-column">
-                <h3>Itens a faturar</h3>
-                <div className="secretary-billing-selection-list">
-                  {billingItems.map((item) => {
-                    const hasValue =
-                      item.amount !== null &&
-                      Number.isFinite(Number(item.amount)) &&
-                      Number(item.amount) > 0;
-                    return (
-                      <div
-                        className={`secretary-billing-selection-item${hasValue ? "" : " secretary-billing-unpriced"}`}
-                        key={requestKey(item)}
-                      >
-                        <label className="secretary-billing-item-check">
-                          <input
-                            type="checkbox"
-                            checked={billingItemKeys.includes(requestKey(item))}
-                            disabled={!hasValue || billingSelected}
-                            onChange={() =>
-                              setBillingItemKeys((current) =>
-                                current.includes(requestKey(item))
-                                  ? current.filter(
-                                      (key) => key !== requestKey(item),
-                                    )
-                                  : [...current, requestKey(item)],
-                              )
-                            }
-                            aria-label={`Incluir ${item.title} no faturamento`}
-                          />
-                        </label>
-                        <div className="secretary-billing-item-copy">
-                          <span
-                            className={`secretary-request-tag secretary-tag-${item.kind.toLowerCase()}`}
-                          >
-                            {item.category}
-                          </span>
-                          <strong>{item.title}</strong>
-                          {!hasValue && (
-                            <small>
-                              Sem valor informado · não pode ser faturado
-                            </small>
-                          )}
-                        </div>
-                        {hasValue ? (
-                          <strong className="secretary-billing-item-price">
-                            {money(Number(item.amount))}
-                          </strong>
-                        ) : (
-                          <button
-                            type="button"
-                            className="secretary-inform-value"
-                            onClick={() =>
-                              setError(
-                                `Informe o valor de ${item.title} no cadastro de injetáveis.`,
-                              )
-                            }
-                          >
-                            Informar valor
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="secretary-billing-column">
-                <h3>Forma de pagamento</h3>
-                <div className="secretary-payment-options">
-                  {(
-                    [
-                      ["PIX", "Pix"],
-                      ["DEBIT_CARD", "Cartão de débito"],
-                      ["CREDIT_CARD", "Cartão de crédito"],
-                      ["CASH", "Dinheiro"],
-                    ] as [PaymentMethod, string][]
-                  ).map(([value, label]) => (
-                    <label
-                      className={`secretary-payment-option${paymentMethod === value ? " selected" : ""}`}
-                      key={value}
-                    >
-                      <input
-                        type="radio"
-                        name="secretary-payment-method"
-                        value={value}
-                        checked={paymentMethod === value}
-                        onChange={() => {
-                          setPaymentMethod(value);
-                          if (value !== "PIX" && value !== "CASH")
-                            setDiscountEnabled(false);
-                        }}
-                      />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </div>
-                <label
-                  className={`secretary-discount-toggle${!discountAllowed ? " disabled" : ""}`}
-                >
-                  <span>
-                    <strong>Liberar desconto de 5%</strong>
-                    <small>
-                      Aplicado sobre o subtotal dos itens selecionados.
-                    </small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={discountEnabled && discountAllowed}
-                    disabled={!discountAllowed || billingSelected}
-                    onChange={(event) =>
-                      setDiscountEnabled(event.target.checked)
-                    }
-                  />
-                  <i aria-hidden="true" />
-                </label>
-                {paymentMethod === "CREDIT_CARD" && (
-                  <label className="secretary-installments">
-                    <span>Parcelas</span>
-                    <select
-                      value={installments}
-                      onChange={(event) =>
-                        setInstallments(Number(event.target.value))
-                      }
-                      disabled={billingSelected}
-                    >
-                      {Array.from({ length: 12 }, (_, index) => index + 1).map(
-                        (value) => (
-                          <option key={value} value={value}>
-                            {value}x {money(billingTotal / value)}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
-                )}
-                <div className="secretary-billing-summary">
-                  <div>
-                    <span>
-                      Subtotal ({billableItems.length}{" "}
-                      {billableItems.length === 1 ? "item" : "itens"})
-                    </span>
-                    <strong>{money(billingSubtotal)}</strong>
-                  </div>
-                  <div className="discount">
-                    <span>Desconto {billingDiscount ? "5%" : "0%"}</span>
-                    <strong>− {money(billingDiscount)}</strong>
-                  </div>
-                  <div className="total">
-                    <span>Total a pagar</span>
-                    <strong>{money(billingTotal)}</strong>
-                  </div>
-                  <small>
-                    Pagamento:{" "}
-                    {
-                      (
-                        {
-                          PIX: "Pix",
-                          DEBIT_CARD: "Cartão de débito",
-                          CREDIT_CARD: "Cartão de crédito",
-                          CASH: "Dinheiro",
-                        } as Record<PaymentMethod, string>
-                      )[paymentMethod]
-                    }
-                    {paymentMethod === "CREDIT_CARD"
-                      ? ` · ${installments}x`
-                      : ""}
-                  </small>
-                  <small className="secretary-summary-only-note">O faturamento não confirma pagamento nem movimenta caixa.</small>
-                </div>
-              </div>
-            </div>
-            <footer className="modal-footer secretary-billing-dialog-footer">
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => setBillingModalOpen(false)}
-                disabled={billingSelected}
-              >
-                Cancelar
-              </button>
-              <button
-                className="primary"
-                type="button"
-                onClick={() => void confirmBilling()}
-                disabled={!billableItems.length || billingSelected}
-              >
-                {billingSelected
-                  ? "Faturando…"
-                  : `Gerar venda e recebível · ${money(billingTotal)}`}
-              </button>
-            </footer>
-          </section>
-        </div>
+        <BillingModal
+          billingItems={billingItems}
+          billingItemKeys={billingItemKeys}
+          setBillingItemKeys={setBillingItemKeys}
+          billingSelected={billingSelected}
+          setError={setError}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          discountAllowed={discountAllowed}
+          discountEnabled={discountEnabled}
+          setDiscountEnabled={setDiscountEnabled}
+          installments={installments}
+          setInstallments={setInstallments}
+          billableItems={billableItems}
+          billingSubtotal={billingSubtotal}
+          billingDiscount={billingDiscount}
+          billingTotal={billingTotal}
+          confirmBilling={confirmBilling}
+          close={() => setBillingModalOpen(false)}
+        />
       )}
-
-      {billing && (
-        <div
-          className="modal-backdrop secretary-modal-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget && setBilling(null)
-          }
-        >
-          <section
-            className="modal secretary-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="secretary-billing-title"
-          >
-            <header className="modal-header secretary-dialog-header">
-              <div>
-                <p className="eyebrow">COBRANÇA · RESUMO</p>
-                <h2 id="secretary-billing-title">{billing.item.title}</h2>
-                <span>{billing.patient.fullName}</span>
-              </div>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => setBilling(null)}
-                aria-label="Fechar resumo de cobrança"
-              >
-                <X size={18} />
-              </button>
-            </header>
-            <div className="secretary-dialog-content">
-              <div className="secretary-billing-items">
-                {billing.item.items.map((line, index) => (
-                  <div key={`${line.label}-${index}`}>
-                    <span>{line.label}</span>
-                    <strong>
-                      {line.value === null
-                        ? "Preço não vinculado"
-                        : money(line.value)}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-              <div className="secretary-billing-total">
-                <span>Valor desta solicitação</span>
-                <strong>
-                  {billing.item.amount === null
-                    ? "Preço não vinculado"
-                    : money(billing.item.amount)}
-                </strong>
-              </div>
-              <div className="secretary-billing-patient-total">
-                <span>
-                  Total conhecido de todas as solicitações da paciente
-                </span>
-                <strong>{money(billing.patient.total)}</strong>
-              </div>
-              {billing.patient.unpriced > 0 && (
-                <p className="secretary-unpriced-note">
-                  Há {billing.patient.unpriced} solicitação(ões) sem preço
-                  cadastrado/vinculado; por isso o total geral pode estar
-                  incompleto.
-                </p>
-              )}
-              <p className="secretary-summary-only-note">
-                Este resumo não registra nem confirma pagamento.
-              </p>
-            </div>
-            <footer className="modal-footer">
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => setBilling(null)}
-              >
-                Fechar
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
-
-      {viewing && (
-        <div
-          className="modal-backdrop secretary-modal-backdrop"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget && setViewing(null)
-          }
-        >
-          <section
-            className="modal secretary-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="secretary-view-title"
-          >
-            <header className="modal-header secretary-dialog-header">
-              <div>
-                <p className="eyebrow">
-                  {requestKindLabel(viewing.item.kind)} ·{" "}
-                  {viewing.item.category}
-                </p>
-                <h2 id="secretary-view-title">{viewing.item.title}</h2>
-                <span>
-                  {viewing.patient}
-                  {viewing.item.code ? ` · ${viewing.item.code}` : ""}
-                </span>
-              </div>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => setViewing(null)}
-                aria-label="Fechar detalhes da solicitação"
-              >
-                <X size={18} />
-              </button>
-            </header>
-            <div className="secretary-dialog-content">
-              <div className="secretary-billing-items">
-                {viewing.item.items.map((line, index) => (
-                  <div key={`${line.label}-${index}`}>
-                    <span>{line.label}</span>
-                    <strong>
-                      {line.value === null
-                        ? "Preço não vinculado"
-                        : money(line.value)}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-              <div className="secretary-billing-total">
-                <span>Valor desta solicitação</span>
-                <strong>
-                  {viewing.item.amount === null
-                    ? "Preço não vinculado"
-                    : money(viewing.item.amount)}
-                </strong>
-              </div>
-              <p className="secretary-view-date">
-                Solicitado em {dateLabel(viewing.item.requestedAt)}
-              </p>
-            </div>
-            <footer className="modal-footer">
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => setViewing(null)}
-              >
-                Fechar
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
+      {billing && <BillingDetailsModal billing={billing} close={() => setBilling(null)} />}
+      {viewing && <RequestDetailsModal viewing={viewing} close={() => setViewing(null)} />}
       {appointmentDraft && appointmentMeta && (
         <AppointmentModal
           initial={appointmentDraft}

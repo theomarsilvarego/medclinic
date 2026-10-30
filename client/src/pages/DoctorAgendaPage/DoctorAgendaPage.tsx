@@ -7,11 +7,12 @@ import {
   Eye,
   Play,
   QrCode,
-  X,
 } from "lucide-react";
 import type { Row } from "../../lib/app";
 import { request } from "../../lib/app";
 import { AnamnesisAppointmentModal } from "../../components/anamnesis/AnamnesisAppointmentModal";
+import { DoctorDetailModal } from "./DoctorDetailModal";
+import "./DoctorAgendaPage.css";
 
 function isSindicatoInsurance(name: unknown) {
   const normalized = String(name || "")
@@ -291,66 +292,11 @@ export function DoctorAgendaPage({
         />
       )}
       {selected && (
-        <div className="modal-backdrop">
-          <div className="doctor-detail-modal">
-            <div className="modal-header">
-              <div>
-                <p className="eyebrow">DADOS DO PACIENTE</p>
-                <h2>{selected.patient?.fullName || "Paciente"}</h2>
-              </div>
-              <button className="icon-button" onClick={() => setSelected(null)}>
-                <X size={19} />
-              </button>
-            </div>
-            <div className="doctor-detail-grid">
-              <div>
-                <span>Horário</span>
-                <strong>{selected.scheduledTime}</strong>
-              </div>
-              <div>
-                <span>Status</span>
-                <strong>
-                  {statusLabel[selected.status] || selected.status}
-                </strong>
-              </div>
-              <div>
-                <span>Telefone</span>
-                <strong>{selected.patient?.phone || "Não informado"}</strong>
-              </div>
-              <div>
-                <span>Médico</span>
-                <strong>{selected.doctor?.fullName || "Não informado"}</strong>
-              </div>
-              <div>
-                <span>Convênio</span>
-                <strong>{selected.insurance?.name || "Não informado"}</strong>
-              </div>
-              <div>
-                <span>Serviço</span>
-                <strong>
-                  {selected.itemType === "PROCEDIMENTO"
-                    ? selected.procedure?.name
-                    : selected.itemType === "INJETAVEL"
-                      ? selected.injectable?.name
-                      : selected.itemType === "COLETA"
-                        ? "Exame de sangue"
-                        : selected.attendance?.name || "Não informado"}
-                </strong>
-              </div>
-              <div className="doctor-detail-wide">
-                <span>Observação</span>
-                <strong>
-                  {selected.notes || "Nenhuma observação registrada."}
-                </strong>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="secondary" onClick={() => setSelected(null)}>
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
+        <DoctorDetailModal
+          appointment={selected}
+          statusLabels={statusLabel}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   );

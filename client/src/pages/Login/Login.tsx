@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Activity, ChevronRight } from "lucide-react";
 import { request } from "../../lib/app";
+import "./Login.css";
 export function Login({ onLogin }: { onLogin: (data: any) => void }) {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");

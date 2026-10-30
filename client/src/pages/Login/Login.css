@@ -1,0 +1,98 @@
+/* Estilos específicos de Login. */
+
+.full {
+  width: 100%;
+  margin-top: 5px;
+}
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.02fr 1fr;
+  background: var(--paper);
+}
+.login-art {
+  background: linear-gradient(145deg, #4f1d30 0%, #7e3048 54%, #a45d70 100%);
+  padding: 11vh 10vw;
+  position: relative;
+  overflow: hidden;
+  color: white;
+}
+.login-art:before {
+  content: "";
+  position: absolute;
+  width: 620px;
+  height: 620px;
+  border: 1px solid #ffffff33;
+  border-radius: 50%;
+  right: -280px;
+  bottom: -210px;
+  box-shadow:
+    0 0 0 75px #ffffff0c,
+    0 0 0 150px #ffffff08;
+}
+.login-art:after {
+  content: "";
+  position: absolute;
+  width: 310px;
+  height: 310px;
+  border-radius: 50%;
+  background: #ffffff0b;
+  right: 17%;
+  top: 13%;
+}
+.login-art h1 {
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(42px, 5vw, 66px);
+  line-height: 1.04;
+  font-weight: 800;
+  margin: 68px 0 20px;
+  letter-spacing: -3px;
+  position: relative;
+  z-index: 1;
+}
+.login-art h1 em {
+  color: #f2cbd3;
+  font-style: normal;
+}
+.login-metric {
+  position: absolute;
+  bottom: 10vh;
+  border-left: 2px solid #f0b8c7;
+  padding-left: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #f0dce1;
+  z-index: 1;
+}
+.login-metric strong {
+  font-size: 14px;
+  color: #fff;
+}
+.login-card {
+  align-self: center;
+  max-width: 440px;
+  width: 80%;
+  margin: auto;
+}
+.mobile-brand {
+  display: none;
+}
+.login-card h2 {
+  font-family: "Manrope", sans-serif;
+  font-size: 32px;
+  letter-spacing: -1.5px;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+.login-card form {
+  margin-top: 34px;
+}
+.login-card small {
+  color: #a6989d;
+  display: block;
+  text-align: center;
+  margin-top: 28px;
+  font-size: 11px;
+}

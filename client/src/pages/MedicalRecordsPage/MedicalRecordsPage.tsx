@@ -31,6 +31,7 @@ import { API, request } from "../../lib/app";
 import QRCode from "qrcode";
 import { AnamnesisAppointmentModal } from "../../components/anamnesis/AnamnesisAppointmentModal";
 import { MedicalDocumentsArea } from "../MedicalDocumentsArea/MedicalDocumentsArea";
+import "./MedicalRecordsPage.css";
 
 type MedicalRecordsPageProps = {
   patientId: number | null;

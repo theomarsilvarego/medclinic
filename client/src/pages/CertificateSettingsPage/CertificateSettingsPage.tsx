@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FileKey2, KeyRound, ShieldCheck, Upload, X } from "lucide-react";
 import { API, request } from "../../lib/app";
+import "./CertificateSettingsPage.css";
 
 type Doctor = { id: number; fullName: string; crm: string };
 type MedicalUser = { id: number; fullName: string; login: string };

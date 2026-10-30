@@ -1,0 +1,46 @@
+/* Estilos específicos de CrudPage. */
+
+.state-badge,
+.insurance-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 220px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+}
+.state-badge-unknown,
+.insurance-badge-unknown {
+  background: #e8e4e5;
+  color: #62585b;
+}
+.row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.row-actions button {
+  background: none;
+  color: #ae9ba1;
+  padding: 5px;
+}
+.row-actions button:hover:first-child {
+  color: var(--brand);
+}
+.row-actions button:hover:last-child {
+  color: #c65362;
+}
+.check-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 9px !important;
+  margin-top: 7px;
+}
+.check-label input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+}
