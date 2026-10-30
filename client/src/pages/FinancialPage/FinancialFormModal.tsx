@@ -26,6 +26,7 @@ export function FinancialFormModal({ formMode, form, accounts, suppliers, patien
           <div>
             <p className="eyebrow">NOVO REGISTRO</p>
             <h2 id="financial-form-title">{formMode === "sale" ? "Nova venda" : formMode === "payable" ? "Nova conta a pagar" : formMode === "account" ? "Nova conta financeira" : formMode === "open-session" ? "Abertura de caixa" : "Nova movimentação"}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A007">A007</span>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar"><X size={19} /></button>
         </div>

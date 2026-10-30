@@ -26,6 +26,7 @@ export function RequestDetailsModal({ viewing, close }: Props) { return (
                   {viewing.item.category}
                 </p>
                 <h2 id="secretary-view-title">{viewing.item.title}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A011">A011</span>
                 <span>
                   {viewing.patient}
                   {viewing.item.code ? ` · ${viewing.item.code}` : ""}

@@ -24,6 +24,7 @@ export function BillingDetailsModal({ billing, close }: Props) { return (
               <div>
                 <p className="eyebrow">COBRANÇA · RESUMO</p>
                 <h2 id="secretary-billing-title">{billing.item.title}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A009">A009</span>
                 <span>{billing.patient.fullName}</span>
               </div>
               <button

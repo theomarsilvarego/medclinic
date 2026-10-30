@@ -15,6 +15,7 @@ export function DoctorDetailModal({ appointment, statusLabels, onClose }: Props)
           <div>
             <p className="eyebrow">DADOS DO PACIENTE</p>
             <h2>{appointment.patient?.fullName || "Paciente"}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A004">A004</span>
           </div>
           <button className="icon-button" onClick={onClose}>
             <X size={19} />

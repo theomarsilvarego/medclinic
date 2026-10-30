@@ -27,6 +27,7 @@ export function ExamGroupValuesModal({ group, onClose }: { group: ExamGroup; onC
               <div>
                 <p className="eyebrow">CONFIGURAÇÃO MÉDICA</p>
                 <h2 id="exam-group-values-title">Tipos de exames</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A006">A006</span>
                 <span className="exam-group-values-subtitle">{group.name}</span>
               </div>
               <button

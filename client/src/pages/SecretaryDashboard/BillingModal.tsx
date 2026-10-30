@@ -28,6 +28,7 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
                 <h2 id="secretary-billing-confirm-title">
                   Faturar selecionadas
                 </h2>
+            <span className="modal-identification-code" aria-label="Código do modal A010">A010</span>
                 <span>Revise os itens e defina a forma prevista. A venda e o recebível serão criados como pendentes; a entrada no caixa só ocorre ao confirmar o pagamento.</span>
               </div>
               <button

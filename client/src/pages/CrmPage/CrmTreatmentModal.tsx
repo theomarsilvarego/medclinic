@@ -92,6 +92,7 @@ export function CrmTreatmentModal({
         <header className="modal-header appointment-modal-header">
           <div>
             <h2>{editing ? "Editar atendimento" : "Novo atendimento"}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A002">A002</span>
             <p className="crm-modal-subtitle">CRM · ATENDIMENTO · Registre cada dose ou sessão do paciente.</p>
           </div>
           <button

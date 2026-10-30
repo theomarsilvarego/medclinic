@@ -262,6 +262,7 @@ export function Modal({
           <div>
             <p className="eyebrow">CADASTRO</p>
             <h2 id="modal-title">{title}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A003">A003</span>
           </div>
           <button
             className="icon-button"

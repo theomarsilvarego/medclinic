@@ -20,6 +20,7 @@ export function ExamGroupFormModal(props: {
               <div>
                 <p className="eyebrow">CONFIGURAÇÃO MÉDICA</p>
                 <h2>{editing.id ? "Editar grupo" : "Novo grupo de exames"}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A005">A005</span>
               </div>
               <button type="button" className="icon-button" onClick={onClose}>
                 <X size={19} />

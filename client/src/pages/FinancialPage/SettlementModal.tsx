@@ -22,6 +22,7 @@ export function SettlementModal({ settlement, form, accounts, saving, onClose, o
           <div>
             <p className="eyebrow">BAIXA FINANCEIRA</p>
             <h2 id="financial-settlement-title">{settlement.kind === "receivable" ? "Registrar recebimento" : "Registrar pagamento"}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A008">A008</span>
             <small>{settlement.description} · Saldo {money(settlement.balance)}</small>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar"><X size={19} /></button>

@@ -163,6 +163,7 @@ export function AppointmentModal({
         <div className="modal-header appointment-modal-header">
           <div>
             <h2>{initial.id ? "Editar agendamento" : "Novo agendamento"}</h2>
+            <span className="modal-identification-code" aria-label="Código do modal A001">A001</span>
             <div className="appointment-context">
               <span>
                 <CalendarDays size={19} />

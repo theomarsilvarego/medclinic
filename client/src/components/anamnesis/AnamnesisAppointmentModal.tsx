@@ -122,7 +122,7 @@ export function AnamnesisAppointmentModal({ appointment, onClose, autoPrint = fa
   return <div className="anamnesis-share-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="anamnesis-share-modal" role="dialog" aria-modal="true" aria-labelledby="anamnesis-share-title">
       <header className="anamnesis-share-header">
-        <div className="anamnesis-share-heading"><span className="anamnesis-share-icon"><QrCode size={20} /></span><div><p>AGENDAMENTO · {appointment.scheduledTime}</p><h2 id="anamnesis-share-title">Ficha de anamnese</h2><span>{appointment.patient?.fullName}</span></div></div>
+        <div className="anamnesis-share-heading"><span className="anamnesis-share-icon"><QrCode size={20} /></span><div><p>AGENDAMENTO · {appointment.scheduledTime}</p><h2 id="anamnesis-share-title">Ficha de anamnese</h2><span className="modal-identification-code" aria-label="Código do modal A012">A012</span><span>{appointment.patient?.fullName}</span></div></div>
         <button className="anamnesis-share-close" type="button" onClick={onClose} aria-label="Fechar janela"><X size={19} /></button>
       </header>
       <div className="anamnesis-share-content">
