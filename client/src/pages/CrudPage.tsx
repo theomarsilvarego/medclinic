@@ -237,10 +237,17 @@ export function CrudPage({
         ? (() => {
             const form = new FormData();
             Object.entries(payload).forEach(([key, value]) => {
-              if (key === "photoUrl" || key === "photo" || value === undefined || value === null) return;
+              if (
+                key === "photoUrl" ||
+                key === "photo" ||
+                value === undefined ||
+                value === null
+              )
+                return;
               form.append(key, String(value));
             });
-            if (payload.photo instanceof File) form.append("photo", payload.photo);
+            if (payload.photo instanceof File)
+              form.append("photo", payload.photo);
             return form;
           })()
         : JSON.stringify(payload);
@@ -308,7 +315,6 @@ export function CrudPage({
                 />
               </label>
               <label className="patient-filter">
-                <span>Convênio</span>
                 <select
                   value={insuranceFilter}
                   onChange={(event) => setInsuranceFilter(event.target.value)}
@@ -322,7 +328,6 @@ export function CrudPage({
                 </select>
               </label>
               <label className="patient-filter">
-                <span>Estado</span>
                 <select
                   value={stateFilter}
                   onChange={(event) => setStateFilter(event.target.value)}

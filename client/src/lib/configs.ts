@@ -57,8 +57,18 @@ export const configs: Record<
     basePath: "",
     title: "Pacientes",
     fields: [
-      { key: "photo", label: "Foto do paciente", type: "file", fullWidth: true },
-      { key: "fullName", label: "Nome completo", fullWidth: true, section: "Dados pessoais" },
+      {
+        key: "photo",
+        label: "Foto do paciente",
+        type: "file",
+        fullWidth: true,
+      },
+      {
+        key: "fullName",
+        label: "Nome completo",
+        fullWidth: true,
+        section: "Dados pessoais",
+      },
       {
         key: "sex",
         label: "Sexo",
@@ -83,9 +93,20 @@ export const configs: Record<
         ],
       },
       { key: "cpf", label: "CPF", section: "Dados pessoais" },
-      { key: "birthDate", label: "Data de nascimento", type: "date", section: "Dados pessoais" },
+      {
+        key: "birthDate",
+        label: "Data de nascimento",
+        type: "date",
+        section: "Dados pessoais",
+      },
       { key: "email", label: "E-mail", type: "email", section: "Contato" },
-      { key: "phone", label: "WhatsApp", type: "tel", placeholder: "(69) 90000-0000", section: "Contato" },
+      {
+        key: "phone",
+        label: "WhatsApp",
+        type: "tel",
+        placeholder: "(69) 90000-0000",
+        section: "Contato",
+      },
       {
         key: "insuranceCode",
         label: "Convênio",
@@ -93,9 +114,25 @@ export const configs: Record<
         options: [],
       },
       { key: "allergies", label: "Alergia", type: "text", section: "Saúde" },
-      { key: "comorbidities", label: "Comorbidade", type: "text", section: "Saúde" },
-      { key: "medicationsInUse", label: "Em uso de medicamento", type: "text", section: "Saúde" },
-      { key: "notes", label: "Observação", type: "textarea", fullWidth: true, section: "Saúde" },
+      {
+        key: "comorbidities",
+        label: "Comorbidade",
+        type: "text",
+        section: "Saúde",
+      },
+      {
+        key: "medicationsInUse",
+        label: "Em uso de medicamento",
+        type: "text",
+        section: "Saúde",
+      },
+      {
+        key: "notes",
+        label: "Observação",
+        type: "textarea",
+        fullWidth: true,
+        section: "Saúde",
+      },
     ],
     columns: [
       { key: "sourceCode", label: "Código" },
@@ -272,7 +309,11 @@ export const configs: Record<
         key: "expirationDate",
         label: "Validade",
         format: (value) =>
-          value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—",
+          value
+            ? new Date(
+                `${String(value).slice(0, 10)}T12:00:00`,
+              ).toLocaleDateString("pt-BR")
+            : "—",
       },
       { key: "lot", label: "Lote" },
       { key: "unit", label: "Unidade" },

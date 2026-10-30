@@ -58,7 +58,8 @@ export function AppointmentModal({
   const update = (key: string, value: any) =>
     setData({ ...data, [key]: value });
   const itemType = data.itemType || "ATENDIMENTO";
-  const selectedInjectableType = data.injectableType || data.injectable?.type || "";
+  const selectedInjectableType =
+    data.injectableType || data.injectable?.type || "";
   const injectables = (meta.injectables || []).filter(
     (item: Row) => item.type === selectedInjectableType,
   );
@@ -86,10 +87,13 @@ export function AppointmentModal({
       ? [selectedPatient, ...filteredPatients]
       : filteredPatients;
   const appointmentDate = String(data.appointmentDate || date).slice(0, 10);
-  const formattedDate = new Date(`${appointmentDate}T12:00:00`).toLocaleDateString(
-    "pt-BR",
-    { weekday: "long", day: "2-digit", month: "long" },
-  );
+  const formattedDate = new Date(
+    `${appointmentDate}T12:00:00`,
+  ).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  });
   const fileSize = (bytes: number) =>
     bytes < 1024 * 1024
       ? `${Math.round(bytes / 1024)} KB`
@@ -137,13 +141,17 @@ export function AppointmentModal({
       itemType === "PROCEDIMENTO" && !data.procedureId && "Procedimento",
       itemType === "INJETAVEL" && !data.injectableId && "Produto injetável",
     ].filter(Boolean) as string[];
-    const incompleteExam = examUploads.some((exam) => !exam.examType || !exam.file);
+    const incompleteExam = examUploads.some(
+      (exam) => !exam.examType || !exam.file,
+    );
     if (missing.length) {
       alert(`Preencha os campos obrigatórios: ${missing.join(", ")}.`);
       return;
     }
     if (incompleteExam) {
-      alert("Preencha a classificação e selecione um arquivo para cada exame anexado.");
+      alert(
+        "Preencha a classificação e selecione um arquivo para cada exame anexado.",
+      );
       return;
     }
     onSave({ ...data, examUploads: examUploads as Row[] });
@@ -166,7 +174,12 @@ export function AppointmentModal({
               </span>
             </div>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Fechar" disabled={saving}>
+          <button
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Fechar"
+            disabled={saving}
+          >
             <X size={21} />
           </button>
         </div>
@@ -269,7 +282,8 @@ export function AppointmentModal({
                 <option value="">Selecione o convênio</option>
                 {meta.insurances.map((x: Row) => (
                   <option key={x.id} value={x.id}>
-                    {x.name}{x.active === false
+                    {x.name}
+                    {x.active === false
                       ? x.fromAttendedVisit
                         ? " (convênio do atendimento selecionado)"
                         : " (inativo; vínculo atual da paciente)"
@@ -348,7 +362,7 @@ export function AppointmentModal({
               </button>
             </div>
             {itemType === "ATENDIMENTO" ? (
-              <label>
+              <label className="appointment-collection-field">
                 <select
                   required
                   value={data.attendanceId || ""}
@@ -364,7 +378,7 @@ export function AppointmentModal({
                 </select>
               </label>
             ) : itemType === "PROCEDIMENTO" ? (
-              <label>
+              <label className="appointment-collection-field">
                 <select
                   required
                   value={data.procedureId || ""}
@@ -381,7 +395,6 @@ export function AppointmentModal({
             ) : itemType === "INJETAVEL" ? (
               <>
                 <label>
-                  <span>Tipo de injetável</span>
                   <select
                     required
                     value={selectedInjectableType}
@@ -400,12 +413,13 @@ export function AppointmentModal({
                   </select>
                 </label>
                 <label>
-                  <span>Produto</span>
                   <select
                     required
                     disabled={!selectedInjectableType}
                     value={data.injectableId || ""}
-                    onChange={(event) => update("injectableId", event.target.value)}
+                    onChange={(event) =>
+                      update("injectableId", event.target.value)
+                    }
                   >
                     <option value="">
                       {selectedInjectableType
@@ -424,24 +438,27 @@ export function AppointmentModal({
               </>
             ) : (
               <label className="appointment-collection-field">
-                <span>Exame</span>
-                <select value="EXAME_SANGUE" disabled aria-label="Exame de coleta">
+                <select
+                  value="EXAME_SANGUE"
+                  disabled
+                  aria-label="Exame de coleta"
+                >
                   <option value="EXAME_SANGUE">Exame de sangue</option>
                 </select>
               </label>
             )}
             <div className="appointment-inline-fields">
               <label>
-                <span>Dia</span>
                 <input
                   type="date"
                   required
                   value={appointmentDate}
-                  onChange={(event) => update("appointmentDate", event.target.value)}
+                  onChange={(event) =>
+                    update("appointmentDate", event.target.value)
+                  }
                 />
               </label>
               <label>
-                <span>Horário</span>
                 <select
                   value={data.scheduledTime || "08:00"}
                   onChange={(e) => update("scheduledTime", e.target.value)}
@@ -454,7 +471,6 @@ export function AppointmentModal({
                 </select>
               </label>
               <label>
-                <span>Situação</span>
                 <select
                   value={data.status || "AGENDADO"}
                   onChange={(e) => update("status", e.target.value)}
@@ -569,11 +585,21 @@ export function AppointmentModal({
                     }
                   >
                     <option value="">Selecione o tipo</option>
-                    {Object.entries(examLabels).filter(([value]) => !value.toUpperCase().startsWith("LABORATORIAIS") && !["USG_TRANSVAGINAL", "USG_MANA", "PREVENTIVO"].includes(value)).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
+                    {Object.entries(examLabels)
+                      .filter(
+                        ([value]) =>
+                          !value.toUpperCase().startsWith("LABORATORIAIS") &&
+                          ![
+                            "USG_TRANSVAGINAL",
+                            "USG_MANA",
+                            "PREVENTIVO",
+                          ].includes(value),
+                      )
+                      .map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
                   </select>
                 </label>
                 <label>
