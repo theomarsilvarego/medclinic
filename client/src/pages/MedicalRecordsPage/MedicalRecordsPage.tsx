@@ -26,11 +26,11 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import type { Row } from "../lib/app";
-import { API, request } from "../lib/app";
+import type { Row } from "../../lib/app";
+import { API, request } from "../../lib/app";
 import QRCode from "qrcode";
-import { AnamnesisAppointmentModal } from "./AnamnesisAppointmentModal";
-import { MedicalDocumentsArea } from "./MedicalDocumentsArea";
+import { AnamnesisAppointmentModal } from "../../components/anamnesis/AnamnesisAppointmentModal";
+import { MedicalDocumentsArea } from "../MedicalDocumentsArea/MedicalDocumentsArea";
 
 type MedicalRecordsPageProps = {
   patientId: number | null;

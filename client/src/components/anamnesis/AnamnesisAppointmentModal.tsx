@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Check, Clipboard, FileText, LoaderCircle, MessageCircle, QrCode, RefreshCw, ShieldCheck, X } from "lucide-react";
 import QRCode from "qrcode";
-import type { Row } from "../lib/app";
-import { request } from "../lib/app";
+import type { Row } from "../../lib/app";
+import { request } from "../../lib/app";
 import "./anamnesis-share.css";
 
 type AnamnesisState = {

@@ -9,9 +9,9 @@ import {
   QrCode,
   X,
 } from "lucide-react";
-import type { Row } from "../lib/app";
-import { request } from "../lib/app";
-import { AnamnesisAppointmentModal } from "./AnamnesisAppointmentModal";
+import type { Row } from "../../lib/app";
+import { request } from "../../lib/app";
+import { AnamnesisAppointmentModal } from "../../components/anamnesis/AnamnesisAppointmentModal";
 
 function isSindicatoInsurance(name: unknown) {
   const normalized = String(name || "")

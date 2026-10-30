@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { request } from "../lib/app";
+import { request } from "../../lib/app";
 
 type Status = "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
 type ProductType = "INJETAVEL" | "PROCEDIMENTO";

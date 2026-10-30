@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, HeartPulse, LoaderCircle, ShieldCheck } from "lucide-react";
-import { API } from "../lib/app";
+import { API } from "../../lib/app";
 import "./anamnesis.css";
 
 type Answers = {

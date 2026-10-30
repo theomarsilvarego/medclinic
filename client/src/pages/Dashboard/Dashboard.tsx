@@ -11,9 +11,9 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import type { ModuleKey } from "../lib/app";
-import { profileGreeting } from "../lib/app";
-import { SecretaryDashboard } from "./SecretaryDashboard";
+import type { ModuleKey } from "../../lib/app";
+import { profileGreeting } from "../../lib/app";
+import { SecretaryDashboard } from "../SecretaryDashboard/SecretaryDashboard";
 export function Dashboard({
   setModule,
   user,

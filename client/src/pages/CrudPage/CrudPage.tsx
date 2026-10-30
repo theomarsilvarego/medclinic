@@ -7,10 +7,10 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import type { ModuleKey, Profile, Row } from "../lib/app";
-import { getRowId, request } from "../lib/app";
-import { getStateFromPhone } from "../lib/brazilian-ddd";
-import { configs } from "../lib/configs";
+import type { ModuleKey, Profile, Row } from "../../lib/app";
+import { getRowId, request } from "../../lib/app";
+import { getStateFromPhone } from "../../lib/brazilian-ddd";
+import { configs } from "../../lib/configs";
 import { Modal } from "./Modal";
 
 type CrudPageProps = {

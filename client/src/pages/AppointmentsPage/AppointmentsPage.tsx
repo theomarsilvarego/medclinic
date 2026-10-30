@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, QrCode } from "lucide-react";
-import type { Row } from "../lib/app";
-import { request } from "../lib/app";
-import { submitAppointment } from "../lib/appointments";
-import { AppointmentModal } from "./AppointmentModal";
-import { AnamnesisAppointmentModal } from "./AnamnesisAppointmentModal";
+import type { Row } from "../../lib/app";
+import { request } from "../../lib/app";
+import { submitAppointment } from "../../lib/appointments";
+import { AppointmentModal } from "../../components/appointments/AppointmentModal";
+import { AnamnesisAppointmentModal } from "../../components/anamnesis/AnamnesisAppointmentModal";
 
 function localDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;

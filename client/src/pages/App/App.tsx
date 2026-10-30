@@ -14,20 +14,20 @@ import {
   Stethoscope,
   Users,
 } from "lucide-react";
-import type { ModuleKey } from "../lib/app";
-import { canAccessModule, menuGroups, modules } from "../lib/modules";
-import { profileLabel, request } from "../lib/app";
-import { Login } from "./Login";
-import { Dashboard } from "./Dashboard";
-import { CrudPage } from "./CrudPage";
-import { AppointmentsPage } from "./AppointmentsPage";
-import { DoctorAgendaPage } from "./DoctorAgendaPage";
-import { MedicalRecordsPage } from "./MedicalRecordsPage";
-import { ExamGroupsPage } from "./ExamGroupsPage";
-import { CertificateSettingsPage } from "./CertificateSettingsPage";
-import { ReportsPage } from "./ReportsPage";
-import { FinancialPage } from "./FinancialPage";
-import { CrmPage } from "./CrmPage";
+import type { ModuleKey } from "../../lib/app";
+import { canAccessModule, menuGroups, modules } from "../../lib/modules";
+import { profileLabel, request } from "../../lib/app";
+import { Login } from "../Login/Login";
+import { Dashboard } from "../Dashboard/Dashboard";
+import { CrudPage } from "../CrudPage/CrudPage";
+import { AppointmentsPage } from "../AppointmentsPage/AppointmentsPage";
+import { DoctorAgendaPage } from "../DoctorAgendaPage/DoctorAgendaPage";
+import { MedicalRecordsPage } from "../MedicalRecordsPage/MedicalRecordsPage";
+import { ExamGroupsPage } from "../ExamGroupsPage/ExamGroupsPage";
+import { CertificateSettingsPage } from "../CertificateSettingsPage/CertificateSettingsPage";
+import { ReportsPage } from "../ReportsPage/ReportsPage";
+import { FinancialPage } from "../FinancialPage/FinancialPage";
+import { CrmPage } from "../CrmPage/CrmPage";
 
 export function App() {
   const [user, setUser] = useState<any>(null);

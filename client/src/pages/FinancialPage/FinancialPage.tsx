@@ -18,8 +18,8 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import type { ModuleKey, Row } from "../lib/app";
-import { money, request } from "../lib/app";
+import type { ModuleKey, Row } from "../../lib/app";
+import { money, request } from "../../lib/app";
 
 type FinancialModule = Extract<ModuleKey, "finance" | "cash" | "accounts" | "sales">;
 type FormMode = "movement" | "account" | "open-session" | "sale" | "payable";

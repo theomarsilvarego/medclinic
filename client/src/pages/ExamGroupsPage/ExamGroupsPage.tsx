@@ -8,8 +8,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { money, request } from "../lib/app";
-import type { Row } from "../lib/app";
+import { money, request } from "../../lib/app";
+import type { Row } from "../../lib/app";
 
 type ExamGroup = Row & { items?: Row[] };
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Trash2, Upload, UserRound, X } from "lucide-react";
-import { API } from "../lib/app";
-import type { Row } from "../lib/app";
+import { API } from "../../lib/app";
+import type { Row } from "../../lib/app";
 
 type FormField = {
   key: string;

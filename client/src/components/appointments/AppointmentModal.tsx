@@ -14,8 +14,8 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type { Row } from "../lib/app";
-import { API, money, request } from "../lib/app";
+import type { Row } from "../../lib/app";
+import { API, money, request } from "../../lib/app";
 
 const examLabels: Record<string, string> = {
   laboratorial: "Exames laboratoriais",

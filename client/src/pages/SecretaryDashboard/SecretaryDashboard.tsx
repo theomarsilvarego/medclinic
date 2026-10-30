@@ -9,10 +9,10 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { API, money, request } from "../lib/app";
-import type { Row } from "../lib/app";
-import { submitAppointment } from "../lib/appointments";
-import { AppointmentModal } from "./AppointmentModal";
+import { API, money, request } from "../../lib/app";
+import type { Row } from "../../lib/app";
+import { submitAppointment } from "../../lib/appointments";
+import { AppointmentModal } from "../../components/appointments/AppointmentModal";
 
 type RequestItem = {
   id: number;
