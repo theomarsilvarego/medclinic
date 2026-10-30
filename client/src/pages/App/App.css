@@ -92,12 +92,12 @@
   gap: 12px;
   color: #d1b9c0;
   width: 100%;
-  padding: 11px 13px;
+  padding: 10px 10px;
   background: none;
   border-radius: 10px;
   text-align: left;
   font-size: 13px;
-  margin: 3px 0;
+  /* margin: 3px 0; */
   transition: 0.2s;
   white-space: nowrap;
   overflow: hidden;
