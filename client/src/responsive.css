@@ -1,0 +1,1076 @@
+/* Camada responsiva mobile-first do MedClinic.
+   Mantém a identidade existente; concentra regras compartilhadas e breakpoints comuns. */
+:root {
+  --layout-gutter: clamp(1rem, 3vw, 3.125rem);
+  --control-min-size: 2.75rem;
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html {
+  min-width: 320px;
+  overflow-x: clip;
+  scroll-padding-top: 5rem;
+}
+
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button,
+a,
+select,
+input[type="checkbox"],
+input[type="radio"] {
+  touch-action: manipulation;
+}
+
+button,
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+.shell,
+.content,
+.main,
+.main > *,
+.page-heading > *,
+.table-card,
+.form-card {
+  min-width: 0;
+}
+
+.content {
+  width: 0;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.main {
+  width: 100%;
+  max-width: 1480px;
+  padding: clamp(1rem, 3vw, 2.625rem) var(--layout-gutter);
+}
+
+.page-heading {
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-heading h1,
+.doctor-page-heading h1 {
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.primary,
+.secondary,
+.today-button,
+.agenda-nav-button,
+.icon-button,
+.nav-item,
+.doctor-action,
+.modal-footer button {
+  min-height: var(--control-min-size);
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+.table-scroll,
+.agenda-card,
+.agenda-grid,
+.reports-results,
+.crm-table-wrap,
+.financial-table-wrap,
+.secretary-request-table {
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table-scroll table {
+  width: 100%;
+}
+
+.modal-backdrop,
+.secretary-modal-backdrop {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal,
+.secretary-dialog,
+.doctor-detail-modal,
+.crud-entry-modal {
+  min-width: 0;
+  max-width: calc(100vw - 2rem);
+  max-height: min(90dvh, 56rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-fields,
+.form-grid,
+.crud-entry-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.modal-fields > *,
+.form-grid > *,
+.crud-entry-fields > * {
+  min-width: 0;
+}
+
+.modal-fields input,
+.modal-fields select,
+.modal-fields textarea,
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.crud-entry-fields input,
+.crud-entry-fields select,
+.crud-entry-fields textarea {
+  width: 100%;
+}
+
+/* 320–639 px: smartphone; navegação em drawer, conteúdo de uma coluna e ações táteis. */
+@media (max-width: 639px) {
+  .shell {
+    display: block;
+    min-height: 100svh;
+  }
+
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(19rem, 86vw);
+    max-width: calc(100vw - 3rem);
+    height: 100vh;
+    height: 100dvh;
+    padding: max(1rem, env(safe-area-inset-top)) 0.875rem max(1rem, var(--mobile-safe-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 220ms ease, visibility 220ms ease;
+    box-shadow: 1rem 0 2.5rem rgb(35 11 21 / 18%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  .sidebar.collapsed .brand {
+    justify-content: flex-start;
+    padding: 0 0.75rem 1.5rem;
+  }
+
+  .sidebar.collapsed .brand-copy,
+  .sidebar.collapsed .secure span,
+  .sidebar.collapsed .collapse-button span {
+    display: block;
+  }
+
+  .sidebar.collapsed .nav-caption {
+    display: flex;
+  }
+
+  .sidebar.collapsed .nav-item {
+    justify-content: flex-start;
+    padding-inline: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgb(29 13 19 / 48%);
+    cursor: pointer;
+    animation: drawer-overlay-in 180ms ease-out;
+  }
+
+  @keyframes drawer-overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .brand {
+    padding: 0 0.75rem 1.5rem;
+  }
+
+  .nav-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .nav-item {
+    min-height: 2.875rem;
+    white-space: normal;
+  }
+
+  .sidebar-footer {
+    padding-inline: 0.75rem;
+  }
+
+  .content {
+    width: 100%;
+  }
+
+  .topbar {
+    position: sticky;
+    z-index: 15;
+    height: auto;
+    min-height: 3.75rem;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+  }
+
+  .menu {
+    display: grid;
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    color: var(--brand);
+    background: var(--brand-soft);
+  }
+
+  .breadcrumb {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0.25rem;
+    overflow: hidden;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .breadcrumb strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .top-actions {
+    flex: 0 0 auto;
+    gap: 0.375rem;
+  }
+
+  .top-actions .date,
+  .top-actions .user-name {
+    display: none;
+  }
+
+  .avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .top-actions > .icon-button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .main {
+    padding: 1rem;
+  }
+
+  .page-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.875rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .page-heading h1,
+  .doctor-page-heading h1 {
+    max-width: 100%;
+    font-size: clamp(1.35rem, 6vw, 1.7rem);
+    letter-spacing: -0.04em;
+  }
+
+  .page-heading .muted {
+    margin-block: 0.35rem 0;
+  }
+
+  .page-heading > button,
+  .page-heading .primary,
+  .secretary-heading-actions > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cards,
+  .quick-grid,
+  .form-grid,
+  .modal-fields,
+  .appointment-modal .modal-fields,
+  .patient-form-fields,
+  .patient-section-grid,
+  .insurance-grid,
+  .contact-grid,
+  .medical-document-form-grid,
+  .doctor-detail-grid,
+  .secretary-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-grid .wide,
+  .modal-fields label,
+  .appointment-modal .modal-fields label,
+  .modal-fields label:has(select),
+  .modal-fields label:has(input[type="password"]),
+  .appointment-modal .modal-fields label:has(textarea),
+  .modal-fields label.modal-field-full-width,
+  .doctor-detail-wide {
+    grid-column: 1 / -1;
+  }
+
+  .form-card {
+    padding: 1.125rem;
+  }
+
+  .form-title {
+    align-items: flex-start;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-footer,
+  .modal-footer,
+  .appointment-modal-footer,
+  .secretary-dialog-footer,
+  .secretary-billing-dialog-footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .form-footer > *,
+  .modal-footer > *,
+  .appointment-modal-footer > *,
+  .secretary-dialog-footer > *,
+  .secretary-billing-dialog-footer > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .table-head,
+  .patient-list-toolbar,
+  .reports-controls,
+  .reports-export-actions,
+  .agenda-toolbar,
+  .agenda-date-controls,
+  .patient-list-controls,
+  .secretary-list-toolbar,
+  .secretary-heading-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-head {
+    gap: 0.625rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .table-scroll {
+    max-width: calc(100vw - 2rem - 2px);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  .table-scroll table:not(.crm-table):not(.financial-table) {
+    min-width: 38rem;
+  }
+
+  th,
+  td {
+    padding: 0.75rem 0.875rem;
+    white-space: nowrap;
+  }
+
+  .patient-list-toolbar {
+    gap: 0.625rem;
+    padding: 0.875rem;
+  }
+
+  .patient-list-controls,
+  .patient-list-toolbar .patient-search,
+  .patient-list-toolbar .patient-filter,
+  .secretary-search,
+  .reports-controls > *,
+  .reports-export-actions > * {
+    width: 100%;
+    max-width: none;
+  }
+
+  .patient-list-toolbar .patient-filter {
+    min-width: 0;
+  }
+
+  .pagination-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .pagination-bar > span:nth-of-type(2) {
+    order: 5;
+    flex-basis: 100%;
+    text-align: center;
+  }
+
+  .modal-backdrop,
+  .secretary-modal-backdrop {
+    align-items: end;
+    justify-items: center;
+    padding: 0;
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .modal,
+  .appointment-modal,
+  .modal.patient-modal,
+  .doctor-detail-modal,
+  .crud-entry-modal,
+  .secretary-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - max(0.5rem, env(safe-area-inset-top)));
+    margin: 0;
+    border-radius: 1rem 1rem 0 0;
+    padding-bottom: var(--mobile-safe-bottom);
+  }
+
+  .modal-header,
+  .patient-modal .modal-header,
+  .doctor-detail-modal .modal-header,
+  .secretary-dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #fff;
+  }
+
+  .modal-header h2 {
+    font-size: 1.125rem;
+  }
+
+  .modal-fields,
+  .appointment-modal .modal-fields,
+  .doctor-detail-grid,
+  .crud-entry-fields {
+    gap: 0;
+    padding: 1rem;
+  }
+
+  .modal-footer,
+  .patient-modal .modal-footer,
+  .doctor-detail-modal .modal-footer,
+  .secretary-dialog-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem calc(0.75rem + var(--mobile-safe-bottom));
+    background: #fff;
+  }
+
+  .appointment-modal .appointment-attachments-field,
+  .appointment-modal .modal-fields label.wide,
+  .appointment-modal .appointment-exam-attachments,
+  .patient-form-section,
+  .patient-form-fields {
+    grid-column: 1 / -1;
+  }
+
+  .agenda-toolbar input,
+  .agenda-date-controls input,
+  .agenda-date-controls label,
+  .agenda-date-controls .today-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .agenda-date-controls {
+    gap: 0.5rem;
+  }
+
+  .agenda-row {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    min-height: 4.5rem;
+  }
+
+  .agenda-time {
+    padding: 0.75rem 0.375rem;
+    font-size: 0.6875rem;
+  }
+
+  .agenda-slots {
+    min-width: 0;
+    padding: 0.5rem;
+  }
+
+  .slot-empty,
+  .appointment-chip {
+    min-width: 0;
+    width: 100%;
+    padding: 0.625rem 1.75rem 0.625rem 0.625rem;
+  }
+
+  .appointment-chip strong,
+  .appointment-chip span,
+  .appointment-chip small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .doctor-page-heading,
+  .doctor-agenda-header,
+  .doctor-patient-row,
+  .secretary-patient-header,
+  .secretary-visit-heading,
+  .medical-records-heading,
+  .clinical-patient-heading,
+  .clinical-patient-title-row,
+  .medical-documents-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .doctor-agenda-date-controls {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+    gap: 0.5rem;
+  }
+
+  .doctor-agenda-date-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .doctor-agenda-date-input input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .doctor-agenda-today {
+    grid-column: 1 / -1;
+  }
+
+  .doctor-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .doctor-stat-card {
+    min-height: 0;
+    padding: 0.875rem 0.625rem;
+  }
+
+  .doctor-stat-card span {
+    font-size: 0.6875rem;
+    line-height: 1.35;
+  }
+
+  .doctor-stat-card strong {
+    font-size: 1.5rem;
+  }
+
+  .doctor-agenda-header {
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .doctor-patient-row {
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .doctor-patient-info,
+  .doctor-patient-name,
+  .doctor-patient-info p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .doctor-patient-name {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .doctor-patient-name strong {
+    font-size: 0.875rem;
+  }
+
+  .doctor-patient-info p {
+    font-size: 0.8125rem;
+  }
+
+  .doctor-agenda-actions,
+  .doctor-action {
+    grid-column: 2;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .welcome-panel {
+    min-height: 0;
+    padding: 1.25rem;
+  }
+
+  .welcome-panel h2 {
+    font-size: clamp(1.25rem, 5.5vw, 1.65rem);
+    line-height: 1.2;
+  }
+
+  .panel-illustration {
+    display: none;
+  }
+
+  .stat-card {
+    min-height: 8rem;
+    padding: 1rem;
+  }
+
+  .stat-card strong {
+    font-size: 1.375rem;
+  }
+
+  .stat-link {
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .quick-grid button {
+    min-width: 0;
+    padding: 0.875rem;
+  }
+
+  .quick-grid button > svg {
+    width: 1rem;
+    flex: 0 0 auto;
+  }
+
+  .secretary-summary-grid {
+    gap: 0.625rem;
+  }
+
+  .secretary-summary-card {
+    min-height: 0;
+    padding: 1rem;
+  }
+
+  .secretary-summary-card strong,
+  .secretary-patient-total strong {
+    font-size: 1.25rem;
+  }
+
+  .secretary-patient-header {
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .secretary-patient-total {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .secretary-visits {
+    padding-inline: 0.875rem;
+  }
+
+  .secretary-request-table {
+    max-width: calc(100vw - 3.75rem);
+  }
+
+  .secretary-request-table-head,
+  .secretary-request-row {
+    min-width: 44rem;
+  }
+
+  .medical-records-workspace,
+  .medical-record-body,
+  .clinical-patient-grid,
+  .medical-record-card,
+  .medical-documents-area,
+  .record-tab-panels {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .medical-records-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .medical-records-sidebar,
+  .patient-exams-sidebar {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .medical-date-rail,
+  .record-tabs,
+  .injectable-tabs,
+  .request-category-chips {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .record-tabs,
+  .injectable-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .record-tabs > *,
+  .injectable-tabs > * {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+  }
+
+  .record-tab-panels,
+  .medical-record-body,
+  .clinical-section,
+  .exam-picker,
+  .exam-request-selection,
+  .exam-requests-area,
+  .procedure-requests-area,
+  .injectable-requests-area,
+  .ultrasound-requests-area,
+  .medical-documents-history {
+    overflow-wrap: anywhere;
+  }
+
+  .clinical-patient-card,
+  .medical-document-history-card,
+  .anamnesis-timeline-card,
+  .exam-group-card,
+  .secretary-patient-card {
+    max-width: 100%;
+  }
+
+  .clinical-patient-avatar {
+    max-width: min(100%, 7rem);
+  }
+
+  .medical-document-form-grid,
+  .medical-document-history-card,
+  .medical-document-history-main,
+  .medical-document-history-actions,
+  .certificate-grid,
+  .exam-group-form,
+  .exam-group-values-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .medical-document-wide,
+  .medical-document-form-grid > *,
+  .certificate-form,
+  .crud-entry-section {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .medical-document-issue,
+  .medical-document-inline-actions,
+  .medical-document-history-actions,
+  .record-actions,
+  .exam-request-actions,
+  .patient-exam-actions,
+  .procedure-requested-list,
+  .injectable-requested-list,
+  .row-actions {
+    flex-wrap: wrap;
+  }
+
+  .medical-document-search,
+  .medical-document-suggestions,
+  .exam-search,
+  .exam-request-search,
+  .procedure-search,
+  .injectable-search,
+  .record-panel,
+  .record-modal {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .financial-summary,
+  .financial-shortcuts,
+  .crm-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .financial-toolbar,
+  .crm-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .financial-search,
+  .financial-filter,
+  .crm-search,
+  .crm-filter {
+    width: 100%;
+    max-width: none;
+  }
+
+  .crm-kanban {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crm-table-card .table-scroll,
+  .reports-results,
+  .financial-table-wrap,
+  .exam-group-values-content {
+    max-width: calc(100vw - 2rem);
+    overflow-x: auto;
+  }
+
+  .reports-export-actions {
+    gap: 0.5rem;
+  }
+
+  .reports-export-actions button {
+    width: 100%;
+  }
+
+  .login-page {
+    min-height: 100svh;
+    padding: 1rem;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 28rem;
+    padding: clamp(1.25rem, 6vw, 2rem);
+  }
+
+  .login-art {
+    display: none;
+  }
+
+  .login-card input,
+  .modal input,
+  .modal select,
+  .modal textarea,
+  .form-card input,
+  .form-card select,
+  .form-card textarea {
+    font-size: 16px;
+  }
+
+  .exam-groups-toolbar,
+  .exam-groups-heading,
+  .exam-group-card-head,
+  .certificate-heading,
+  .certificate-card-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .certificate-active-list,
+  .medical-prescription-chips,
+  .attachment-chips,
+  .selected-exam-chips {
+    flex-wrap: wrap;
+  }
+}
+
+/* 640–899 px: tablets compactos e smartphones grandes em paisagem. */
+@media (min-width: 640px) and (max-width: 899px) {
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(20rem, 82vw);
+    height: 100dvh;
+    overflow-y: auto;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 220ms ease, visibility 220ms ease;
+    box-shadow: 1rem 0 2.5rem rgb(35 11 21 / 18%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  .sidebar.collapsed .brand {
+    justify-content: flex-start;
+    padding-inline: 0.75rem;
+  }
+
+  .sidebar.collapsed .brand-copy,
+  .sidebar.collapsed .secure span,
+  .sidebar.collapsed .collapse-button span {
+    display: block;
+  }
+
+  .sidebar.collapsed .nav-caption {
+    display: flex;
+  }
+
+  .sidebar.collapsed .nav-item {
+    justify-content: flex-start;
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: rgb(29 13 19 / 48%);
+  }
+
+  .content {
+    width: 100%;
+  }
+
+  .menu {
+    display: grid;
+  }
+
+  .topbar {
+    gap: 0.75rem;
+    padding-inline: 1.25rem;
+  }
+
+  .main {
+    padding: 1.5rem;
+  }
+
+  .cards,
+  .doctor-stat-grid,
+  .secretary-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .financial-summary,
+  .financial-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crm-kanban {
+    grid-template-columns: repeat(2, minmax(15rem, 1fr));
+    overflow-x: auto;
+  }
+
+  .doctor-stat-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .medical-records-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .medical-records-sidebar {
+    width: 100%;
+  }
+}
+
+/* 900–1199 px: tablet paisagem e notebook compacto. */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .sidebar {
+    width: 14.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .main {
+    padding-inline: clamp(1.25rem, 2.5vw, 2rem);
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .medical-records-workspace {
+    grid-template-columns: minmax(13rem, 0.85fr) minmax(0, 1.5fr);
+  }
+}
+
+/* 1200–1599 px: desktop; fluidez sem ultrapassar a largura legível. */
+@media (min-width: 1200px) {
+  .sidebar-backdrop {
+    display: none;
+  }
+
+  .main {
+    padding-block: clamp(2rem, 3vw, 2.625rem);
+  }
+}
+
+/* 1600 px+: preservar densidade de leitura em telas grandes. */
+@media (min-width: 1600px) {
+  .main {
+    padding-inline: clamp(3rem, 3.5vw, 4.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
