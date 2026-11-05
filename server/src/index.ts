@@ -168,6 +168,21 @@ function adminOnly(req: AuthRequest, res: Response, next: NextFunction) {
   next();
 }
 
+function adminOrSecretaryForCrm(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  if (
+    req.user?.profile !== Profile.ADMINISTRADOR &&
+    req.user?.profile !== Profile.SECRETARIA
+  )
+    return res.status(403).json({
+      message: "Acesso ao CRM restrito aos perfis Administrador e Secretária.",
+    });
+  next();
+}
+
 function appointmentAccess(
   req: AuthRequest,
   res: Response,
@@ -3200,7 +3215,14 @@ app.post("/api/appointments/:id/attachments", auth, doctorOnly, appointmentAttac
   res.json(await prisma.appointment.findUnique({ where: { id }, include: appointmentInclude }));
 });
 
-app.use("/api/admin", auth, adminOnly);
+app.use(
+  "/api/admin",
+  auth,
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.path.startsWith("/crm")) return adminOrSecretaryForCrm(req, res, next);
+    return adminOnly(req, res, next);
+  },
+);
 app.use("/api/financial", auth, adminOnly, createFinancialRouter(prisma));
 
 function crmStatusForDoseCount(count: number): CrmStatus {

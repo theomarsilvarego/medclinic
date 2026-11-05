@@ -212,7 +212,11 @@ export function App() {
               <Dashboard setModule={setModule} user={user} />
             )
           ) : module === "crm" ? (
-            normalizedProfile === "ADMINISTRADOR" ? <CrmPage /> : <Dashboard setModule={setModule} user={user} />
+            normalizedProfile === "ADMINISTRADOR" || normalizedProfile === "SECRETARIA" ? (
+              <CrmPage />
+            ) : (
+              <Dashboard setModule={setModule} user={user} />
+            )
           ) : module === "doctor-day" ? (
             user.profile === "MEDICO" ? (
               <DoctorAgendaPage

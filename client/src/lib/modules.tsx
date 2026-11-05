@@ -209,7 +209,10 @@ export function canAccessModule(profile: string, key: ModuleKey) {
     key === "sales" ||
     key === "crm"
   )
-    return normalizedProfile === "ADMINISTRADOR";
+    return (
+      normalizedProfile === "ADMINISTRADOR" ||
+      (key === "crm" && normalizedProfile === "SECRETARIA")
+    );
   return (
     normalizedProfile === "ADMINISTRADOR" ||
     (key === "appointments" && normalizedProfile === "SECRETARIA")
