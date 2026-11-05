@@ -430,10 +430,9 @@
   }
 }
 
-
 /* CRM treatment dialog follows the appointment modal's visual frame and scrolling model. */
 .crm-treatment-modal {
-  width: min(760px, 100%);
+  width: min(900px, 100%);
   max-height: min(94vh, 900px);
   overflow: hidden;
   display: flex;
@@ -458,7 +457,7 @@
   color: #a06f7f;
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: .8px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
 }
 .crm-modal-heading h2 {
@@ -474,7 +473,7 @@
   color: var(--brand);
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: .4px;
+  letter-spacing: 0.4px;
   vertical-align: 3px;
 }
 .crm-modal-subtitle {
@@ -534,7 +533,7 @@
   margin: 0;
   color: #49363c;
   font-size: 14px;
-  letter-spacing: -.1px;
+  letter-spacing: -0.1px;
 }
 .crm-section-copy h3 svg {
   color: var(--brand);
@@ -569,7 +568,10 @@
   border-color: #eadde1;
   border-radius: 11px;
   background: #fff;
-  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 .crm-treatment-fields textarea {
   min-height: 112px;
