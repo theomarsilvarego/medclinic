@@ -5,6 +5,12 @@ export type ResourceField = {
   label: string;
   type?: string;
   fullWidth?: boolean;
+  required?: boolean;
+  min?: number;
+  step?: number;
+  defaultValue?: string | number | boolean | null;
+  visibleWhen?: { key: string; value: unknown };
+  clearWhenHidden?: boolean;
   section?: string;
   placeholder?: string;
   options?: (string | { value: string; label: string })[];
@@ -14,6 +20,7 @@ export type ResourceColumn = {
   key: string;
   label: string;
   format?: (value: any) => string;
+  badge?: boolean;
 };
 
 export type ResourceConfig = {
@@ -24,4 +31,3 @@ export type ResourceConfig = {
   fields: ResourceField[];
   columns: ResourceColumn[];
 };
-

@@ -19,9 +19,28 @@ export function ResourceFormModal({
   onClose,
   onSave,
 }: Props) {
-  const [data, setData] = useState<Row>(initial);
+  const [data, setData] = useState<Row>(() => {
+    const initialized = { ...initial };
+    for (const field of fields) {
+      if (initialized[field.key] === undefined && field.defaultValue !== undefined)
+        initialized[field.key] = field.defaultValue;
+    }
+    return initialized;
+  });
   const update = (key: string, value: unknown) =>
-    setData((current) => ({ ...current, [key]: value }));
+    setData((current) => {
+      const next = { ...current, [key]: value };
+      for (const field of fields) {
+        if (
+          field.clearWhenHidden &&
+          field.visibleWhen &&
+          next[field.visibleWhen.key] !== field.visibleWhen.value
+        ) {
+          next[field.key] = null;
+        }
+      }
+      return next;
+    });
 
   return (
     <div
@@ -59,6 +78,10 @@ export function ResourceFormModal({
         <div className="modal-fields appointment-modal-fields crud-entry-fields">
           <section className="appointment-section crud-entry-section">
             {fields.map((field) => {
+              if (
+                field.visibleWhen &&
+                data[field.visibleWhen.key] !== field.visibleWhen.value
+              ) return null;
               const fieldId = `resource-${field.key}`;
               if (field.type === "checkbox") {
                 return (
@@ -71,7 +94,7 @@ export function ResourceFormModal({
                     <input
                       id={fieldId}
                       type="checkbox"
-                      checked={data[field.key] ?? true}
+                      checked={data[field.key] ?? field.defaultValue ?? true}
                       onChange={(event) =>
                         update(field.key, event.target.checked)
                       }
@@ -96,6 +119,7 @@ export function ResourceFormModal({
                     <select
                       id={fieldId}
                       value={value}
+                      required={field.required}
                       onChange={(event) =>
                         update(field.key, event.target.value)
                       }
@@ -118,6 +142,7 @@ export function ResourceFormModal({
                       id={fieldId}
                       rows={4}
                       value={value}
+                      required={field.required}
                       placeholder={field.placeholder}
                       onChange={(event) =>
                         update(field.key, event.target.value)
@@ -128,6 +153,9 @@ export function ResourceFormModal({
                       id={fieldId}
                       type={field.type || "text"}
                       value={value}
+                      required={field.required}
+                      min={field.min}
+                      step={field.step}
                       placeholder={field.placeholder}
                       onChange={(event) =>
                         update(field.key, event.target.value)
