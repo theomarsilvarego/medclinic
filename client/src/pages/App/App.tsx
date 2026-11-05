@@ -58,6 +58,14 @@ export function App() {
         .then(setUser)
         .catch(() => localStorage.removeItem("medclinic_token"));
   }, []);
+  useEffect(() => {
+    if (!mobileMenu) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenu(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileMenu]);
   if (!user) return <Login onLogin={setUser} />;
   function logout() {
     localStorage.removeItem("medclinic_token");
@@ -67,6 +75,8 @@ export function App() {
   return (
     <div className={sidebarCollapsed ? "shell sidebar-collapsed" : "shell"}>
       <aside
+        id="primary-navigation"
+        aria-label="Menu principal"
         className={`${mobileMenu ? "sidebar open" : "sidebar"}${sidebarCollapsed ? " collapsed" : ""}`}
       >
         <div className="brand">
@@ -154,10 +164,22 @@ export function App() {
           </div>
         </div>
       </aside>
+      {mobileMenu && (
+        <button
+          className="sidebar-backdrop"
+          type="button"
+          aria-label="Fechar menu de navegação"
+          onClick={() => setMobileMenu(false)}
+        />
+      )}
       <div className="content">
         <header className="topbar">
           <button
             className="icon-button menu"
+            type="button"
+            aria-label={mobileMenu ? "Fechar menu de navegação" : "Abrir menu de navegação"}
+            aria-controls="primary-navigation"
+            aria-expanded={mobileMenu}
             onClick={() => setMobileMenu(!mobileMenu)}
           >
             <Menu size={20} />
