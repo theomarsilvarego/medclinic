@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { CalendarDays, Check, Plus, X } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { CalendarDays, Check, Info, Plus, UserRound, X } from "lucide-react";
 
 type Status = "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
 type ProductType = "INJETAVEL" | "PROCEDIMENTO";
@@ -75,6 +75,7 @@ export function CrmTreatmentModal({
 }: Props) {
   const [patientSearch, setPatientSearch] = useState("");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
+  const patientInputRef = useRef<HTMLInputElement>(null);
   const normalizedPatientSearch = patientSearch.trim().toLocaleLowerCase("pt-BR");
   const filteredPatients = catalog.patients.filter((patient) =>
     !normalizedPatientSearch || patient.fullName.toLocaleLowerCase("pt-BR").includes(normalizedPatientSearch),
@@ -88,12 +89,19 @@ export function CrmTreatmentModal({
 
   return (
     <div className="modal-backdrop appointment-backdrop">
-      <div className="modal appointment-modal crm-treatment-modal">
+      <div
+        className="modal appointment-modal crm-treatment-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="crm-treatment-title"
+        aria-describedby="crm-treatment-description"
+      >
         <header className="modal-header appointment-modal-header">
-          <div>
-            <h2>{editing ? "Editar atendimento" : "Novo atendimento"}</h2>
+          <div className="crm-modal-heading">
+            <p className="crm-modal-kicker">CRM · ATENDIMENTO</p>
+            <h2 id="crm-treatment-title">{editing ? "Editar atendimento" : "Novo atendimento"}</h2>
             <span className="modal-identification-code" aria-label="Código do modal A002">A002</span>
-            <p className="crm-modal-subtitle">CRM · ATENDIMENTO · Registre cada dose ou sessão do paciente.</p>
+            <p id="crm-treatment-description" className="crm-modal-subtitle">Registre o acompanhamento do paciente em poucos passos.</p>
           </div>
           <button
             type="button"
@@ -110,11 +118,19 @@ export function CrmTreatmentModal({
           <div className="modal-fields appointment-modal-fields crm-treatment-fields">
             {error && <div className="error" role="alert">{error}</div>}
 
-            <section className="appointment-section crm-treatment-section">
+            <section className="appointment-section crm-treatment-section crm-patient-section" aria-labelledby="crm-patient-title">
+              <div className="crm-section-copy">
+                <div>
+                  <p className="crm-section-eyebrow">01 · identificação</p>
+                  <h3 id="crm-patient-title"><UserRound size={17} /> Paciente</h3>
+                </div>
+                <span className="crm-required-hint">Obrigatório</span>
+              </div>
               <label className="appointment-patient-field crm-field-full">
-                Paciente
+                <span className="crm-field-label">Buscar paciente</span>
                 <div className="appointment-patient-picker">
                   <input
+                    ref={patientInputRef}
                     className="appointment-patient-search"
                     type="search"
                     required={!form.patientId}
@@ -122,10 +138,13 @@ export function CrmTreatmentModal({
                     onFocus={() => setPatientPickerOpen(true)}
                     onBlur={() => setTimeout(() => setPatientPickerOpen(false), 120)}
                     onChange={(event) => {
-                      setPatientSearch(event.target.value);
+                      const value = event.target.value;
+                      setPatientSearch(value);
                       setPatientPickerOpen(true);
-                      if (!event.target.value) onUpdateForm("patientId", "");
+                      if (!selectedPatient || value !== selectedPatient.fullName) onUpdateForm("patientId", "");
+                      event.currentTarget.setCustomValidity("");
                     }}
+                    onInvalid={(event) => event.currentTarget.setCustomValidity("Selecione um paciente na lista de resultados.")}
                     placeholder="Buscar paciente por nome"
                     aria-label="Buscar paciente por nome"
                     aria-expanded={patientPickerOpen}
@@ -143,6 +162,7 @@ export function CrmTreatmentModal({
                             onUpdateForm("patientId", String(patient.id));
                             setPatientSearch(patient.fullName);
                             setPatientPickerOpen(false);
+                            patientInputRef.current?.setCustomValidity("");
                           }}
                         >
                           {patient.fullName}
@@ -156,10 +176,17 @@ export function CrmTreatmentModal({
               </label>
             </section>
 
-            <section className="appointment-section crm-treatment-section">
+            <section className="appointment-section crm-treatment-section crm-details-section" aria-labelledby="crm-details-title">
+              <div className="crm-section-copy">
+                <div>
+                  <p className="crm-section-eyebrow">02 · atendimento</p>
+                  <h3 id="crm-details-title">Detalhes do atendimento</h3>
+                </div>
+                <p className="crm-section-description">Defina o item acompanhado e o momento atual do tratamento.</p>
+              </div>
               <div className="crm-form-grid">
                 <label>
-                  Tipo
+                  <span className="crm-field-label">Tipo</span>
                   <select
                     value={form.productType}
                     onChange={(event) => onChangeProductType(event.target.value as ProductType)}
@@ -169,11 +196,15 @@ export function CrmTreatmentModal({
                   </select>
                 </label>
                 <label>
-                  Produto / processo
+                  <span className="crm-field-label">Produto / processo <i>Obrigatório</i></span>
                   <select
                     required
                     value={form.productId}
-                    onChange={(event) => onUpdateForm("productId", event.target.value)}
+                    onChange={(event) => {
+                      onUpdateForm("productId", event.target.value);
+                      event.currentTarget.setCustomValidity("");
+                    }}
+                    onInvalid={(event) => event.currentTarget.setCustomValidity("Selecione o produto ou processo do atendimento.")}
                   >
                     <option value="">Selecione</option>
                     {products.map((product) => (
@@ -187,7 +218,7 @@ export function CrmTreatmentModal({
 
               <div className="crm-form-grid">
                 <label>
-                  Categoria
+                  <span className="crm-field-label">Categoria</span>
                   <select
                     value={form.category}
                     onChange={(event) => onUpdateForm("category", event.target.value as Category)}
@@ -198,7 +229,7 @@ export function CrmTreatmentModal({
                   </select>
                 </label>
                 <label>
-                  Status
+                  <span className="crm-field-label">Status</span>
                   <select
                     value={form.status}
                     onChange={(event) => onUpdateForm("status", event.target.value as Status)}
@@ -213,42 +244,63 @@ export function CrmTreatmentModal({
 
             <section className="appointment-section crm-treatment-section crm-dose-section">
               <div className="appointment-attachments-title crm-section-heading">
-                <span>Doses / sessões <b>{form.doseDates.filter(Boolean).length} registrada(s)</b></span>
-                <button type="button" className="secondary" onClick={onAddDose}>
+                <div>
+                  <p className="crm-section-eyebrow">03 · acompanhamento</p>
+                  <span><CalendarDays size={17} /> Doses / sessões <b>{form.doseDates.filter(Boolean).length} registrada(s)</b></span>
+                  <p className="crm-section-description">Adicione as datas para acompanhar a evolução do protocolo.</p>
+                </div>
+                <button type="button" className="secondary crm-add-dose" onClick={onAddDose}>
                   <Plus size={16} /> Adicionar dose
                 </button>
               </div>
-              {form.doseDates.map((date, index) => (
-                <div className="crm-dose-row" key={`dose-${index}`}>
-                  <CalendarDays size={18} />
-                  <input
-                    type="date"
-                    required
-                    // Converte a data para o formato YYYY-MM-DD que o input exige.
-                    value={date ? new Date(date).toISOString().slice(0, 10) : ""}
-                    onChange={(event) => onUpdateDose(index, event.target.value)}
-                    aria-label={`Data da dose ${index + 1}`}
-                  />
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => onRemoveDose(index)}
-                    aria-label={`Remover dose ${index + 1}`}
-                  >
-                    <X size={17} />
-                  </button>
-                </div>
-              ))}
+              <div className="crm-dose-list">
+                {form.doseDates.map((date, index) => (
+                  <div className="crm-dose-row" key={`dose-${index}`}>
+                    <span className="crm-dose-index">{String(index + 1).padStart(2, "0")}</span>
+                    <CalendarDays size={18} aria-hidden="true" />
+                    <label>
+                      <span className="crm-dose-label">Data da dose {index + 1}</span>
+                      <input
+                        type="date"
+                        required
+                        // Converte a data para o formato YYYY-MM-DD que o input exige.
+                        value={date ? new Date(date).toISOString().slice(0, 10) : ""}
+                        onChange={(event) => {
+                          onUpdateDose(index, event.target.value);
+                          event.currentTarget.setCustomValidity("");
+                        }}
+                        onInvalid={(event) => event.currentTarget.setCustomValidity("Informe a data desta dose ou sessão.")}
+                        aria-label={`Data da dose ${index + 1}`}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => onRemoveDose(index)}
+                      aria-label={`Remover dose ${index + 1}`}
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                ))}
+              </div>
               <p className="crm-dose-rule">
                 <Check size={14} /> 1 dose: Iniciado · 2 doses: Em andamento · 3 ou mais: Concluído
               </p>
             </section>
 
-            <section className="appointment-section crm-treatment-section">
+            <section className="appointment-section crm-treatment-section crm-observation-section" aria-labelledby="crm-observation-title">
+              <div className="crm-section-copy">
+                <div>
+                  <p className="crm-section-eyebrow">04 · registro</p>
+                  <h3 id="crm-observation-title">Observações</h3>
+                </div>
+                <Info size={17} aria-hidden="true" />
+              </div>
               <label className="crm-field-full">
-                Observação
+                <span className="crm-field-label">Observação <i>Opcional</i></span>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={form.observation}
                   onChange={(event) => onUpdateForm("observation", event.target.value)}
                   placeholder="Inclua orientações ou observações do atendimento"

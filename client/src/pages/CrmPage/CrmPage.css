@@ -433,21 +433,55 @@
 
 /* CRM treatment dialog follows the appointment modal's visual frame and scrolling model. */
 .crm-treatment-modal {
-  width: min(700px, 100%);
-  max-height: min(92vh, 850px);
+  width: min(760px, 100%);
+  max-height: min(94vh, 900px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border: 1px solid #eadcdf;
+  border-radius: 20px;
+  background: #fff;
 }
 .crm-treatment-modal .appointment-modal-header {
   flex: 0 0 auto;
-  align-items: flex-start;
-  padding: 23px 25px 18px;
+  align-items: center;
+  padding: 24px 28px 20px;
+  background: linear-gradient(135deg, #fffafb 0%, #fff 72%);
+}
+.crm-modal-heading {
+  position: relative;
+  padding-right: 56px;
+}
+.crm-modal-kicker,
+.crm-section-eyebrow {
+  margin: 0 0 6px;
+  color: #a06f7f;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+.crm-modal-heading h2 {
+  display: inline;
+}
+.crm-modal-heading .modal-identification-code {
+  display: inline-block;
+  margin: 0 0 0 9px;
+  padding: 4px 7px;
+  border: 1px solid #ead1d9;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .4px;
+  vertical-align: 3px;
 }
 .crm-modal-subtitle {
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.45;
 }
 .crm-treatment-modal .crm-form {
   display: flex;
@@ -460,10 +494,11 @@
   flex: 1 1 auto;
   grid-template-columns: 1fr 1fr;
   align-content: start;
-  gap: 14px 17px;
+  gap: 14px;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 25px;
+  padding: 20px 28px 24px;
+  background: #fffdfd;
 }
 .crm-treatment-fields > .error,
 .crm-treatment-fields > .crm-treatment-section,
@@ -472,32 +507,117 @@
 }
 .crm-treatment-fields > .crm-treatment-section {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
+  padding: 17px;
+  border: 1px solid #eee1e4;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 7px 18px #5b2b3d08;
 }
 .crm-treatment-fields .crm-form-grid {
-  gap: 14px 17px;
+  gap: 14px 16px;
 }
 .crm-treatment-fields .crm-field-full {
   width: 100%;
 }
-.crm-treatment-fields .crm-dose-section {
-  gap: 10px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+.crm-section-copy {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.crm-section-copy h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #49363c;
+  font-size: 14px;
+  letter-spacing: -.1px;
+}
+.crm-section-copy h3 svg {
+  color: var(--brand);
+}
+.crm-section-description {
+  max-width: 310px;
+  margin: 3px 0 0;
+  color: #987f87;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.crm-required-hint,
+.crm-field-label i {
+  color: #a06f7f;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+.crm-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.crm-treatment-fields .crm-form-grid label {
+  gap: 7px;
+}
+.crm-treatment-fields input,
+.crm-treatment-fields select,
+.crm-treatment-fields textarea {
+  min-height: 44px;
+  border-color: #eadde1;
+  border-radius: 11px;
+  background: #fff;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.crm-treatment-fields textarea {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.crm-treatment-fields input:hover,
+.crm-treatment-fields select:hover,
+.crm-treatment-fields textarea:hover {
+  border-color: #d8b8c3;
+}
+.crm-treatment-fields input:focus,
+.crm-treatment-fields select:focus,
+.crm-treatment-fields textarea:focus {
+  border-color: #b85b77;
   background: #fffafb;
+  box-shadow: 0 0 0 4px #b85b7714;
+}
+.crm-patient-section .appointment-patient-search {
+  min-height: 48px;
+  padding-left: 14px;
+}
+.crm-details-section {
+  gap: 17px;
+}
+.crm-observation-section > .crm-section-copy > svg {
+  color: #aa8793;
+}
+.crm-treatment-fields .crm-dose-section {
+  gap: 13px;
+  padding: 18px;
+  border-color: #e8d6dc;
+  background: linear-gradient(180deg, #fffafb 0%, #fff 100%);
 }
 .crm-treatment-fields .crm-section-heading {
-  margin: 0 0 2px;
+  align-items: flex-start;
+  margin: 0;
 }
-.crm-treatment-fields .crm-section-heading > span {
+.crm-treatment-fields .crm-section-heading > div > span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   color: #49363c;
   font-size: 13px;
   font-weight: 800;
+}
+.crm-treatment-fields .crm-section-heading > div > span svg {
+  color: var(--brand);
 }
 .crm-treatment-fields .crm-section-heading b {
   min-width: 22px;
@@ -511,24 +631,78 @@
 .crm-treatment-fields .crm-section-heading button {
   flex: 0 0 auto;
 }
-.crm-treatment-fields .crm-dose-row {
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+.crm-treatment-fields .crm-add-dose {
+  min-height: 40px;
+  padding: 9px 13px;
+  border-color: #e7c6d0;
   background: #fff;
+  color: var(--brand);
+  white-space: nowrap;
+}
+.crm-treatment-fields .crm-add-dose:hover {
+  background: #fff5f8;
+}
+.crm-dose-list {
+  display: grid;
+  gap: 9px;
+}
+.crm-treatment-fields .crm-dose-row {
+  display: grid;
+  grid-template-columns: 28px 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #eadde1;
+  border-radius: 12px;
+  background: #fff;
+  color: #aa8793;
+}
+.crm-dose-index {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  background: #f8edf1;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 900;
+}
+.crm-dose-row label {
+  gap: 4px;
+  min-width: 0;
+}
+.crm-dose-label {
+  color: #9a8189;
+  font-size: 10px;
+  font-weight: 800;
 }
 .crm-treatment-fields .crm-dose-row input {
+  min-height: 34px;
+  padding: 5px 8px;
   border: 0;
   box-shadow: none;
 }
+.crm-treatment-fields .crm-dose-row input:focus {
+  background: #fff8fa;
+  box-shadow: 0 0 0 3px #b85b7714;
+}
 .crm-treatment-fields .crm-dose-rule {
   margin: 0;
+  padding-top: 2px;
   line-height: 1.5;
 }
 .crm-treatment-modal .appointment-modal-footer {
   flex: 0 0 auto;
-  padding: 18px 25px;
+  align-items: center;
+  padding: 16px 28px 18px;
+  background: #fff;
+}
+.crm-treatment-modal .appointment-modal-footer .primary,
+.crm-treatment-modal .appointment-modal-footer .secondary {
+  min-height: 42px;
+  padding-inline: 16px;
 }
 @media (max-width: 620px) {
   .crm-treatment-modal {
@@ -540,7 +714,7 @@
   .crm-treatment-modal .crm-treatment-fields {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
-    padding: 16px 17px;
+    padding: 16px 17px 20px;
   }
   .crm-treatment-fields .crm-form-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -550,10 +724,27 @@
     padding: 12px;
   }
   .crm-treatment-fields .crm-section-heading {
-    align-items: flex-start;
     flex-direction: column;
+  }
+  .crm-treatment-fields .crm-section-heading > div {
+    width: 100%;
+  }
+  .crm-treatment-fields .crm-section-heading .crm-add-dose {
+    width: 100%;
+    justify-content: center;
+  }
+  .crm-treatment-fields .crm-dose-row {
+    grid-template-columns: 28px 18px minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 8px;
+  }
+  .crm-section-description {
+    max-width: none;
   }
   .crm-treatment-modal .appointment-modal-footer {
     padding: 16px 17px;
+  }
+  .crm-treatment-modal .appointment-modal-footer button {
+    flex: 1;
   }
 }
