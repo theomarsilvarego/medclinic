@@ -47,7 +47,7 @@ export function ResourceCatalogView({
                   <tr key={row.id}>
                     {config.columns.map((column) => (
                       <td key={column.key}>
-                        {column.key === "active" || column.badge ? (
+                        {column.key === "active" ? (
                           <span className={row[column.key] ? "status active" : "status"}>{column.format?.(row[column.key])}</span>
                         ) : column.format ? column.format(row[column.key]) : row[column.key]}
                       </td>
