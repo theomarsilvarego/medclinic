@@ -18,6 +18,7 @@ export const proceduresConfig: ResourceConfig = {
           { value: "CONTRACEPTIVO", label: "Contraceptivo" },
         ],
       },
+      { key: "indication", label: "Indicação", type: "text", fullWidth: true, placeholder: "Informe a indicação do procedimento" },
       { key: "value", label: "Valor", type: "number" },
       { key: "active", label: "Ativo", type: "checkbox" },
     ],
@@ -37,6 +38,7 @@ export const proceduresConfig: ResourceConfig = {
           )[String(v)] || "Não definido",
       },
       { key: "value", label: "Valor", format: money },
+      { key: "indication", label: "Indicação", format: (value) => String(value || "—") },
       {
         key: "active",
         label: "Status",

@@ -94,6 +94,7 @@ model Procedure {
   id        Int      @id @default(autoincrement())
   name      String   @db.VarChar(160)
   type      ProcedureType?
+  indication String?  @db.VarChar(255)
   value     Decimal  @db.Decimal(10, 2)
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")

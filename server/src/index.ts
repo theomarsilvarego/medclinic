@@ -327,6 +327,7 @@ const financialSchema = z.object({
 });
 const procedureSchema = financialSchema.extend({
   type: z.nativeEnum(ProcedureType),
+  indication: z.string().trim().max(255).nullish(),
 });
 const insuranceSchema = financialSchema.extend({ ans: requiredText });
 const attendanceSchema = financialSchema.extend({
