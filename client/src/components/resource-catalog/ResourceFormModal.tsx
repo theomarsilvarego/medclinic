@@ -50,13 +50,14 @@ export function ResourceFormModal({
       }}
     >
       <section
-        className="modal appointment-modal crud-entry-modal"
+        className="modal resource-form-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="resource-modal-title"
       >
-        <header className="modal-header appointment-modal-header">
+        <header className="modal-header">
           <div>
+            <p className="eyebrow">CADASTRO</p>
             <h2 id="resource-modal-title">{title}</h2>
             <span
               className="modal-identification-code"
@@ -75,108 +76,96 @@ export function ResourceFormModal({
           </button>
         </header>
 
-        <div className="modal-fields appointment-modal-fields crud-entry-fields">
-          <section className="appointment-section crud-entry-section">
-            {fields.map((field) => {
-              if (
-                field.visibleWhen &&
-                data[field.visibleWhen.key] !== field.visibleWhen.value
-              ) return null;
-              const fieldId = `resource-${field.key}`;
-              if (field.type === "checkbox") {
-                return (
-                  <label
-                    key={field.key}
-                    htmlFor={fieldId}
-                    data-field-key={field.key}
-                    className="check-label"
-                  >
-                    <input
-                      id={fieldId}
-                      type="checkbox"
-                      checked={data[field.key] ?? field.defaultValue ?? true}
-                      onChange={(event) =>
-                        update(field.key, event.target.checked)
-                      }
-                    />
-                    {field.label}
-                  </label>
-                );
-              }
-              const value =
-                field.type === "date" && data[field.key]
-                  ? String(data[field.key]).slice(0, 10)
-                  : String(data[field.key] ?? "");
+        <div className="modal-fields resource-form-fields">
+          {fields.map((field) => {
+            if (
+              field.visibleWhen &&
+              data[field.visibleWhen.key] !== field.visibleWhen.value
+            ) return null;
+            const fieldId = `resource-${field.key}`;
+            if (field.type === "checkbox") {
               return (
                 <label
                   key={field.key}
                   htmlFor={fieldId}
                   data-field-key={field.key}
-                  className={`modal-form-field${field.fullWidth ? " modal-field-full-width" : ""}`}
+                  className="check-label"
                 >
-                  <span>{field.label}</span>
-                  {field.type === "select" ? (
-                    <select
-                      id={fieldId}
-                      value={value}
-                      required={field.required}
-                      onChange={(event) =>
-                        update(field.key, event.target.value)
-                      }
-                    >
-                      <option value="">Selecione…</option>
-                      {field.options?.map((option) => {
-                        const optionValue =
-                          typeof option === "string" ? option : option.value;
-                        const optionLabel =
-                          typeof option === "string" ? option : option.label;
-                        return (
-                          <option key={optionValue} value={optionValue}>
-                            {optionLabel}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  ) : field.type === "textarea" ? (
-                    <textarea
-                      id={fieldId}
-                      rows={4}
-                      value={value}
-                      required={field.required}
-                      placeholder={field.placeholder}
-                      onChange={(event) =>
-                        update(field.key, event.target.value)
-                      }
-                    />
-                  ) : (
-                    <input
-                      id={fieldId}
-                      type={field.type || "text"}
-                      value={value}
-                      required={field.required}
-                      min={field.min}
-                      step={field.step}
-                      placeholder={field.placeholder}
-                      onChange={(event) =>
-                        update(field.key, event.target.value)
-                      }
-                    />
-                  )}
+                  <input
+                    id={fieldId}
+                    type="checkbox"
+                    checked={data[field.key] ?? field.defaultValue ?? true}
+                    onChange={(event) =>
+                      update(field.key, event.target.checked)
+                    }
+                  />
+                  {field.label}
                 </label>
               );
-            })}
-          </section>
+            }
+            const value =
+              field.type === "date" && data[field.key]
+                ? String(data[field.key]).slice(0, 10)
+                : String(data[field.key] ?? "");
+            return (
+              <label
+                key={field.key}
+                htmlFor={fieldId}
+                data-field-key={field.key}
+                className={`modal-form-field${field.fullWidth ? " modal-field-full-width" : ""}`}
+              >
+                <span>{field.label}</span>
+                {field.type === "select" ? (
+                  <select
+                    id={fieldId}
+                    value={value}
+                    required={field.required}
+                    onChange={(event) => update(field.key, event.target.value)}
+                  >
+                    <option value="">Selecione…</option>
+                    {field.options?.map((option) => {
+                      const optionValue =
+                        typeof option === "string" ? option : option.value;
+                      const optionLabel =
+                        typeof option === "string" ? option : option.label;
+                      return (
+                        <option key={optionValue} value={optionValue}>
+                          {optionLabel}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : field.type === "textarea" ? (
+                  <textarea
+                    id={fieldId}
+                    rows={4}
+                    value={value}
+                    required={field.required}
+                    placeholder={field.placeholder}
+                    onChange={(event) => update(field.key, event.target.value)}
+                  />
+                ) : (
+                  <input
+                    id={fieldId}
+                    type={field.type || "text"}
+                    value={value}
+                    required={field.required}
+                    min={field.min}
+                    step={field.step}
+                    placeholder={field.placeholder}
+                    onChange={(event) => update(field.key, event.target.value)}
+                  />
+                )}
+              </label>
+            );
+          })}
         </div>
 
-        <footer className="modal-footer appointment-modal-footer">
+        <footer className="modal-footer">
           <button className="secondary" type="button" onClick={onClose}>
             Cancelar
           </button>
-          <button
-            className="primary"
-            type="button"
-            onClick={() => onSave(data)}
-          >
+          <button className="primary" type="button" onClick={() => onSave(data)}>
             Salvar cadastro
           </button>
         </footer>
