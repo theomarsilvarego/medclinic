@@ -15,20 +15,19 @@ export const ultrasoundsConfig: ResourceConfig = {
     {
       key: "description",
       label: "Descrição",
-      type: "textarea",
-      fullWidth: true,
+      fullWidth: false,
       placeholder: "Descreva o exame de ultrassom.",
     },
     {
       key: "observation",
       label: "Observação",
       type: "textarea",
-      fullWidth: true,
+      fullWidth: false,
       placeholder: "Observações adicionais (opcional).",
     },
     {
       key: "performedInClinic",
-      label: "Realiza na clínica",
+      label: "Realizado na clínica",
       type: "checkbox",
       defaultValue: false,
     },
