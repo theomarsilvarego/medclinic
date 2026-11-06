@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Activity,
   CalendarCheck,
   ChartNoAxesCombined,
   CircleDollarSign,
@@ -86,6 +87,12 @@ export const modules: {
     label: "Procedimentos",
     singular: "procedimento",
     icon: <ClipboardList size={18} />,
+  },
+  {
+    key: "ultrasounds",
+    label: "Ultrassom",
+    singular: "ultrassom",
+    icon: <Activity size={18} />,
   },
   {
     key: "exam-types",
@@ -183,7 +190,7 @@ export const menuGroups: {
   {
     label: "PROCEDIMENTOS E INSUMOS",
     icon: <Syringe size={16} />,
-    keys: ["injectables", "procedures"],
+    keys: ["injectables", "procedures", "ultrasounds"],
   },
   {
     label: "GESTÃO ADMINISTRATIVA E FINANCEIRA",
@@ -213,6 +220,7 @@ export function canAccessModule(profile: string, key: ModuleKey) {
       normalizedProfile === "ADMINISTRADOR" ||
       (key === "crm" && normalizedProfile === "SECRETARIA")
     );
+  if (key === "ultrasounds") return normalizedProfile === "ADMINISTRADOR";
   return (
     normalizedProfile === "ADMINISTRADOR" ||
     (key === "appointments" && normalizedProfile === "SECRETARIA")

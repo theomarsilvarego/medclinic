@@ -368,6 +368,34 @@ const examTypeSchema = z.object({
   value: z.coerce.number().nonnegative(),
   active: z.boolean().default(true),
 });
+const ultrasoundCatalogSchema = z.object({
+  name: requiredText.max(160),
+  description: z.preprocess(
+    (value) => typeof value === "string" ? value.trim() || null : value,
+    z.string().max(5000).nullable().optional(),
+  ),
+  observation: z.preprocess(
+    (value) => typeof value === "string" ? value.trim() || null : value,
+    z.string().max(5000).nullable().optional(),
+  ),
+  performedInClinic: z.boolean(),
+  value: z.preprocess(
+    (value) => value === "" || value === null || value === undefined ? null : Number(value),
+    z.number().finite().nonnegative().nullable(),
+  ),
+  active: z.boolean().default(true),
+}).superRefine((data, context) => {
+  if (data.performedInClinic && data.value === null) {
+    context.addIssue({
+      code: "custom",
+      path: ["value"],
+      message: "Informe o valor quando o ultrassom for realizado na clínica.",
+    });
+  }
+}).transform((data) => ({
+  ...data,
+  value: data.performedInClinic ? data.value : null,
+}));
 const examGroupSchema = z.object({
   name: requiredText,
   examTypeIds: z
@@ -3749,6 +3777,44 @@ app.delete("/api/admin/exam-types/:id", async (req, res) => {
   const id = routeId(req, res);
   if (id === null) return;
   await prisma.examType.delete({ where: { id } });
+  res.status(204).send();
+});
+
+app.get("/api/admin/ultrasounds", auth, adminOnly, async (_req, res) => {
+  const items = await prisma.ultrasoundCatalogItem.findMany({
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+  });
+  res.json(items);
+});
+app.post("/api/admin/ultrasounds", auth, adminOnly, async (req, res) => {
+  const parsed = ultrasoundCatalogSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({
+      message: parsed.error.issues[0]?.message || "Preencha os dados do ultrassom.",
+    });
+  res.status(201).json(
+    await prisma.ultrasoundCatalogItem.create({ data: parsed.data }),
+  );
+});
+app.put("/api/admin/ultrasounds/:id", auth, adminOnly, async (req, res) => {
+  const parsed = ultrasoundCatalogSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({
+      message: parsed.error.issues[0]?.message || "Preencha os dados do ultrassom.",
+    });
+  const id = routeId(req, res);
+  if (id === null) return;
+  res.json(
+    await prisma.ultrasoundCatalogItem.update({
+      where: { id },
+      data: parsed.data,
+    }),
+  );
+});
+app.delete("/api/admin/ultrasounds/:id", auth, adminOnly, async (req, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  await prisma.ultrasoundCatalogItem.delete({ where: { id } });
   res.status(204).send();
 });
 

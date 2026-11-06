@@ -47,14 +47,14 @@ export function ResourceCatalogView({
                   <tr key={row.id}>
                     {config.columns.map((column) => (
                       <td key={column.key}>
-                        {column.key === "active" ? (
+                        {column.key === "active" || column.badge ? (
                           <span className={row[column.key] ? "status active" : "status"}>{column.format?.(row[column.key])}</span>
                         ) : column.format ? column.format(row[column.key]) : row[column.key]}
                       </td>
                     ))}
                     <td className="row-actions">
-                      <button type="button" onClick={() => { state.setEditing(row); state.setModalOpen(true); }} title="Editar" aria-label={`Editar ${config.title.slice(0, -1)}`}><Pencil size={16} /></button>
-                      <button type="button" onClick={() => void state.remove(Number(row.id))} title="Excluir" aria-label={`Excluir ${config.title.slice(0, -1)}`}><Trash2 size={16} /></button>
+                      <button type="button" onClick={() => { state.setEditing(row); state.setModalOpen(true); }} title="Editar" aria-label={`Editar ${singular}`}><Pencil size={16} /></button>
+                      <button type="button" onClick={() => void state.remove(Number(row.id))} title="Excluir" aria-label={`Excluir ${singular}`}><Trash2 size={16} /></button>
                     </td>
                   </tr>
                 ))}

@@ -26,6 +26,7 @@ import { ClinicPage } from "../ClinicPage/ClinicPage";
 import { DoctorsPage } from "../DoctorsPage/DoctorsPage";
 import { InsurancesPage } from "../InsurancesPage/InsurancesPage";
 import { ProceduresPage } from "../ProceduresPage/ProceduresPage";
+import { UltrasoundsPage } from "../UltrasoundsPage/UltrasoundsPage";
 import { InjectablesPage } from "../InjectablesPage/InjectablesPage";
 import { SuppliersPage } from "../SuppliersPage/SuppliersPage";
 import { ExamTypesPage } from "../ExamTypesPage/ExamTypesPage";
@@ -299,6 +300,7 @@ export function App() {
           : module === "doctors" ? <DoctorsPage />
           : module === "insurances" ? <InsurancesPage />
           : module === "procedures" ? <ProceduresPage />
+          : module === "ultrasounds" ? (normalizedProfile === "ADMINISTRADOR" ? <UltrasoundsPage /> : <Dashboard setModule={setModule} user={user} />)
           : module === "injectables" ? <InjectablesPage />
           : module === "suppliers" ? <SuppliersPage />
           : module === "exam-types" ? <ExamTypesPage />

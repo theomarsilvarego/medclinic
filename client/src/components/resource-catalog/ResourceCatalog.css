@@ -1,92 +1,133 @@
-/* Non-patient CRUD dialogs use the appointment modal's framed, responsive layout. */
-.crud-entry-modal {
+/* Formulários de catálogo seguem o shell e a identidade dos modais do sistema. */
+.resource-form-modal.modal {
   display: flex;
   flex-direction: column;
-  width: min(700px, 100%);
-  max-height: min(92vh, 850px);
-  overflow: hidden;
-}
-.crud-entry-modal .appointment-modal-header {
-  flex: 0 0 auto;
-  padding: 23px 25px 18px;
-}
-.crud-entry-fields {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 12px;
+  width: min(900px, calc(100vw - 40px));
+  max-height: min(90vh, 900px);
   min-height: 0;
-  overflow-y: auto;
-  padding: 20px 25px;
-  background: var(--paper);
+  overflow: hidden;
+  border: 1px solid #e7dfe1;
 }
-.crud-entry-section {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 17px;
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
+.resource-form-modal .modal-header {
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 28px;
   background: #fff;
-  box-shadow: 0 2px 6px rgba(75, 50, 55, 0.025);
 }
-.crud-entry-section > * {
+.resource-form-modal .modal-header > div {
   min-width: 0;
 }
-.crud-entry-section label {
-  margin-bottom: 16px;
-  color: #53494d;
+.resource-form-modal .modal-header h2 {
+  color: #30262a;
+}
+.resource-form-fields {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px 16px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px 28px 22px;
+  background: #f8f6f5;
+  overscroll-behavior: contain;
+}
+.resource-form-fields .modal-form-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  color: #332a2e;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
+  line-height: 1.4;
 }
-.crud-entry-section label input,
-.crud-entry-section label select,
-.crud-entry-section label textarea {
-  min-height: 44px;
-  padding: 11px 12px;
-  border-color: #e3dfe0;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
-.crud-entry-section label textarea {
-  min-height: 88px;
-  resize: vertical;
-}
-.crud-entry-section .modal-field-full-width {
+.resource-form-fields .modal-form-field.modal-field-full-width {
   grid-column: 1 / -1;
 }
-.crud-entry-modal .appointment-modal-footer {
+.resource-form-fields .modal-form-field > span {
+  color: #383034;
+  font-size: 12px;
+  font-weight: 750;
+}
+.resource-form-fields .modal-form-field input,
+.resource-form-fields .modal-form-field select,
+.resource-form-fields .modal-form-field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #b9aeb2;
+  border-radius: 8px;
+  background: #fff;
+  color: #2d272a;
+  font-size: 13px;
+  font-weight: 450;
+  box-shadow: inset 0 1px 2px rgba(43, 29, 34, 0.04);
+}
+.resource-form-fields .modal-form-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.resource-form-fields .modal-form-field input::placeholder,
+.resource-form-fields .modal-form-field textarea::placeholder {
+  color: #756b70;
+  opacity: 1;
+}
+.resource-form-fields .modal-form-field input:focus-visible,
+.resource-form-fields .modal-form-field select:focus-visible,
+.resource-form-fields .modal-form-field textarea:focus-visible {
+  border-color: #8d465c;
+  outline: 3px solid #ead1d8;
+  outline-offset: 1px;
+}
+.resource-form-modal .modal-footer {
   flex: 0 0 auto;
-  padding: 18px 25px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 14px 28px;
+  border-top: 1px solid #e4d9dc;
+  background: #fff;
+  box-shadow: 0 -5px 16px rgba(57, 31, 39, 0.05);
+}
+.resource-form-modal .modal-footer .primary,
+.resource-form-modal .modal-footer .secondary {
+  min-height: 42px;
+}
+.resource-form-modal .modal-footer .primary {
+  min-width: 164px;
 }
 @media (max-width: 620px) {
-  .crud-entry-modal {
+  .resource-form-modal.modal {
     width: calc(100vw - 24px);
-    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 13px;
   }
-  .crud-entry-modal .appointment-modal-header {
-    padding: 18px 17px;
+  .resource-form-modal .modal-header {
+    gap: 9px;
+    padding: 14px 15px;
   }
-  .crud-entry-fields {
+  .resource-form-modal .modal-header h2 {
+    font-size: 18px;
+  }
+  .resource-form-fields {
+    grid-template-columns: minmax(0, 1fr);
     padding: 16px 17px;
   }
-  .crud-entry-section {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 16px;
-    border-radius: 15px;
-  }
-  .crud-entry-modal .appointment-modal-footer {
+  .resource-form-modal .modal-footer {
     flex-wrap: wrap;
     padding: 14px 17px;
   }
-  .crud-entry-modal .appointment-modal-footer button {
+  .resource-form-modal .modal-footer button {
     flex: 1;
     min-width: 0;
   }
+  .resource-form-modal .modal-footer .primary {
+    min-width: 0;
+  }
 }
-
 
 .row-actions {
   text-align: right;
