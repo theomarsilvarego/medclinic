@@ -25,6 +25,11 @@ type RequestItem = {
   code: string | null;
   requestedAt: string;
   amount: number | null;
+  procedureId?: number | null;
+  procedureName?: string | null;
+  procedureValue?: number | null;
+  injectableId?: number | null;
+  injectableType?: string | null;
   billingStatus: "A_FATURAR" | "FATURADO" | "NAO_APLICAVEL";
   schedulingStatus: "NAO_AGENDADO" | "AGENDADO";
   items: { label: string; value: number | null }[];
@@ -36,7 +41,7 @@ type Visit = {
   time: string;
   patient: { id: number; fullName: string };
   insurance: { id: number; name: string };
-  doctor: { fullName: string };
+  doctor: { id: number; fullName: string };
   requests: RequestItem[];
 };
 type PatientSummary = {
@@ -140,15 +145,45 @@ export function SecretaryDashboard() {
         insuranceId && !hasVisitInsurance && visit.insurance?.name
           ? [...insurances, { ...visit.insurance, active: false, fromAttendedVisit: true }]
           : insurances;
+      const doctor = (metadata.doctors || []).find(
+        (candidate: Row) => Number(candidate.id) === Number(visit.doctor?.id),
+      ) || (metadata.doctors || []).find(
+        (candidate: Row) => candidate.fullName === visit.doctor?.fullName,
+      );
+      const isProcedure = item?.kind === "PROCEDIMENTO";
+      const isInjectable = item?.kind === "INJETAVEL";
+      const requestedProcedureId = Number(item?.procedureId || 0);
+      const procedures = metadata.procedures || [];
+      const modalProcedures =
+        isProcedure && requestedProcedureId &&
+        !procedures.some((procedure: Row) => Number(procedure.id) === requestedProcedureId)
+          ? [...procedures, {
+              id: requestedProcedureId,
+              name: item?.procedureName || item?.title,
+              value: item?.procedureValue ?? item?.amount ?? 0,
+            }]
+          : procedures;
 
-      setAppointmentMeta({ ...metadata, insurances: modalInsurances });
+      setAppointmentMeta({
+        ...metadata,
+        insurances: modalInsurances,
+        procedures: modalProcedures,
+      });
       setAppointmentDraft({
         appointmentDate: today,
         scheduledTime: "08:00",
         status: "AGENDADO",
-        itemType: "ATENDIMENTO",
+        itemType: isProcedure
+          ? "PROCEDIMENTO"
+          : isInjectable
+            ? "INJETAVEL"
+            : "ATENDIMENTO",
         patientId: selectedPatient.id,
+        doctorId: doctor?.id ? String(doctor.id) : "",
         insuranceId: insuranceId ? String(insuranceId) : "",
+        procedureId: isProcedure && requestedProcedureId ? String(requestedProcedureId) : "",
+        injectableId: isInjectable && item?.injectableId ? String(item.injectableId) : "",
+        injectableType: isInjectable ? item?.injectableType || "" : "",
         requestKind: item?.kind || null,
         requestId: item?.id || null,
       });
