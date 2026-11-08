@@ -406,3 +406,72 @@
   flex: none;
   margin-top: 1px;
 }
+
+.medical-signature-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border: 1px solid #ddc0cb;
+  border-radius: 12px;
+  background: linear-gradient(110deg, #fbf3f6 0%, #fff 72%);
+  color: #382b32;
+}
+.medical-signature-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  color: #741447;
+  background: #f2e1e9;
+}
+.medical-signature-copy {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.medical-signature-copy strong {
+  color: #5d2135;
+  font-size: 13px;
+}
+.medical-signature-copy span {
+  color: #5f555a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.medical-signature-ready {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid #b8d8ce;
+  border-radius: 999px;
+  color: #21594b;
+  background: #edf7f3;
+  font-size: 12px;
+  font-weight: 700;
+}
+.medical-signature-action {
+  min-height: 38px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.medical-signature-action:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+@media (max-width: 640px) {
+  .medical-signature-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .medical-signature-copy {
+    flex-basis: calc(100% - 56px);
+  }
+  .medical-signature-action,
+  .medical-signature-ready {
+    margin-left: 52px;
+  }
+}

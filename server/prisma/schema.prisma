@@ -33,6 +33,7 @@ model User {
   heldCertificates DigitalCertificate[] @relation("DigitalCertificateHolder")
   issuedClinicalDocuments ClinicalDocument[] @relation("ClinicalDocumentIssuer")
   cancelledClinicalDocuments ClinicalDocument[] @relation("ClinicalDocumentCanceller")
+  clinicalSigningSessions ClinicalSigningSession[]
   medicationCatalogItems MedicationCatalogItem[]
   financialSalesCreated FinancialSale[] @relation("FinancialSaleCreator")
   financialPayablesCreated FinancialPayable[] @relation("FinancialPayableCreator")
@@ -70,6 +71,7 @@ model Doctor {
   appointments Appointment[]
   digitalCertificates DigitalCertificate[]
   clinicalDocuments ClinicalDocument[]
+  clinicalSigningSessions ClinicalSigningSession[]
   financialSales FinancialSale[]
 
   @@map("doctors")
@@ -340,6 +342,7 @@ model MedicalRecord {
   procedureRequests ProcedureRequest[]
   ultrasoundRequests UltrasoundRequest[]
   clinicalDocuments ClinicalDocument[]
+  clinicalSigningSessions ClinicalSigningSession[]
 
   @@index([patientId, recordDate])
   @@index([authorId, recordDate])
@@ -631,8 +634,14 @@ enum ClinicalDocumentType {
 }
 
 enum ClinicalDocumentStatus {
+  AGUARDANDO_ASSINATURA
   EMITIDO
   CANCELADO
+}
+
+enum ClinicalSignatureProvider {
+  LOCAL_P12
+  VIDAAS
 }
 
 model ClinicalDocument {
@@ -642,6 +651,8 @@ model ClinicalDocument {
   type                   ClinicalDocumentType
   subtype                String                 @db.VarChar(40)
   status                 ClinicalDocumentStatus @default(EMITIDO)
+  signatureProvider      ClinicalSignatureProvider @default(LOCAL_P12) @map("signature_provider")
+  signatureMetadata      Json?                  @map("signature_metadata")
   content                Json
   pdfStorageKey          String                 @unique @map("pdf_storage_key") @db.VarChar(255)
   cidAuthorizedAt        DateTime?              @map("cid_authorized_at") @db.DateTime(3)
@@ -651,7 +662,7 @@ model ClinicalDocument {
   patientId              Int                    @map("patient_id")
   doctorId               Int                    @map("doctor_id")
   issuedById             Int                    @map("issued_by_id")
-  signatureCertificateId Int                    @map("signature_certificate_id")
+  signatureCertificateId Int?                   @map("signature_certificate_id")
   cancelledAt            DateTime?              @map("cancelled_at") @db.DateTime(3)
   cancelledById          Int?                   @map("cancelled_by_id")
   cancellationReason     String?                @map("cancellation_reason") @db.Text
@@ -661,13 +672,46 @@ model ClinicalDocument {
   doctor                 Doctor                 @relation(fields: [doctorId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   issuedBy               User                   @relation("ClinicalDocumentIssuer", fields: [issuedById], references: [id], onUpdate: Cascade, onDelete: Restrict)
   cancelledBy            User?                  @relation("ClinicalDocumentCanceller", fields: [cancelledById], references: [id], onUpdate: Cascade, onDelete: Restrict)
-  signatureCertificate   DigitalCertificate    @relation(fields: [signatureCertificateId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  signatureCertificate   DigitalCertificate?   @relation(fields: [signatureCertificateId], references: [id], onUpdate: Cascade, onDelete: Restrict)
 
   @@index([medicalRecordId, issuedAt])
   @@index([appointmentId, issuedAt])
   @@index([patientId, issuedAt])
   @@index([doctorId, issuedAt])
   @@map("clinical_documents")
+}
+
+enum ClinicalSigningSessionStatus {
+  AUTHORIZING
+  READY
+  SIGNING
+  USED
+  FAILED
+  EXPIRED
+}
+
+model ClinicalSigningSession {
+  id                        String                       @id @default(uuid()) @db.Char(36)
+  status                    ClinicalSigningSessionStatus @default(AUTHORIZING)
+  userId                    Int                          @map("user_id")
+  doctorId                  Int                          @map("doctor_id")
+  medicalRecordId           Int                          @map("medical_record_id")
+  authenticationRequestId   String?                      @map("authentication_request_id") @db.VarChar(120)
+  credentialId              String?                      @map("credential_id") @db.VarChar(120)
+  verifierEncrypted         String?                      @map("verifier_encrypted") @db.Text
+  certificateMetadata       Json?                        @map("certificate_metadata")
+  failureReason             String?                      @map("failure_reason") @db.VarChar(255)
+  expiresAt                 DateTime                     @map("expires_at") @db.DateTime(3)
+  usedAt                    DateTime?                    @map("used_at") @db.DateTime(3)
+  createdAt                 DateTime                     @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                 DateTime                     @updatedAt @map("updated_at") @db.DateTime(3)
+  user                      User                         @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  doctor                    Doctor                       @relation(fields: [doctorId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  medicalRecord             MedicalRecord                @relation(fields: [medicalRecordId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  @@index([userId, medicalRecordId, status, expiresAt])
+  @@index([doctorId, createdAt])
+  @@map("clinical_signing_sessions")
 }
 
 enum FinancialAccountType {

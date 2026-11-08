@@ -12,6 +12,9 @@ import {
   CrmCategory,
   CrmProductType,
   CrmStatus,
+  ClinicalDocumentStatus,
+  ClinicalSignatureProvider,
+  ClinicalSigningSessionStatus,
   FinancialPaymentMethod,
   InjectableType,
   Prisma,
@@ -24,15 +27,38 @@ import PDFDocument from "pdfkit";
 import { SignPdf } from "@signpdf/signpdf";
 import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 import { P12Signer } from "@signpdf/signer-p12";
+import { SUBFILTER_ETSI_CADES_DETACHED } from "@signpdf/utils";
 import { z } from "zod";
 import QRCode from "qrcode";
 import forge from "node-forge";
 import { createFinancialRouter, createSalesFromRequests } from "./financial.routes.js";
+import { signPdfWithRemoteCms, verifyPdfSignature } from "./clinical-signature.js";
+import {
+  VidassIntegrationError,
+  beginVidassAuthentication,
+  createPkcePair,
+  getVidassConfiguration,
+  getVidassCredential,
+  requestVidassCmsSignature,
+} from "./vidaas.js";
 
 const prisma = new PrismaClient();
 const app = express();
 const port = Number(process.env.PORT || 3333);
-const jwtSecret = process.env.JWT_SECRET || "dev-secret";
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+if (Number.isInteger(trustProxyHops) && trustProxyHops > 0)
+  app.set("trust proxy", trustProxyHops);
+const isProduction = process.env.NODE_ENV === "production";
+const jwtSecret = process.env.JWT_SECRET || (isProduction ? "" : "dev-secret");
+const configuredEncryptionSecret = process.env.CERTIFICATE_ENCRYPTION_KEY || (isProduction ? "" : jwtSecret);
+if (isProduction && (!jwtSecret || jwtSecret.length < 32))
+  throw new Error("Configure JWT_SECRET com ao menos 32 caracteres antes de iniciar o MedClinic.");
+if (isProduction && (!configuredEncryptionSecret || configuredEncryptionSecret.length < 32))
+  throw new Error("Configure CERTIFICATE_ENCRYPTION_KEY com ao menos 32 caracteres antes de iniciar o MedClinic.");
+if (isProduction && !process.env.CERTIFICATE_ENCRYPTION_KEY)
+  throw new Error("CERTIFICATE_ENCRYPTION_KEY é obrigatória em produção e deve ser diferente de JWT_SECRET.");
+if (isProduction && process.env.CERTIFICATE_ENCRYPTION_KEY === process.env.JWT_SECRET)
+  throw new Error("Use valores independentes para CERTIFICATE_ENCRYPTION_KEY e JWT_SECRET em produção.");
 const clinicTimeZone = process.env.CLINIC_TIMEZONE || "America/Porto_Velho";
 const corsOrigins = new Set([
   "http://100.101.191.54:3000",
@@ -46,7 +72,7 @@ const corsOrigins = new Set([
 ]);
 const certificateEncryptionKey = crypto
   .createHash("sha256")
-  .update(process.env.CERTIFICATE_ENCRYPTION_KEY || jwtSecret)
+  .update(configuredEncryptionSecret)
   .digest();
 const attachmentRoot = path.resolve(
   process.env.MEDICAL_RECORD_UPLOAD_DIR ||
@@ -139,6 +165,7 @@ app.use(
     },
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
     optionsSuccessStatus: 204,
   }),
 );
@@ -269,6 +296,38 @@ function decryptSecret(value: string) {
     decipher.update(packed.subarray(28)),
     decipher.final(),
   ]);
+}
+
+function requestCookie(req: Request, name: string) {
+  const cookieHeader = req.headers.cookie || "";
+  for (const part of cookieHeader.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    if (part.slice(0, separator).trim() !== name) continue;
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function clinicalDocumentSigningProvider(): ClinicalSignatureProvider {
+  const defaultProvider = process.env.VIDAAS_CHANNEL_ID ? "VIDAAS" : "LOCAL_P12";
+  return String(process.env.CLINICAL_DOCUMENT_SIGNING_PROVIDER || defaultProvider)
+    .trim()
+    .toUpperCase() === "LOCAL_P12"
+    ? ClinicalSignatureProvider.LOCAL_P12
+    : ClinicalSignatureProvider.VIDAAS;
+}
+
+function vidassCallbackPage(success: boolean) {
+  const title = success ? "Autenticação concluída" : "Autenticação não concluída";
+  const message = success
+    ? "O certificado foi associado ao atendimento. Você já pode retornar ao MedClinic."
+    : "Não foi possível concluir a autenticação do certificado. Retorne ao MedClinic e tente novamente.";
+  return `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body style="font:16px system-ui,sans-serif;max-width:560px;margin:12vh auto;padding:24px;color:#40313a"><h1>${title}</h1><p>${message}</p><p>Esta janela será fechada em instantes.</p><script>setTimeout(()=>window.close(),1200)</script></body></html>`;
 }
 
 function routeId(
@@ -850,6 +909,7 @@ async function signPdfWithActiveCertificate(pdfPath: string) {
     name: details.name,
     contactInfo: "MedClinic",
     location: "Brasil",
+    subFilter: SUBFILTER_ETSI_CADES_DETACHED,
   });
   const signedPdf = await new SignPdf().sign(
     placeholder,
@@ -892,6 +952,7 @@ async function signPdfWithDoctorCertificate(pdfPath: string, details: any, reaso
     name: details.name,
     contactInfo: "MedClinic",
     location: "Brasil",
+    subFilter: SUBFILTER_ETSI_CADES_DETACHED,
   });
   const signedPdf = await new SignPdf().sign(
     placeholder,
@@ -903,9 +964,10 @@ async function generateClinicalDocumentPdf(data: any, pdfPath: string) {
   const { document, patient, doctor, clinic } = data;
   const content = document.content as any;
   const verifyBase = String(process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  const verifyOrigin = new URL(verifyBase).origin;
   const verifyUrl = new URL(
-    `/api/public/clinical-documents/verify/${document.validationCode}`,
-    verifyBase,
+    `/validar/${document.validationCode}`,
+    verifyOrigin,
   ).toString();
   const qrBuffer = await QRCode.toBuffer(verifyUrl, {
     errorCorrectionLevel: "M",
@@ -972,7 +1034,7 @@ async function generateClinicalDocumentPdf(data: any, pdfPath: string) {
     doc.text(`${clinicName}  ·  ${clinic?.address || "Endereço não cadastrado"}`, 48, footerY + 36, { width: 340, height: 24, ellipsis: true });
     doc.image(qrBuffer, 455, footerY + 1, { width: 76, height: 76 });
     doc.fillColor(gray).fontSize(6.5).text(`Código de validação: ${document.validationCode}`, 48, footerY + 62, { width: 340 });
-    doc.fillColor(wine).font("Helvetica-Bold").fontSize(6.5).text("Assinatura digital PAdES vinculada ao certificado cadastrado. Valide a cadeia de confiança no leitor de PDF.", 48, footerY + 74, { width: 390 });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(6.5).text("Assinatura PAdES. Verifique integridade, autoria e cadeia no VALIDAR oficial do ITI.", 48, footerY + 74, { width: 390 });
     doc.end();
   });
 }
@@ -2349,6 +2411,235 @@ app.post("/api/medication-catalog", auth, doctorOnly, async (req: AuthRequest, r
     throw error;
   }
 });
+app.post("/api/medical-records/:id/clinical-documents/signing-session", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const medicalRecordId = routeId(req, res);
+  if (medicalRecordId === null) return;
+  if (clinicalDocumentSigningProvider() !== ClinicalSignatureProvider.VIDAAS)
+    return res.status(409).json({ message: "A assinatura remota VIDaaS não está selecionada neste ambiente." });
+  const configuration = getVidassConfiguration();
+  if (!configuration.ready)
+    return res.status(409).json({ message: configuration.message });
+  const record = await prisma.medicalRecord.findUnique({
+    where: { id: medicalRecordId },
+    select: { patientId: true, appointment: { select: { patientId: true, doctorId: true } } },
+  });
+  if (!record?.appointment)
+    return res.status(409).json({ message: "Salve o atendimento vinculado antes de autenticar o certificado." });
+  if (record.patientId !== record.appointment.patientId)
+    return res.status(409).json({ message: "O paciente do prontuário não corresponde ao paciente do atendimento." });
+  const now = new Date();
+  await prisma.clinicalSigningSession.updateMany({
+    where: {
+      userId: req.user!.id,
+      medicalRecordId,
+      status: { in: [ClinicalSigningSessionStatus.AUTHORIZING, ClinicalSigningSessionStatus.READY, ClinicalSigningSessionStatus.SIGNING] },
+      expiresAt: { lte: now },
+    },
+    data: { status: ClinicalSigningSessionStatus.EXPIRED, verifierEncrypted: null },
+  });
+  const activeSession = await prisma.clinicalSigningSession.findFirst({
+    where: {
+      userId: req.user!.id,
+      doctorId: record.appointment.doctorId,
+      medicalRecordId,
+      status: { in: [ClinicalSigningSessionStatus.AUTHORIZING, ClinicalSigningSessionStatus.READY] },
+      expiresAt: { gt: now },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (activeSession)
+    return res.status(409).json({
+      state: activeSession.status,
+      message: activeSession.status === ClinicalSigningSessionStatus.READY
+        ? "Já existe uma sessão VIDaaS autorizada para este documento."
+        : "A autenticação VIDaaS deste atendimento já está em andamento.",
+    });
+
+  const pkce = createPkcePair();
+  const signingSession = await prisma.clinicalSigningSession.create({
+    data: {
+      userId: req.user!.id,
+      doctorId: record.appointment.doctorId,
+      medicalRecordId,
+      status: ClinicalSigningSessionStatus.AUTHORIZING,
+      verifierEncrypted: encryptSecret(pkce.verifier),
+      expiresAt: new Date(now.getTime() + 15 * 60 * 1000),
+    },
+  });
+  try {
+    const authentication = await beginVidassAuthentication(configuration, pkce.challenge);
+    await prisma.clinicalSigningSession.update({
+      where: { id: signingSession.id },
+      data: { authenticationRequestId: authentication.requestId },
+    });
+    const secureCallback = new URL(configuration.callbackUrl).protocol === "https:";
+    res.cookie("medclinic_vidaas_session", signingSession.id, {
+      httpOnly: true,
+      secure: secureCallback,
+      sameSite: secureCallback ? "none" : "lax",
+      maxAge: 15 * 60 * 1000,
+      path: "/api/vidaas/callback",
+    });
+    return res.status(201).json({
+      authorizationUrl: authentication.authorizationUrl,
+      expiresAt: signingSession.expiresAt,
+    });
+  } catch (error: any) {
+    await prisma.clinicalSigningSession.update({
+      where: { id: signingSession.id },
+      data: {
+        status: ClinicalSigningSessionStatus.FAILED,
+        verifierEncrypted: null,
+        failureReason: "Falha ao iniciar autenticação no provedor.",
+      },
+    });
+    const message = error instanceof VidassIntegrationError
+      ? error.message
+      : "Não foi possível iniciar a autenticação VIDaaS.";
+    return res.status(502).json({ message });
+  }
+});
+
+app.get("/api/medical-records/:id/clinical-documents/signing-session", auth, doctorOnly, async (req: AuthRequest, res) => {
+  const medicalRecordId = routeId(req, res);
+  if (medicalRecordId === null) return;
+  const record = await prisma.medicalRecord.findUnique({
+    where: { id: medicalRecordId },
+    select: { appointment: { select: { doctorId: true } } },
+  });
+  if (!record?.appointment)
+    return res.status(404).json({ state: "NONE", message: "Atendimento não encontrado." });
+  const session = await prisma.clinicalSigningSession.findFirst({
+    where: {
+      userId: req.user!.id,
+      doctorId: record.appointment.doctorId,
+      medicalRecordId,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!session) return res.json({ state: "NONE" });
+  if (
+    (session.status === ClinicalSigningSessionStatus.AUTHORIZING ||
+      session.status === ClinicalSigningSessionStatus.READY ||
+      session.status === ClinicalSigningSessionStatus.SIGNING) &&
+    session.expiresAt <= new Date()
+  ) {
+    await prisma.clinicalSigningSession.update({
+      where: { id: session.id },
+      data: { status: ClinicalSigningSessionStatus.EXPIRED, verifierEncrypted: null },
+    });
+    return res.json({ state: "EXPIRED" });
+  }
+  const certificate = session.certificateMetadata as Record<string, unknown> | null;
+  return res.json({
+    state: session.status,
+    expiresAt: session.expiresAt,
+    signerName: certificate?.subjectName || null,
+    message: session.status === ClinicalSigningSessionStatus.FAILED
+      ? "A autenticação não foi concluída. Inicie uma nova sessão VIDaaS."
+      : undefined,
+  });
+});
+
+app.get("/api/vidaas/callback", async (req, res) => {
+  const sessionId = requestCookie(req, "medclinic_vidaas_session");
+  const query = req.query as Record<string, unknown>;
+  const credentialId = String(query.credentialId || query.credential_id || "").trim();
+  let signingSession: Awaited<ReturnType<typeof prisma.clinicalSigningSession.findUnique>> & {
+    doctor?: { fullName: string };
+    user?: { login: string; fullName: string };
+  } | null = null;
+  const configuration = getVidassConfiguration();
+  try {
+    if (!sessionId || !configuration.ready || !credentialId)
+      throw new Error("Callback sem sessão ou credencial válida.");
+    signingSession = await prisma.clinicalSigningSession.findUnique({
+      where: { id: sessionId },
+      include: { doctor: { select: { fullName: true } }, user: { select: { login: true, fullName: true } } },
+    });
+    if (
+      !signingSession ||
+      signingSession.status !== ClinicalSigningSessionStatus.AUTHORIZING ||
+      signingSession.expiresAt <= new Date() ||
+      !signingSession.verifierEncrypted
+    )
+      throw new Error("Sessão VIDaaS expirada ou inválida.");
+
+    const verifier = decryptSecret(signingSession.verifierEncrypted).toString("utf8");
+    const credential = await getVidassCredential(configuration, credentialId, verifier);
+    const certificateInfo = credential.certificateInformation!;
+    const x509 = new crypto.X509Certificate(certificateInfo.encodedX509!);
+    const now = Date.now();
+    if (now < Date.parse(x509.validFrom) || now > Date.parse(x509.validTo))
+      throw new Error("O certificado retornado pelo VIDaaS está fora da validade.");
+    const subjectName = x509.subject.match(/(?:^|[\n,])\s*CN\s*=\s*([^\n,]+)/i)?.[1]
+      ?.replace(/\s*[:;,]\s*\d{11}\s*$/, "")
+      .trim() || "";
+    if (
+      !subjectName ||
+      normalizePersonName(subjectName) !== normalizePersonName(signingSession.doctor?.fullName || "")
+    )
+      throw new Error("O certificado VIDaaS não pertence à médica do atendimento.");
+    const loginCpf = (signingSession.user?.login || "").replace(/\D/g, "");
+    const certificateCpf = String(credential.subjectIdentification?.identificationKey || "").replace(/\D/g, "");
+    if (!/^\d{11}$/.test(certificateCpf))
+      throw new Error("A VALID não retornou um CPF válido associado ao certificado VIDaaS.");
+    if (normalizePersonName(signingSession.user?.fullName || "") !== normalizePersonName(signingSession.doctor?.fullName || ""))
+      throw new Error("A conta médica autenticada não corresponde à profissional do atendimento.");
+    if (loginCpf.length === 11 && (!certificateCpf || loginCpf !== certificateCpf))
+      throw new Error("O CPF do certificado não corresponde à conta autenticada ou não foi retornado pela VALID.");
+
+    const certificateMetadata = {
+      subjectName,
+      issuerName: certificateInfo.issuerName || x509.issuer,
+      serialNumber: certificateInfo.serialNumber || x509.serialNumber,
+      validFrom: x509.validFrom,
+      validTo: x509.validTo,
+      fingerprint256: certificateInfo.fingerprint256 || x509.fingerprint256,
+      subjectCpf: certificateCpf || null,
+    };
+    const updated = await prisma.clinicalSigningSession.updateMany({
+      where: {
+        id: signingSession.id,
+        status: ClinicalSigningSessionStatus.AUTHORIZING,
+        expiresAt: { gt: new Date() },
+      },
+      data: {
+        status: ClinicalSigningSessionStatus.READY,
+        credentialId,
+        certificateMetadata: certificateMetadata as Prisma.InputJsonValue,
+        failureReason: null,
+      },
+    });
+    if (!updated.count) throw new Error("Sessão VIDaaS já consumida ou expirada.");
+    res.clearCookie("medclinic_vidaas_session", {
+      httpOnly: true,
+      secure: new URL(configuration.callbackUrl).protocol === "https:",
+      sameSite: new URL(configuration.callbackUrl).protocol === "https:" ? "none" : "lax",
+      path: "/api/vidaas/callback",
+    });
+    return res.type("html").send(vidassCallbackPage(true));
+  } catch (error) {
+    if (signingSession?.id) {
+      await prisma.clinicalSigningSession.updateMany({
+        where: { id: signingSession.id, status: ClinicalSigningSessionStatus.AUTHORIZING },
+        data: {
+          status: ClinicalSigningSessionStatus.FAILED,
+          verifierEncrypted: null,
+          failureReason: "Falha na validação da autenticação e identidade do certificado.",
+        },
+      }).catch(() => undefined);
+    }
+    res.clearCookie("medclinic_vidaas_session", {
+      httpOnly: true,
+      secure: configuration.callbackUrl.startsWith("https://"),
+      sameSite: configuration.callbackUrl.startsWith("https://") ? "none" : "lax",
+      path: "/api/vidaas/callback",
+    });
+    return res.status(400).type("html").send(vidassCallbackPage(false));
+  }
+});
+
 app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorOnly, async (req: AuthRequest, res) => {
   const medicalRecordId = routeId(req, res);
   if (medicalRecordId === null) return;
@@ -2361,18 +2652,44 @@ app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorO
   if (record.patientId !== record.appointment.patientId)
     return res.status(409).json({ ready: false, message: "O paciente do prontuário não corresponde ao paciente do atendimento." });
   try {
-    const certificate = await getDoctorCertificateDetails(record.appointment.doctorId, req.user!.id);
-    if (!certificate)
-      return res.json({ ready: false, message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite o cadastro de um certificado ICP-Brasil válido ao administrador." });
     const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || "");
     if (!publicBaseUrl)
       return res.json({ ready: false, message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS para habilitar o QR code de validação." });
     const publicBase = new URL(publicBaseUrl);
     if (publicBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(publicBase.hostname))
       return res.json({ ready: false, message: "PUBLIC_BASE_URL deve usar um endereço público HTTPS para validar o QR code." });
-    res.json({ ready: true, message: "Certificado da médica e verificação pública configurados. A cadeia de confiança deve ser validada no leitor de PDF." });
+
+    const provider = clinicalDocumentSigningProvider();
+    if (provider === ClinicalSignatureProvider.VIDAAS) {
+      const configuration = getVidassConfiguration();
+      if (!configuration.ready)
+        return res.json({ ready: false, signatureProvider: provider, message: configuration.message });
+      const session = await prisma.clinicalSigningSession.findFirst({
+        where: {
+          userId: req.user!.id,
+          doctorId: record.appointment.doctorId,
+          medicalRecordId,
+          status: { in: [ClinicalSigningSessionStatus.AUTHORIZING, ClinicalSigningSessionStatus.READY] },
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.json({
+        ready: true,
+        signatureProvider: provider,
+        signingSessionState: session?.status || "NONE",
+        message: session?.status === ClinicalSigningSessionStatus.READY
+          ? "VIDaaS autorizado para este atendimento."
+          : "Autentique o certificado VIDaaS da médica para assinar o documento.",
+      });
+    }
+
+    const certificate = await getDoctorCertificateDetails(record.appointment.doctorId, req.user!.id);
+    if (!certificate)
+      return res.json({ ready: false, signatureProvider: provider, message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite o cadastro de um certificado ICP-Brasil válido ao administrador." });
+    return res.json({ ready: true, signatureProvider: provider, message: "Certificado local da médica e verificação pública configurados." });
   } catch (error: any) {
-    res.json({ ready: false, message: error?.message || "Não foi possível validar o certificado da médica." });
+    return res.json({ ready: false, signatureProvider: clinicalDocumentSigningProvider(), message: error?.message || "Não foi possível validar a configuração de assinatura." });
   }
 });
 app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async (req: AuthRequest, res) => {
@@ -2450,14 +2767,6 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
     cidAuthorizedAt = value.cidAuthorized ? new Date() : null;
   }
 
-  let certificate: any;
-  try {
-    certificate = await getDoctorCertificateDetails(doctor.id, req.user!.id);
-  } catch (error: any) {
-    return res.status(409).json({ message: error.message || "Não foi possível validar o certificado da médica." });
-  }
-  if (!certificate)
-    return res.status(409).json({ message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro de um certificado ICP-Brasil válido antes de emitir." });
   try {
     const publicBase = String(process.env.PUBLIC_BASE_URL || "");
     const parsedBase = new URL(publicBase);
@@ -2465,12 +2774,196 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
   } catch {
     return res.status(409).json({ message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS do sistema para ativar a validação pelo QR code." });
   }
+  const signingProvider = clinicalDocumentSigningProvider();
+  let certificate: any = null;
+  let remoteSession: any = null;
+  const vidassConfiguration = getVidassConfiguration();
+  if (signingProvider === ClinicalSignatureProvider.LOCAL_P12) {
+    try {
+      certificate = await getDoctorCertificateDetails(doctor.id, req.user!.id);
+    } catch (error: any) {
+      return res.status(409).json({ message: error.message || "Não foi possível validar o certificado da médica." });
+    }
+    if (!certificate)
+      return res.status(409).json({ message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro de um certificado ICP-Brasil válido antes de emitir." });
+  } else {
+    if (!vidassConfiguration.ready)
+      return res.status(409).json({ code: "VIDAAS_NOT_CONFIGURED", message: vidassConfiguration.message });
+    remoteSession = await prisma.clinicalSigningSession.findFirst({
+      where: {
+        userId: req.user!.id,
+        doctorId: doctor.id,
+        medicalRecordId: record.id,
+        status: ClinicalSigningSessionStatus.READY,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!remoteSession?.credentialId || !remoteSession.verifierEncrypted)
+      return res.status(409).json({ code: "VIDAAS_AUTH_REQUIRED", message: "Autentique o certificado VIDaaS da médica antes de emitir." });
+    const claimed = await prisma.clinicalSigningSession.updateMany({
+      where: {
+        id: remoteSession.id,
+        userId: req.user!.id,
+        doctorId: doctor.id,
+        medicalRecordId: record.id,
+        status: ClinicalSigningSessionStatus.READY,
+        expiresAt: { gt: new Date() },
+      },
+      data: { status: ClinicalSigningSessionStatus.SIGNING },
+    });
+    if (!claimed.count)
+      return res.status(409).json({ code: "VIDAAS_SESSION_BUSY", message: "A sessão VIDaaS já está sendo usada ou expirou. Autentique novamente." });
+  }
   const clinic = await prisma.clinic.findFirst({ orderBy: { id: "asc" } });
   const issuedAt = new Date();
   const validationCode = crypto.randomBytes(18).toString("hex").toUpperCase();
   const pdfStorageKey = `${crypto.randomUUID()}.pdf`;
   const pdfPath = path.join(clinicalDocumentRoot, pdfStorageKey);
   let createdId: number | null = null;
+  if (signingProvider === ClinicalSignatureProvider.VIDAAS && remoteSession) {
+    let temporaryPdfPath = "";
+    try {
+      const draft = await prisma.$transaction(async (tx) => {
+        const created = await tx.clinicalDocument.create({
+          data: {
+            documentNumber: null,
+            validationCode,
+            type: parsed.data.type,
+            subtype,
+            status: ClinicalDocumentStatus.AGUARDANDO_ASSINATURA,
+            signatureProvider: ClinicalSignatureProvider.VIDAAS,
+            content: content as Prisma.InputJsonValue,
+            pdfStorageKey,
+            cidAuthorizedAt,
+            issuedAt,
+            medicalRecordId: record.id,
+            appointmentId: record.appointment!.id,
+            patientId: record.patientId,
+            doctorId: doctor.id,
+            issuedById: req.user!.id,
+            signatureCertificateId: null,
+          },
+        });
+        createdId = created.id;
+        const documentYear = new Intl.DateTimeFormat("en-US", {
+          timeZone: clinicTimeZone,
+          year: "numeric",
+        }).format(issuedAt);
+        const documentNumber = `${parsed.data.type === "RECEITA" ? "RX" : "AT"}-${documentYear}-${String(created.id).padStart(6, "0")}`;
+        return tx.clinicalDocument.update({
+          where: { id: created.id },
+          data: { documentNumber },
+        });
+      });
+
+      await generateClinicalDocumentPdf(
+        { document: draft, patient: record.patient, doctor, clinic },
+        pdfPath,
+      );
+      const verifier = decryptSecret(remoteSession.verifierEncrypted).toString("utf8");
+      const signatureResults: Array<Awaited<ReturnType<typeof requestVidassCmsSignature>>> = [];
+      const signedPdf = await signPdfWithRemoteCms({
+        pdfBuffer: await fs.promises.readFile(pdfPath),
+        doctorName: doctor.fullName,
+        reason: parsed.data.type === "RECEITA" ? "Prescrição médica" : "Atestado médico",
+        signDigest: async (digestBase64) => {
+          const result = await requestVidassCmsSignature({
+            configuration: vidassConfiguration,
+            credentialId: remoteSession.credentialId,
+            verifier,
+            contentId: `clinical-document-${draft.id}`,
+            digestBase64,
+            description: `${draft.documentNumber} — ${parsed.data.type === "RECEITA" ? "Receita não controlada" : "Atestado médico"}`,
+          });
+          signatureResults[0] = result;
+          return result.cms;
+        },
+      });
+      const signatureResult = signatureResults[0];
+      if (!signatureResult)
+        throw new VidassIntegrationError("O VIDaaS não concluiu a assinatura do documento.");
+      if (!signatureResult.certificateInformation.encodedX509)
+        throw new VidassIntegrationError("A resposta de assinatura do VIDaaS não contém o certificado público do signatário.");
+      const authorizedCertificate = remoteSession.certificateMetadata as Record<string, unknown> | null;
+      const signingX509 = new crypto.X509Certificate(signatureResult.certificateInformation.encodedX509);
+      const normalizeFingerprint = (value: unknown) => String(value || "").replace(/[^a-f0-9]/gi, "").toLowerCase();
+      const authorizedFingerprint = normalizeFingerprint(authorizedCertificate?.fingerprint256);
+      const signingFingerprint = normalizeFingerprint(
+        signatureResult.certificateInformation.fingerprint256 || signingX509.fingerprint256,
+      );
+      if (!authorizedFingerprint || !signingFingerprint || authorizedFingerprint !== signingFingerprint)
+        throw new VidassIntegrationError("O certificado que assinou o documento não corresponde ao certificado autorizado nesta sessão.");
+
+      const verification = await verifyPdfSignature(signedPdf);
+      if (!verification.available || !verification.integrityValid)
+        throw new VidassIntegrationError(verification.message);
+      temporaryPdfPath = `${pdfPath}.tmp-${crypto.randomUUID()}`;
+      await fs.promises.writeFile(temporaryPdfPath, signedPdf, { mode: 0o600 });
+      await fs.promises.rename(temporaryPdfPath, pdfPath);
+      temporaryPdfPath = "";
+
+      const certificateMetadata = remoteSession.certificateMetadata as Prisma.JsonValue;
+      const signatureMetadata = {
+        provider: "VIDaaS",
+        authenticationRequestId: remoteSession.authenticationRequestId,
+        signatureRequestId: signatureResult.requestId,
+        signatureId: signatureResult.signatureId,
+        signatureTimestamp: signatureResult.signatureTimestamp,
+        certificate: certificateMetadata,
+        verification: {
+          available: verification.available,
+          integrityValid: verification.integrityValid,
+          certificateTrust: verification.certificateTrust,
+          checkedAt: verification.checkedAt,
+          message: verification.message,
+        },
+      } satisfies Prisma.InputJsonObject;
+      const issued = await prisma.$transaction(async (tx) => {
+        const document = await tx.clinicalDocument.update({
+          where: { id: draft.id },
+          data: {
+            status: ClinicalDocumentStatus.EMITIDO,
+            signatureProvider: ClinicalSignatureProvider.VIDAAS,
+            signatureMetadata: signatureMetadata as Prisma.InputJsonValue,
+          },
+          include: {
+            issuedBy: { select: { id: true, fullName: true } },
+            doctor: { select: { id: true, fullName: true, crm: true } },
+          },
+        });
+        await tx.clinicalSigningSession.update({
+          where: { id: remoteSession.id },
+          data: {
+            status: ClinicalSigningSessionStatus.USED,
+            verifierEncrypted: null,
+            usedAt: new Date(),
+          },
+        });
+        return document;
+      });
+      return res.status(201).json(issued);
+    } catch (error: any) {
+      if (temporaryPdfPath)
+        await fs.promises.unlink(temporaryPdfPath).catch(() => undefined);
+      await fs.promises.unlink(pdfPath).catch(() => undefined);
+      if (createdId)
+        await prisma.clinicalDocument.delete({ where: { id: createdId } }).catch(() => undefined);
+      await prisma.clinicalSigningSession.updateMany({
+        where: { id: remoteSession.id, status: ClinicalSigningSessionStatus.SIGNING },
+        data: {
+          status: ClinicalSigningSessionStatus.FAILED,
+          verifierEncrypted: null,
+          failureReason: "Falha ao emitir ou validar o PDF assinado.",
+        },
+      }).catch(() => undefined);
+      console.error("Falha na emissão VIDaaS:", error instanceof Error ? error.message : "erro desconhecido");
+      const message = error instanceof VidassIntegrationError
+        ? error.message
+        : "Não foi possível montar, assinar e verificar o documento. Tente autenticar o VIDaaS novamente.";
+      return res.status(502).json({ message });
+    }
+  }
   try {
     const issued = await prisma.$transaction(async (tx) => {
       const created = await tx.clinicalDocument.create({
@@ -2479,7 +2972,8 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
           validationCode,
           type: parsed.data.type,
           subtype,
-          status: "EMITIDO",
+          status: ClinicalDocumentStatus.EMITIDO,
+          signatureProvider: ClinicalSignatureProvider.LOCAL_P12,
           content: content as Prisma.InputJsonValue,
           pdfStorageKey,
           cidAuthorizedAt,
@@ -2505,6 +2999,24 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
         certificate,
         parsed.data.type === "RECEITA" ? "Prescrição médica" : "Atestado médico",
       );
+      const verification = await verifyPdfSignature(await fs.promises.readFile(pdfPath));
+      if (!verification.available || !verification.integrityValid)
+        throw new Error(verification.message);
+      await tx.clinicalDocument.update({
+        where: { id: created.id },
+        data: {
+          signatureMetadata: {
+            provider: "LOCAL_P12",
+            verification: {
+              available: verification.available,
+              integrityValid: verification.integrityValid,
+              certificateTrust: verification.certificateTrust,
+              checkedAt: verification.checkedAt,
+              message: verification.message,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
       return tx.clinicalDocument.findUniqueOrThrow({
         where: { id: created.id },
         include: { issuedBy: { select: { id: true, fullName: true } }, doctor: { select: { id: true, fullName: true, crm: true } } },
@@ -2524,10 +3036,10 @@ app.patch("/api/clinical-documents/:id/cancel", auth, doctorOnly, async (req: Au
   const parsed = z.object({ reason: z.string().trim().min(5).max(1000) }).safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ message: "Informe o motivo do cancelamento (mínimo de 5 caracteres)." });
-  const existing = await prisma.clinicalDocument.findUnique({ where: { id }, select: { id: true, status: true, signatureCertificate: { select: { assignedUserId: true } } } });
+  const existing = await prisma.clinicalDocument.findUnique({ where: { id }, select: { id: true, status: true, issuedById: true, signatureCertificate: { select: { assignedUserId: true } } } });
   if (!existing) return res.status(404).json({ message: "Documento não encontrado." });
-  if (existing.signatureCertificate.assignedUserId !== req.user!.id)
-    return res.status(403).json({ message: "Somente a conta médica vinculada ao certificado pode cancelar este documento." });
+  if (existing.issuedById !== req.user!.id && existing.signatureCertificate?.assignedUserId !== req.user!.id)
+    return res.status(403).json({ message: "Somente a conta médica que emitiu ou está vinculada ao documento pode cancelá-lo." });
   if (existing.status === "CANCELADO")
     return res.status(409).json({ message: "Este documento já foi cancelado." });
   const cancelledAt = new Date();
@@ -2547,7 +3059,7 @@ app.get("/api/clinical-documents/:id/pdf", auth, doctorOnly, async (req: AuthReq
   if (id === null) return;
   const document = await prisma.clinicalDocument.findUnique({ where: { id }, select: { pdfStorageKey: true, documentNumber: true, issuedById: true, signatureCertificate: { select: { assignedUserId: true } } } });
   if (!document) return res.status(404).json({ message: "Documento não encontrado." });
-  if (document.issuedById !== req.user!.id && document.signatureCertificate.assignedUserId !== req.user!.id)
+  if (document.issuedById !== req.user!.id && document.signatureCertificate?.assignedUserId !== req.user!.id)
     return res.status(403).json({ message: "Somente a conta médica autorizada pode abrir o PDF deste documento." });
   const pdfPath = path.join(clinicalDocumentRoot, document.pdfStorageKey);
   if (!fs.existsSync(pdfPath)) return res.status(410).json({ message: "O arquivo PDF deste documento não está disponível." });
@@ -2555,30 +3067,72 @@ app.get("/api/clinical-documents/:id/pdf", auth, doctorOnly, async (req: AuthReq
     headers: { "Content-Disposition": `inline; filename="${document.documentNumber}.pdf"` },
   });
 });
-app.get("/api/public/clinical-documents/verify/:code", async (req, res) => {
+const publicVerificationRate = new Map<string, { count: number; resetAt: number }>();
+function limitPublicVerification(req: Request, res: Response, next: NextFunction) {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || "unknown";
+  let bucket = publicVerificationRate.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + 60_000 };
+    publicVerificationRate.set(key, bucket);
+  }
+  if (bucket.count >= 30) {
+    res.setHeader("Retry-After", String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
+    return res.status(429).json({ valid: false, message: "Muitas consultas em sequência. Aguarde um minuto e tente novamente." });
+  }
+  bucket.count += 1;
+  if (publicVerificationRate.size > 5000) {
+    for (const [ip, item] of publicVerificationRate)
+      if (item.resetAt <= now) publicVerificationRate.delete(ip);
+  }
+  next();
+}
+app.get("/api/public/clinical-documents/verify/:code", limitPublicVerification, async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
   if (!/^[A-F0-9]{36}$/.test(code))
     return res.status(400).json({ valid: false, message: "Código de validação inválido." });
   const document = await prisma.clinicalDocument.findUnique({
     where: { validationCode: code },
-    select: { id: true, documentNumber: true, validationCode: true, type: true, status: true, issuedAt: true, pdfStorageKey: true, doctor: { select: { fullName: true, crm: true } } },
+    select: { id: true, documentNumber: true, validationCode: true, type: true, status: true, signatureProvider: true, issuedAt: true, pdfStorageKey: true, doctor: { select: { fullName: true, crm: true } } },
   });
   if (!document) return res.status(404).json({ valid: false, message: "Documento não encontrado." });
-  const pdfExists = fs.existsSync(path.join(clinicalDocumentRoot, document.pdfStorageKey));
+  const pdfPath = path.join(clinicalDocumentRoot, document.pdfStorageKey);
+  const pdfExists = fs.existsSync(pdfPath);
+  const signatureVerification = document.status === ClinicalDocumentStatus.EMITIDO && pdfExists
+    ? await verifyPdfSignature(await fs.promises.readFile(pdfPath))
+    : null;
+  const integrityValid = Boolean(signatureVerification?.available && signatureVerification.integrityValid);
+  const certificateTrusted = signatureVerification?.certificateTrust === "TRUSTED";
   res.json({
     registered: true,
-    valid: document.status === "EMITIDO" && pdfExists,
+    valid: document.status === ClinicalDocumentStatus.EMITIDO && pdfExists && integrityValid,
     number: document.documentNumber,
     type: document.type,
     status: document.status,
     issuedAt: document.issuedAt,
     doctor: document.doctor.fullName,
     crm: document.doctor.crm,
+    signatureProvider: document.signatureProvider,
+    signatureVerification: {
+      integrityValid,
+      certificateTrust: signatureVerification?.certificateTrust || "UNAVAILABLE",
+      checkedAt: signatureVerification?.checkedAt || null,
+      message: signatureVerification?.message || "A verificação criptográfica não foi executada.",
+    },
+    officialValidationUrl: "https://validar.iti.gov.br/",
     message: document.status === "CANCELADO"
       ? "Código associado a um documento cancelado. Não utilize este documento."
       : !pdfExists
         ? "O registro foi localizado, mas o arquivo PDF não está disponível. Contate a clínica."
-        : "Código associado a um registro ativo. Verifique a assinatura digital do PDF no leitor de documentos.",
+        : document.status !== ClinicalDocumentStatus.EMITIDO
+          ? "A emissão ou assinatura deste documento ainda não foi concluída. Não utilize o PDF."
+          : !signatureVerification?.available
+            ? "O documento foi localizado, mas a verificação criptográfica está indisponível neste servidor."
+            : !integrityValid
+              ? "A assinatura digital não passou na verificação criptográfica. Não utilize este documento."
+              : certificateTrusted
+                ? "Documento ativo e assinatura íntegra. A cadeia do certificado foi confiada pelo verificador local."
+                : "A assinatura e a integridade do PDF foram verificadas. A cadeia ICP-Brasil deve ser confirmada no VALIDAR oficial do ITI.",
   });
 });
 
