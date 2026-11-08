@@ -1,1 +1,1 @@
-{"routes":[{"path":"/","title":"MedClinic"}]}
+{"routes":[{"path":"/","title":"MedClinic"},{"path":"/anamnese/:token","title":"Ficha de anamnese"},{"path":"/validar/:code","title":"Validar documento clínico"}]}

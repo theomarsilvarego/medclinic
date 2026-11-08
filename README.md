@@ -67,6 +67,23 @@ cd client && npm run dev
 
 Acesse `http://localhost:5173`.
 
+## Receitas e atestados digitais
+
+O módulo emite receitas somente para medicamentos não controlados e atestados. No servidor, configure `PUBLIC_BASE_URL` com a origem HTTPS pública da aplicação, `CLINICAL_DOCUMENT_SIGNING_PROVIDER=VIDAAS`, o `VIDAAS_CHANNEL_ID` habilitado pela VALID e `VIDAAS_CALLBACK_URL` igual à URI cadastrada no Channel e terminada em `/api/vidaas/callback`. Opcionalmente, defina `VIDAAS_API_BASE_URL`; o padrão é `https://services.integraicp.com.br`. Sem uma seleção explícita, o sistema mantém o fluxo local P12 existente e passa a selecionar VIDaaS automaticamente quando `VIDAAS_CHANNEL_ID` está configurado.
+
+```env
+PUBLIC_BASE_URL="https://www.intimavie.com.br"
+CLINICAL_DOCUMENT_SIGNING_PROVIDER="VIDAAS"
+VIDAAS_CHANNEL_ID=""
+VIDAAS_CALLBACK_URL="https://api.intimavie.com.br/api/vidaas/callback"
+VIDAAS_API_BASE_URL="https://services.integraicp.com.br"
+CERTIFICATE_ENCRYPTION_KEY="gere-uma-chave-aleatoria-separada-com-32-caracteres-ou-mais"
+```
+
+O backend requer `pdfsig` (fornecido pelo pacote `poppler-utils`) para verificar criptograficamente o PDF antes de concluir a emissão e durante a consulta pública do QR. Em produção, instale essa dependência no mesmo container/host do servidor. A página `/validar/:code` apresenta o status do documento e da integridade do PDF. A cadeia de certificação ICP-Brasil deve ser confirmada também no serviço oficial [VALIDAR do ITI](https://validar.iti.gov.br/); a resposta automática local não substitui essa validação oficial. A migration `20261108190000_vidaas_clinical_documents` deve ser aplicada com `cd server && npm run prisma:migrate` após configurar o backup e a janela de implantação.
+
+No build de produção do cliente, configure `VITE_API_URL` com a URL HTTPS da API, por exemplo `https://api.intimavie.com.br/api`. Em produção, `JWT_SECRET` e `CERTIFICATE_ENCRYPTION_KEY` são obrigatórias, devem ter pelo menos 32 caracteres e precisam ser valores independentes. Se o backend estiver atrás de um proxy reverso confiável, configure `TRUST_PROXY_HOPS` com a quantidade exata de proxies para que a limitação das consultas públicas use o IP do visitante.
+
 ## Executar server e client simultaneamente
 
 Na pasta raiz do projeto, execute:

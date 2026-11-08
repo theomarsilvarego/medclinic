@@ -22,6 +22,14 @@ type PrescriptionItem = Medication & {
   quantity: string;
 };
 type DocumentTab = "RECEITA" | "ATESTADO";
+type SigningSessionState =
+  | "NONE"
+  | "AUTHORIZING"
+  | "READY"
+  | "SIGNING"
+  | "USED"
+  | "FAILED"
+  | "EXPIRED";
 
 function dateToday() {
   const now = new Date();
@@ -94,6 +102,11 @@ export function MedicalDocumentsArea({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [issueReady, setIssueReady] = useState(false);
+  const [signatureProvider, setSignatureProvider] = useState<"VIDAAS" | "LOCAL_P12">("VIDAAS");
+  const [signingSessionState, setSigningSessionState] = useState<SigningSessionState>("NONE");
+  const [signerName, setSignerName] = useState("");
+  const [startingVidass, setStartingVidass] = useState(false);
+  const [signingPollKey, setSigningPollKey] = useState(0);
   const [eligibilityMessage, setEligibilityMessage] = useState(
     "Verificando certificado e validação pública…",
   );
@@ -125,9 +138,12 @@ export function MedicalDocumentsArea({
     let mounted = true;
     setIssueReady(false);
     request(`/medical-records/${recordId}/clinical-documents/eligibility`)
-      .then((result: { ready: boolean; message: string }) => {
+      .then((result: { ready: boolean; message: string; signatureProvider?: string; signingSessionState?: SigningSessionState }) => {
         if (!mounted) return;
         setIssueReady(Boolean(result.ready));
+        setSignatureProvider(result.signatureProvider === "LOCAL_P12" ? "LOCAL_P12" : "VIDAAS");
+        if (result.signingSessionState)
+          setSigningSessionState(result.signingSessionState);
         setEligibilityMessage(result.message || "Emissão indisponível.");
       })
       .catch((cause: any) => {
@@ -141,6 +157,35 @@ export function MedicalDocumentsArea({
       mounted = false;
     };
   }, [active, canIssue, recordId]);
+
+  useEffect(() => {
+    if (!active || !canIssue || !issueReady || !recordId || signatureProvider !== "VIDAAS")
+      return;
+    let mounted = true;
+    let timer: number | undefined;
+    const pollSession = async () => {
+      try {
+        const result = await request(
+          `/medical-records/${recordId}/clinical-documents/signing-session`,
+          { credentials: "include" },
+        );
+        if (!mounted) return;
+        const state = (result.state || "NONE") as SigningSessionState;
+        setSigningSessionState(state);
+        setSignerName(String(result.signerName || ""));
+        if (state === "AUTHORIZING" || state === "SIGNING")
+          timer = window.setTimeout(() => void pollSession(), 1500);
+      } catch {
+        if (mounted)
+          timer = window.setTimeout(() => void pollSession(), 2500);
+      }
+    };
+    void pollSession();
+    return () => {
+      mounted = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [active, canIssue, issueReady, recordId, signatureProvider, signingPollKey]);
 
   useEffect(() => {
     if (tab !== "ATESTADO" || templateEdited) return;
@@ -241,6 +286,44 @@ export function MedicalDocumentsArea({
     }
   }
 
+  async function authenticateVidass() {
+    if (!recordId) {
+      setError("Salve o atendimento antes de autenticar o certificado.");
+      return;
+    }
+    const popup = window.open("about:blank", "_blank", "popup,width=520,height=760");
+    if (!popup) {
+      setError("Permita a abertura de pop-ups para autenticar o VIDaaS.");
+      return;
+    }
+    setStartingVidass(true);
+    setError("");
+    setMessage("Aguardando autenticação segura no VIDaaS…");
+    try {
+      const result = await request(
+        `/medical-records/${recordId}/clinical-documents/signing-session`,
+        { method: "POST", credentials: "include" },
+      );
+      const authorizationUrl = new URL(String(result.authorizationUrl || ""));
+      if (
+        authorizationUrl.protocol !== "https:" ||
+        !(authorizationUrl.hostname === "integraicp.com.br" || authorizationUrl.hostname.endsWith(".integraicp.com.br"))
+      )
+        throw new Error("A URL de autenticação retornada não é confiável.");
+      popup.location.assign(authorizationUrl.toString());
+      popup.focus();
+      setSigningSessionState("AUTHORIZING");
+      setSigningPollKey((value) => value + 1);
+    } catch (cause: any) {
+      popup.close();
+      setSigningSessionState("FAILED");
+      setError(cause.message || "Não foi possível iniciar a autenticação VIDaaS.");
+      setSigningPollKey((value) => value + 1);
+    } finally {
+      setStartingVidass(false);
+    }
+  }
+
   async function issueDocument(event: React.FormEvent) {
     event.preventDefault();
     if (!recordId) {
@@ -249,6 +332,13 @@ export function MedicalDocumentsArea({
     }
     if (!issueReady) {
       setError(eligibilityMessage);
+      return;
+    }
+    if (
+      signatureProvider === "VIDAAS" &&
+      signingSessionState !== "READY"
+    ) {
+      setError("Autentique o certificado VIDaaS da médica antes de emitir.");
       return;
     }
     if (tab === "RECEITA" && !items.length) {
@@ -301,6 +391,10 @@ export function MedicalDocumentsArea({
         method: "POST",
         body: JSON.stringify(body),
       });
+      if (signatureProvider === "VIDAAS") {
+        setSigningSessionState("USED");
+        setSigningPollKey((value) => value + 1);
+      }
       setItems([]);
       setInstructions("");
       setCid("");
@@ -311,6 +405,8 @@ export function MedicalDocumentsArea({
       await onChanged();
     } catch (cause: any) {
       setError(cause.message || "Não foi possível emitir o documento.");
+      if (signatureProvider === "VIDAAS")
+        setSigningPollKey((value) => value + 1);
     } finally {
       setSaving(false);
     }
@@ -374,6 +470,51 @@ export function MedicalDocumentsArea({
         <div className="medical-document-readiness" role="status">
           <ShieldCheck size={15} />
           <span>{eligibilityMessage}</span>
+        </div>
+      )}
+      {canIssue && active && issueReady && signatureProvider === "VIDAAS" && (
+        <div className="medical-signature-card" role="status">
+          <div className="medical-signature-icon" aria-hidden="true">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="medical-signature-copy">
+            <strong>Assinatura digital · VIDaaS</strong>
+            <span>
+              {signingSessionState === "READY"
+                ? `Certificado autorizado${signerName ? `: ${signerName}` : ""}. Pronto para assinar.`
+                : signingSessionState === "AUTHORIZING"
+                  ? "Aguardando sua confirmação na janela segura da VALID…"
+                  : signingSessionState === "SIGNING"
+                    ? "Assinatura em andamento. Aguarde a validação do PDF…"
+                    : signingSessionState === "FAILED"
+                      ? "A autenticação não foi concluída. Você pode tentar novamente."
+                      : signingSessionState === "EXPIRED"
+                        ? "A autorização expirou. Autentique o certificado novamente."
+                        : signingSessionState === "USED"
+                          ? "A autorização anterior foi consumida. Autentique novamente para emitir outro documento."
+                          : "Autentique o certificado ICP-Brasil da médica antes de emitir."}
+            </span>
+          </div>
+          {signingSessionState === "READY" ? (
+            <span className="medical-signature-ready">Autorizado</span>
+          ) : (
+            <button
+              type="button"
+              className="secondary medical-signature-action"
+              onClick={authenticateVidass}
+              disabled={
+                startingVidass ||
+                signingSessionState === "AUTHORIZING" ||
+                signingSessionState === "SIGNING"
+              }
+            >
+              {startingVidass || signingSessionState === "AUTHORIZING" || signingSessionState === "SIGNING"
+                ? "Aguardando…"
+                : signingSessionState === "NONE"
+                  ? "Autenticar certificado"
+                  : "Autenticar novamente"}
+            </button>
+          )}
         </div>
       )}
 
@@ -570,7 +711,7 @@ export function MedicalDocumentsArea({
             <button
               type="submit"
               className="primary medical-document-issue"
-              disabled={saving || !issueReady || items.length === 0}
+              disabled={saving || !issueReady || items.length === 0 || (signatureProvider === "VIDAAS" && signingSessionState !== "READY")}
             >
               {saving ? "Assinando e emitindo…" : "Emitir receita"}
             </button>
@@ -691,7 +832,7 @@ export function MedicalDocumentsArea({
             <button
               type="submit"
               className="primary medical-document-issue"
-              disabled={saving || !issueReady}
+              disabled={saving || !issueReady || (signatureProvider === "VIDAAS" && signingSessionState !== "READY")}
             >
               {saving ? "Assinando e emitindo…" : "Emitir atestado"}
             </button>

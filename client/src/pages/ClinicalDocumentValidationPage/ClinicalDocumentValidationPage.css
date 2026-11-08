@@ -1,0 +1,181 @@
+.document-validation-page {
+  min-height: 100vh;
+  padding: 30px 18px 22px;
+  background: radial-gradient(ellipse at 50% 0%, #f4e7ea 0%, #fbf8f5 52%);
+  color: #29262a;
+  font-family: Inter, Arial, sans-serif;
+}
+.document-validation-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  margin: 0 auto 24px;
+}
+.document-validation-brand > span:last-child { display: grid; gap: 2px; }
+.document-validation-brand strong {
+  color: #5d2135;
+  font-family: Manrope, Inter, sans-serif;
+  font-size: 19px;
+}
+.document-validation-brand small {
+  color: #80777c;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+.document-validation-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #7e3048;
+  color: #fff;
+}
+.document-validation-card {
+  width: min(100%, 600px);
+  margin: 0 auto;
+  padding: 30px;
+  border: 1px solid #eadfe0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(73, 36, 46, .08);
+}
+.document-validation-state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px 0;
+  text-align: center;
+}
+.document-validation-state h1,
+.document-validation-card h1 {
+  margin: 0;
+  color: #3e3036;
+  font: 700 24px/1.25 Manrope, Inter, sans-serif;
+  text-align: center;
+}
+.document-validation-state p,
+.document-validation-message {
+  margin: 0;
+  color: #685e63;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+.document-validation-state button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: 6px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: #7e3048;
+  color: #fff;
+  font-weight: 700;
+}
+.document-validation-state button:hover,
+.document-validation-official:hover { background: #5d2135; }
+.document-validation-spinner {
+  color: #7e3048;
+  animation: document-validation-spin 1s linear infinite;
+}
+@keyframes document-validation-spin { to { transform: rotate(360deg); } }
+.document-validation-status {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+}
+.document-validation-status.valid { background: #e9f5ef; color: #267557; }
+.document-validation-status.invalid { background: #fbebeb; color: #a2333b; }
+.document-validation-eyebrow {
+  margin: 0 0 8px;
+  color: #8a6673;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-align: center;
+}
+.document-validation-message { max-width: 490px; margin: 10px auto 22px; }
+.document-validation-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0 0 18px;
+  border-top: 1px solid #eee6e8;
+}
+.document-validation-details div { padding: 12px 8px; border-bottom: 1px solid #eee6e8; }
+.document-validation-details dt { margin-bottom: 5px; color: #80777c; font-size: 11px; }
+.document-validation-details dd {
+  margin: 0;
+  color: #322a2e;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.document-validation-check,
+.document-validation-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid #e3dedf;
+  border-radius: 10px;
+  background: #fbfaf9;
+}
+.document-validation-check svg { flex: none; margin-top: 1px; }
+.document-validation-check.check-ok { border-color: #cfe5da; background: #f3faf6; color: #28634e; }
+.document-validation-check.check-fail { border-color: #ebd4d4; background: #fff7f7; color: #8f353d; }
+.document-validation-check div { display: grid; gap: 5px; }
+.document-validation-check strong,
+.document-validation-note strong { font-size: 12px; }
+.document-validation-check span,
+.document-validation-note span { color: #62595d; font-size: 12px; line-height: 1.5; }
+.document-validation-note { display: block; border-color: #ead9b7; background: #fffaf0; }
+.document-validation-note strong { display: block; margin-bottom: 5px; color: #735923; }
+.document-validation-official {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  margin-top: 18px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: #7e3048;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+.document-validation-code {
+  margin: 16px 0 0;
+  color: #80777c;
+  font-size: 11px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.document-validation-code code { color: #5d2135; font-weight: 700; }
+.document-validation-footer {
+  max-width: 600px;
+  margin: 16px auto 0;
+  color: #80777c;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+@media (max-width: 560px) {
+  .document-validation-page { padding: 20px 12px; }
+  .document-validation-card { padding: 22px 16px; border-radius: 14px; }
+  .document-validation-card h1,
+  .document-validation-state h1 { font-size: 21px; }
+  .document-validation-details { grid-template-columns: 1fr; }
+  .document-validation-details div { padding: 10px 4px; }
+}
