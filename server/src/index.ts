@@ -2879,7 +2879,7 @@ app.get(
         include: {
           patient: { select: { id: true, fullName: true } },
           insurance: { select: { id: true, name: true } },
-          doctor: { select: { fullName: true } },
+          doctor: { select: { id: true, fullName: true } },
           medicalRecords: {
             orderBy: { recordDate: "desc" },
             include: {
@@ -2902,7 +2902,7 @@ app.get(
               injectableRequests: {
                 orderBy: { requestedAt: "desc" },
                 include: {
-                  injectable: { select: { value: true } },
+                  injectable: { select: { value: true, type: true } },
                 },
               },
               procedureRequests: { orderBy: { requestedAt: "desc" } },
@@ -3009,6 +3009,8 @@ app.get(
               requestedAt: item.requestedAt,
               billingStatus: item.billingStatus,
               schedulingStatus: item.schedulingStatus,
+              injectableId: item.injectableId,
+              injectableType: item.injectable.type,
               amount,
               items: [{
                 label: `${item.name} · ${item.sessions} sessão(ões)`,
@@ -3026,6 +3028,9 @@ app.get(
             requestedAt: item.requestedAt,
             billingStatus: item.billingStatus,
             schedulingStatus: item.schedulingStatus,
+            procedureId: item.procedureId,
+            procedureName: item.name,
+            procedureValue: Number(item.value),
             amount: Number(item.value),
             items: [{ label: item.name, value: Number(item.value) }],
             pdfPath: item.status === "DISPONIVEL_PARA_VISUALIZACAO"
