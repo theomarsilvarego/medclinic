@@ -354,6 +354,7 @@ enum ExamRequestStatus {
 enum RequestBillingStatus {
   A_FATURAR
   FATURADO
+  NAO_APLICAVEL
 }
 
 enum RequestSchedulingStatus {
@@ -501,6 +502,7 @@ model AppointmentAttachment {
 
 enum ProcedureRequestStatus {
   AGUARDANDO_AGENDAMENTO
+  DISPONIVEL_PARA_VISUALIZACAO
 }
 
 model ProcedureRequest {

@@ -25,7 +25,7 @@ type RequestItem = {
   code: string | null;
   requestedAt: string;
   amount: number | null;
-  billingStatus: "A_FATURAR" | "FATURADO";
+  billingStatus: "A_FATURAR" | "FATURADO" | "NAO_APLICAVEL";
   schedulingStatus: "NAO_AGENDADO" | "AGENDADO";
   items: { label: string; value: number | null }[];
   pdfPath: string | null;
@@ -64,9 +64,15 @@ function requestKindLabel(kind: RequestItem["kind"]) {
   }[kind];
 }
 function billingStatusLabel(status: RequestItem["billingStatus"]) {
-  return status === "FATURADO" ? "Faturado" : "A faturar";
+  if (status === "FATURADO") return "Faturado";
+  if (status === "NAO_APLICAVEL") return "Sem cobrança";
+  return "A faturar";
 }
-function schedulingStatusLabel(status: RequestItem["schedulingStatus"]) {
+function schedulingStatusLabel(
+  status: RequestItem["schedulingStatus"],
+  billingStatus: RequestItem["billingStatus"],
+) {
+  if (billingStatus === "NAO_APLICAVEL") return "Sem agendamento";
   return status === "AGENDADO" ? "Agendado" : "Não agendado";
 }
 function localDate(date: Date) {
@@ -241,7 +247,7 @@ export function SecretaryDashboard() {
         .flatMap((visit) => visit.requests)
         .filter(
           (item) =>
-            item.billingStatus !== "FATURADO" &&
+            item.billingStatus === "A_FATURAR" &&
             selectedRequests.includes(`${item.kind}:${item.id}`),
         ),
     [selectedRequests, visits],
@@ -271,7 +277,7 @@ export function SecretaryDashboard() {
     return `${item.kind}:${item.id}`;
   }
   function toggleRequest(item: RequestItem) {
-    if (item.billingStatus === "FATURADO") return;
+    if (item.billingStatus !== "A_FATURAR") return;
     const key = requestKey(item);
     setSelectedRequests((current) =>
       current.includes(key)
@@ -485,7 +491,7 @@ export function SecretaryDashboard() {
                             <label className="secretary-request-check">
                               <input
                                 type="checkbox"
-                                disabled={item.billingStatus === "FATURADO"}
+                                disabled={item.billingStatus !== "A_FATURAR"}
                                 checked={selectedRequests.includes(
                                   requestKey(item),
                                 )}
@@ -521,7 +527,7 @@ export function SecretaryDashboard() {
                             <span
                               className={`secretary-request-status secretary-scheduling-${item.schedulingStatus.toLowerCase()}`}
                             >
-                              {schedulingStatusLabel(item.schedulingStatus)}
+                              {schedulingStatusLabel(item.schedulingStatus, item.billingStatus)}
                             </span>
                             <div
                               className="secretary-request-actions"
@@ -531,6 +537,7 @@ export function SecretaryDashboard() {
                                 type="button"
                                 title="Abrir resumo de cobrança"
                                 aria-label={`Abrir resumo de cobrança de ${item.title} para ${patient.fullName}`}
+                                disabled={item.billingStatus !== "A_FATURAR"}
                                 onClick={() => setBilling({ patient, item })}
                               >
                                 <CircleDollarSign size={17} />
@@ -557,6 +564,7 @@ export function SecretaryDashboard() {
                                 type="button"
                                 title="Abrir novo agendamento"
                                 aria-label={`Abrir novo agendamento para ${patient.fullName}`}
+                                disabled={item.billingStatus === "NAO_APLICAVEL"}
                                 onClick={() => void openAppointment(patient, visit, item)}
                               >
                                 <CalendarPlus size={17} />

@@ -615,6 +615,19 @@ function UltrasoundRequestsArea({
       setMessage(error.message);
     }
   }
+  async function viewUnpricedProcedure(item: Row) {
+    try {
+      const token = localStorage.getItem("medclinic_token");
+      const response = await fetch(`${API}/medical-record-procedure-requests/${item.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error("Não foi possível abrir a solicitação de USG.");
+      const blobUrl = URL.createObjectURL(await response.blob());
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+    } catch (error: any) {
+      setMessage(error.message);
+    }
+  }
   if (!canCompose && requests.length === 0 && procedureRequests.length === 0)
     return null;
   return (
@@ -742,7 +755,16 @@ function UltrasoundRequestsArea({
                   })}
                 </small>
               </span>
-              <span className="procedure-status">Aguardando agendamento</span>
+              {item.status === "DISPONIVEL_PARA_VISUALIZACAO" ? (
+                <>
+                  <span className="exam-request-status">Disponível para visualização</span>
+                  <button type="button" className="exam-request-view" onClick={() => void viewUnpricedProcedure(item)} title="Visualizar solicitação de USG em PDF">
+                    <Eye size={16} />
+                  </button>
+                </>
+              ) : (
+                <span className="procedure-status">Aguardando agendamento</span>
+              )}
             </div>
           ))}
         </div>
