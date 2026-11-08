@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Eye,
   FileCheck2,
   FileText,
   Plus,
@@ -885,16 +886,20 @@ export function MedicalDocumentsArea({
                   type="button"
                   className="secondary"
                   onClick={() => void openPdf(Number(document.id))}
+                  aria-label="Abrir PDF"
+                  title="Abrir PDF"
                 >
-                  Abrir PDF
+                  <Eye size={16} />
                 </button>
                 {canIssue && document.status === "EMITIDO" && (
                   <button
                     type="button"
                     className="medical-document-cancel"
                     onClick={() => void cancelDocument(Number(document.id))}
+                    aria-label="Cancelar documento"
+                    title="Cancelar documento"
                   >
-                    <Trash2 size={14} /> Cancelar
+                    <Trash2 size={16} />
                   </button>
                 )}
               </div>
