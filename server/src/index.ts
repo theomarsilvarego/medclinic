@@ -1022,6 +1022,42 @@ async function generateUltrasoundRequestPdf(data: any) {
   return pdfPath;
 }
 
+async function generateUnpricedImagingRequestPdf(data: any) {
+  const pdfPath = path.join(examRequestPdfRoot, `imaging-${data.id}.pdf`);
+  const certificate = await getActiveCertificateDetails();
+  const doctor = data.medicalRecord?.appointment?.doctor;
+  const signedAt = new Date();
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    const stream = fs.createWriteStream(pdfPath);
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    doc.on("error", reject);
+    doc.pipe(stream);
+    const wine = "#741447";
+    const gray = "#706970";
+    doc.rect(0, 0, 595, 70).fill("#f8edf3");
+    doc.rect(0, 0, 595, 5).fill(wine);
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(22).text("intimavie", 48, 25);
+    doc.fillColor("#76566b").font("Helvetica").fontSize(9).text("MEDICINA ÍNTIMA", 51, 50);
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(10).text("SOLICITAÇÃO DE ULTRASSONOGRAFIA", 48, 105);
+    doc.fillColor(gray).font("Helvetica").fontSize(8).text("PACIENTE", 65, 145);
+    doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(15).text(String(data.patient?.fullName || "").toUpperCase(), 65, 160, { width: 465 });
+    doc.roundedRect(48, 220, 499, 86, 8).fillAndStroke("#fff9fc", "#d9b2c7");
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(12).text(String(data.name || data.procedure?.name || "Exame de imagem"), 65, 240, { width: 465 });
+    doc.fillColor(gray).font("Helvetica").fontSize(9).text("Exame solicitado para avaliação diagnóstica.", 65, 266, { width: 465 });
+    doc.fillColor(wine).font("Helvetica-Bold").fontSize(8).text("ASSINATURA DIGITAL", 65, 650);
+    doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(8).text(`Assinado digitalmente por ${certificate?.name || data.requestedBy?.fullName || "Médico"}`, 65, 668, { width: 400, ellipsis: true });
+    doc.fillColor(gray).font("Helvetica").fontSize(7).text(`CPF: ${certificate?.cpf || "Não disponível"}`, 65, 685);
+    doc.text(`CRM/UF: ${doctor?.crm || "Não informado"}`, 65, 699);
+    doc.text(`Data e hora: ${pdfDateTime(signedAt)}`, 65, 713);
+    doc.fillColor(gray).fontSize(7).text("Documento gerado pelo sistema Clínica Intimavie.", 175, 770, { width: 250, align: "center" });
+    doc.end();
+  });
+  await signPdfWithActiveCertificate(pdfPath);
+  return pdfPath;
+}
+
 async function generateExamRequestPdf(data: any) {
   const pdfPath = path.join(examRequestPdfRoot, `${data.id}.pdf`);
   const signedAt = new Date();
@@ -2186,7 +2222,7 @@ app.post(
       });
     const procedures = await prisma.procedure.findMany({
       where: { id: { in: procedureIds }, active: true },
-      select: { id: true, name: true, value: true },
+      select: { id: true, name: true, type: true, value: true },
     });
     if (procedures.length !== procedureIds.length)
       return res
@@ -2205,6 +2241,12 @@ app.post(
         procedureId: item.id,
         name: item.name,
         value: item.value,
+        ...(item.type === ProcedureType.DIAGNOSTICO_POR_IMAGEM && Number(item.value) <= 0
+          ? {
+              status: "DISPONIVEL_PARA_VISUALIZACAO" as const,
+              billingStatus: "NAO_APLICAVEL" as const,
+            }
+          : {}),
         requestedById: req.user!.id,
       }));
     if (data.length) await prisma.procedureRequest.createMany({ data });
@@ -2215,6 +2257,33 @@ app.post(
         include: procedureRequestInclude,
       }),
     );
+  },
+);
+
+app.get(
+  "/api/medical-record-procedure-requests/:id/pdf",
+  auth,
+  clinicalRequestReadAccess,
+  async (req: AuthRequest, res) => {
+    const id = routeId(req, res);
+    if (id === null) return;
+    const request = await prisma.procedureRequest.findUnique({
+      where: { id },
+      include: {
+        patient: { select: { fullName: true } },
+        procedure: { select: { name: true, type: true } },
+        requestedBy: { select: { fullName: true } },
+        medicalRecord: {
+          select: { appointment: { select: { doctor: { select: { fullName: true, crm: true } } } } },
+        },
+      },
+    });
+    if (!request || request.status !== "DISPONIVEL_PARA_VISUALIZACAO")
+      return res.status(404).json({ message: "Solicitação sem documento disponível." });
+    const pdfPath = await generateUnpricedImagingRequestPdf(request);
+    res.type("application/pdf").sendFile(pdfPath, {
+      headers: { "Content-Disposition": `inline; filename="USG-${String(request.id).padStart(6, "0")}.pdf"` },
+    });
   },
 );
 
@@ -2959,7 +3028,9 @@ app.get(
             schedulingStatus: item.schedulingStatus,
             amount: Number(item.value),
             items: [{ label: item.name, value: Number(item.value) }],
-            pdfPath: null,
+            pdfPath: item.status === "DISPONIVEL_PARA_VISUALIZACAO"
+              ? `/medical-record-procedure-requests/${item.id}/pdf`
+              : null,
           })),
         ]),
       })).filter((appointment) => appointment.requests.length > 0),
