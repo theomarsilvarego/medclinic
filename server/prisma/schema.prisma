@@ -651,6 +651,7 @@ enum ClinicalDocumentStatus {
 enum ClinicalSignatureProvider {
   LOCAL_P12
   VIDAAS
+  UNSIGNED
 }
 
 model ClinicalDocument {

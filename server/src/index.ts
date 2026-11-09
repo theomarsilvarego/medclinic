@@ -2734,12 +2734,32 @@ app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorO
     return res.status(409).json({ ready: false, message: "O paciente do prontuário não corresponde ao paciente do atendimento." });
   let provider = clinicalDocumentSigningProvider();
   try {
+    const requestedType = String(req.query.type || "").toUpperCase();
     const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || "");
     if (!publicBaseUrl)
       return res.json({ ready: false, message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS para habilitar o QR code de validação." });
     const publicBase = new URL(publicBaseUrl);
     if (publicBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(publicBase.hostname))
       return res.json({ ready: false, message: "PUBLIC_BASE_URL deve usar um endereço público HTTPS para validar o QR code." });
+
+    if (requestedType === "RECEITA") {
+      try {
+        const certificate = await getDoctorCertificateDetails(record.appointment.doctorId, req.user!.id);
+        return res.json({
+          ready: true,
+          signatureProvider: certificate ? ClinicalSignatureProvider.LOCAL_P12 : ClinicalSignatureProvider.UNSIGNED,
+          message: certificate
+            ? "Receita pronta para emissão com o certificado digital cadastrado."
+            : "Receita pronta para emissão. Nenhum certificado digital válido foi encontrado; a receita será emitida sem assinatura digital.",
+        });
+      } catch {
+        return res.json({
+          ready: true,
+          signatureProvider: ClinicalSignatureProvider.UNSIGNED,
+          message: "Receita pronta para emissão. O certificado cadastrado não pôde ser usado; a receita será emitida sem assinatura digital.",
+        });
+      }
+    }
 
     const signingSetup = await resolveClinicalDocumentSigningSetup(
       record.appointment.doctorId,
@@ -2876,26 +2896,40 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
   } catch {
     return res.status(409).json({ message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS do sistema para ativar a validação pelo QR code." });
   }
-  let signingSetup: Awaited<ReturnType<typeof resolveClinicalDocumentSigningSetup>>;
-  try {
-    signingSetup = await resolveClinicalDocumentSigningSetup(doctor.id, req.user!.id);
-  } catch (error: any) {
-    return res.status(409).json({
-      message: error.message || "Não foi possível validar o certificado da médica.",
-    });
+  const isPrescription = parsed.data.type === "RECEITA";
+  let signingProvider: ClinicalSignatureProvider;
+  let certificate: any = null;
+  let signingSetup: Awaited<ReturnType<typeof resolveClinicalDocumentSigningSetup>> | null = null;
+  if (isPrescription) {
+    signingProvider = ClinicalSignatureProvider.LOCAL_P12;
+    try {
+      certificate = await getDoctorCertificateDetails(doctor.id, req.user!.id);
+    } catch {
+      certificate = null;
+    }
+    if (!certificate)
+      signingProvider = ClinicalSignatureProvider.UNSIGNED;
+  } else {
+    try {
+      signingSetup = await resolveClinicalDocumentSigningSetup(doctor.id, req.user!.id);
+    } catch (error: any) {
+      return res.status(409).json({
+        message: error.message || "Não foi possível validar o certificado da médica.",
+      });
+    }
+    signingProvider = signingSetup.provider;
+    certificate = signingSetup.certificate;
   }
-  const signingProvider = signingSetup.provider;
-  let certificate: any = signingSetup.certificate;
   let remoteSession: any = null;
   const vidassConfiguration = getVidassConfiguration();
   if (signingProvider === ClinicalSignatureProvider.LOCAL_P12) {
-    if (!certificate)
+    if (!certificate && !isPrescription)
       return res.status(409).json({
-        message: signingSetup.usingLocalFallback
+        message: signingSetup?.usingLocalFallback
           ? "VIDaaS não está configurado e não há certificado local ativo vinculado a esta médica e à sua conta. Solicite o cadastro em Certificados Digitais."
           : "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro de um certificado ICP-Brasil válido antes de emitir.",
       });
-  } else {
+  } else if (signingProvider === ClinicalSignatureProvider.VIDAAS) {
     if (!vidassConfiguration.ready)
       return res.status(409).json({ code: "VIDAAS_NOT_CONFIGURED", message: vidassConfiguration.message });
     remoteSession = await prisma.clinicalSigningSession.findFirst({
@@ -3082,7 +3116,7 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
           type: parsed.data.type,
           subtype,
           status: ClinicalDocumentStatus.EMITIDO,
-          signatureProvider: ClinicalSignatureProvider.LOCAL_P12,
+          signatureProvider: signingProvider,
           content: content as Prisma.InputJsonValue,
           pdfStorageKey,
           cidAuthorizedAt,
@@ -3092,7 +3126,7 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
           patientId: record.patientId,
           doctorId: doctor.id,
           issuedById: req.user!.id,
-          signatureCertificateId: certificate.certificate.id,
+          signatureCertificateId: certificate?.certificate.id || null,
         },
       });
       createdId = created.id;
@@ -3103,29 +3137,41 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
         data: { documentNumber },
       });
       await generateClinicalDocumentPdf({ document, patient: record.patient, doctor, clinic }, pdfPath);
-      await signPdfWithDoctorCertificate(
-        pdfPath,
-        certificate,
-        parsed.data.type === "RECEITA" ? "Prescrição médica" : "Atestado médico",
-      );
-      const verification = await verifyPdfSignature(await fs.promises.readFile(pdfPath));
-      if (!verification.available || !verification.integrityValid)
-        throw new Error(verification.message);
-      await tx.clinicalDocument.update({
-        where: { id: created.id },
-        data: {
-          signatureMetadata: {
-            provider: "LOCAL_P12",
-            verification: {
-              available: verification.available,
-              integrityValid: verification.integrityValid,
-              certificateTrust: verification.certificateTrust,
-              checkedAt: verification.checkedAt,
-              message: verification.message,
-            },
-          } as Prisma.InputJsonValue,
-        },
-      });
+      if (certificate) {
+        await signPdfWithDoctorCertificate(
+          pdfPath,
+          certificate,
+          parsed.data.type === "RECEITA" ? "Prescrição médica" : "Atestado médico",
+        );
+        const verification = await verifyPdfSignature(await fs.promises.readFile(pdfPath));
+        if (!verification.available || !verification.integrityValid)
+          throw new Error(verification.message);
+        await tx.clinicalDocument.update({
+          where: { id: created.id },
+          data: {
+            signatureMetadata: {
+              provider: "LOCAL_P12",
+              verification: {
+                available: verification.available,
+                integrityValid: verification.integrityValid,
+                certificateTrust: verification.certificateTrust,
+                checkedAt: verification.checkedAt,
+                message: verification.message,
+              },
+            } as Prisma.InputJsonValue,
+          },
+        });
+      } else {
+        await tx.clinicalDocument.update({
+          where: { id: created.id },
+          data: {
+            signatureMetadata: {
+              provider: "UNSIGNED",
+              message: "Receita emitida sem certificado digital cadastrado.",
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
       return tx.clinicalDocument.findUniqueOrThrow({
         where: { id: created.id },
         include: { issuedBy: { select: { id: true, fullName: true } }, doctor: { select: { id: true, fullName: true, crm: true } } },
@@ -3210,11 +3256,14 @@ app.get("/api/public/clinical-documents/verify/:code", limitPublicVerification, 
   const signatureVerification = document.status === ClinicalDocumentStatus.EMITIDO && pdfExists
     ? await verifyPdfSignature(await fs.promises.readFile(pdfPath))
     : null;
-  const integrityValid = Boolean(signatureVerification?.available && signatureVerification.integrityValid);
+  const unsigned = document.signatureProvider === ClinicalSignatureProvider.UNSIGNED;
+  const integrityValid = unsigned
+    ? false
+    : Boolean(signatureVerification?.available && signatureVerification.integrityValid);
   const certificateTrusted = signatureVerification?.certificateTrust === "TRUSTED";
   res.json({
     registered: true,
-    valid: document.status === ClinicalDocumentStatus.EMITIDO && pdfExists && integrityValid,
+    valid: document.status === ClinicalDocumentStatus.EMITIDO && pdfExists && (unsigned || integrityValid),
     number: document.documentNumber,
     type: document.type,
     status: document.status,
@@ -3235,7 +3284,9 @@ app.get("/api/public/clinical-documents/verify/:code", limitPublicVerification, 
         ? "O registro foi localizado, mas o arquivo PDF não está disponível. Contate a clínica."
         : document.status !== ClinicalDocumentStatus.EMITIDO
           ? "A emissão ou assinatura deste documento ainda não foi concluída. Não utilize o PDF."
-          : !signatureVerification?.available
+          : unsigned
+            ? "Documento ativo e registrado. Esta receita foi emitida sem certificado digital."
+            : !signatureVerification?.available
             ? "O documento foi localizado, mas a verificação criptográfica está indisponível neste servidor."
             : !integrityValid
               ? "A assinatura digital não passou na verificação criptográfica. Não utilize este documento."

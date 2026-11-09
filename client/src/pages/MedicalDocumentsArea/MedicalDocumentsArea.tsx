@@ -35,6 +35,7 @@ type SigningSessionState =
   | "USED"
   | "FAILED"
   | "EXPIRED";
+type SignatureProvider = "VIDAAS" | "LOCAL_P12" | "UNSIGNED";
 
 function dateToday() {
   const now = new Date();
@@ -110,7 +111,7 @@ export function MedicalDocumentsArea({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [issueReady, setIssueReady] = useState(false);
-  const [signatureProvider, setSignatureProvider] = useState<"VIDAAS" | "LOCAL_P12">("VIDAAS");
+  const [signatureProvider, setSignatureProvider] = useState<SignatureProvider>("VIDAAS");
   const [signingSessionState, setSigningSessionState] = useState<SigningSessionState>("NONE");
   const [signerName, setSignerName] = useState("");
   const [startingVidass, setStartingVidass] = useState(false);
@@ -145,11 +146,17 @@ export function MedicalDocumentsArea({
     }
     let mounted = true;
     setIssueReady(false);
-    request(`/medical-records/${recordId}/clinical-documents/eligibility`)
+    request(`/medical-records/${recordId}/clinical-documents/eligibility?type=${encodeURIComponent(tab)}`)
       .then((result: { ready: boolean; message: string; signatureProvider?: string; signingSessionState?: SigningSessionState }) => {
         if (!mounted) return;
         setIssueReady(Boolean(result.ready));
-        setSignatureProvider(result.signatureProvider === "LOCAL_P12" ? "LOCAL_P12" : "VIDAAS");
+        setSignatureProvider(
+          result.signatureProvider === "LOCAL_P12"
+            ? "LOCAL_P12"
+            : result.signatureProvider === "UNSIGNED"
+              ? "UNSIGNED"
+              : "VIDAAS",
+        );
         if (result.signingSessionState)
           setSigningSessionState(result.signingSessionState);
         setEligibilityMessage(result.message || "Emissão indisponível.");
@@ -164,7 +171,7 @@ export function MedicalDocumentsArea({
     return () => {
       mounted = false;
     };
-  }, [active, canIssue, recordId]);
+  }, [active, canIssue, recordId, tab]);
 
   useEffect(() => {
     if (!active || !canIssue || !issueReady || !recordId || signatureProvider !== "VIDAAS")
@@ -340,10 +347,7 @@ export function MedicalDocumentsArea({
       setError(eligibilityMessage);
       return;
     }
-    if (
-      signatureProvider === "VIDAAS" &&
-      signingSessionState !== "READY"
-    ) {
+    if (signatureProvider === "VIDAAS" && signingSessionState !== "READY") {
       setError("Autentique o certificado VIDaaS da médica antes de emitir.");
       return;
     }
@@ -518,6 +522,12 @@ export function MedicalDocumentsArea({
                   : "Autenticar novamente"}
             </button>
           )}
+        </div>
+      )}
+      {canIssue && active && issueReady && signatureProvider === "UNSIGNED" && tab === "RECEITA" && (
+        <div className="medical-document-readiness" role="status">
+          <ShieldCheck size={15} />
+          <span>{eligibilityMessage}</span>
         </div>
       )}
 
