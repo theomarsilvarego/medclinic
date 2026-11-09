@@ -89,9 +89,6 @@ export function MedicalDocumentsArea({
   const [search, setSearch] = useState("");
   const [selectedMedication, setSelectedMedication] =
     useState<Medication | null>(null);
-  const [dose, setDose] = useState("");
-  const [route, setRoute] = useState("");
-  const [posology, setPosology] = useState("");
   const [items, setItems] = useState<PrescriptionItem[]>([]);
   const [catalogName, setCatalogName] = useState("");
   const [catalogRoute, setCatalogRoute] = useState("ORAL");
@@ -229,31 +226,28 @@ export function MedicalDocumentsArea({
 
   function clearPrescriptionFields() {
     setSelectedMedication(null);
-    setDose("");
-    setRoute("");
-    setPosology("");
     setSearch("");
   }
 
   function addPrescriptionItem() {
-    if (
-      !selectedMedication ||
-      !dose.trim() ||
-      !route.trim() ||
-      !posology.trim()
-    ) {
-      setError(
-        "Selecione um medicamento e preencha dose, via e posologia.",
-      );
+    if (!selectedMedication) {
+      setError("Selecione um medicamento do catálogo.");
+      return;
+    }
+    const medicationDose = selectedMedication.dose?.trim();
+    const medicationRoute = selectedMedication.route;
+    const medicationPosology = selectedMedication.posology?.trim();
+    if (!medicationDose || !medicationRoute || !medicationPosology) {
+      setError("O medicamento não possui via, dose e posologia completas. Solicite ao Administrador que atualize o catálogo.");
       return;
     }
     setItems((current) => [
       ...current,
       {
         ...selectedMedication,
-        dose: dose.trim(),
-        route: route.trim(),
-        posology: posology.trim(),
+        dose: medicationDose,
+        route: medicationRoute,
+        posology: medicationPosology,
       },
     ]);
     setError("");
@@ -277,9 +271,6 @@ export function MedicalDocumentsArea({
       });
       setCatalog((current) => [item, ...current]);
       setSelectedMedication(item);
-      setDose(item.dose || "");
-      setRoute(item.route || "");
-      setPosology(item.posology || "");
       setCatalogName("");
       setCatalogRoute("ORAL");
       setCatalogDose("");
@@ -364,19 +355,7 @@ export function MedicalDocumentsArea({
         tab === "RECEITA"
           ? {
               type: "RECEITA",
-              items: items.map(
-                ({
-                  id,
-                  dose: itemDose,
-                  route: itemRoute,
-                  posology: itemPosology,
-                }) => ({
-                  medicationId: id,
-                  dose: itemDose,
-                  route: itemRoute,
-                  posology: itemPosology,
-                }),
-              ),
+              items: items.map(({ id }) => ({ medicationId: id })),
             }
           : {
               type: "ATESTADO",
@@ -546,14 +525,11 @@ export function MedicalDocumentsArea({
                 {suggestions.map((item) => (
                   <button
                     type="button"
-                    key={item.id}
-                    onClick={() => {
-                      setSelectedMedication(item);
-                      setSearch(item.name);
-                      setDose(item.dose || "");
-                      setRoute(item.route || "");
-                      setPosology(item.posology || "");
-                    }}
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedMedication(item);
+                    setSearch(item.name);
+                  }}
                   >
                     <strong>{item.name}</strong>
                     <span>{medicationRouteLabel(item.route)} · {item.dose || "Dose não cadastrada"} · {item.posology || "Posologia não cadastrada"}</span>
@@ -619,7 +595,7 @@ export function MedicalDocumentsArea({
                   </button>
                 </div>
                 <small>
-                  Cadastre somente itens confirmados pela médica e não sujeitos a controle especial. Dose e posologia podem ser ajustadas na receita.
+                  Cadastre somente itens confirmados pela médica e não sujeitos a controle especial. A receita usará estes valores sem edição; correções no catálogo devem ser solicitadas ao Administrador.
                 </small>
               </div>
             ) : (
@@ -632,37 +608,10 @@ export function MedicalDocumentsArea({
               </button>
             )}
             {selectedMedication && (
-              <div className="medical-document-form-grid prescription-fields">
-                <label>
-                  Dose
-                  <input
-                    value={dose}
-                    onChange={(event) => setDose(event.target.value)}
-                    placeholder="Ex.: 1 comprimido"
-                    required
-                  />
-                </label>
-                <label>
-                  Via
-                  <select value={route} onChange={(event) => setRoute(event.target.value)} required>
-                    <option value="">Selecione</option>
-                    <option value="ORAL">Oral</option>
-                    <option value="VAGINAL">Vaginal</option>
-                    <option value="TOPICO">Tópico</option>
-                  </select>
-                </label>
-                <label className="medical-document-wide">
-                  Posologia
-                  <input
-                    value={posology}
-                    onChange={(event) => setPosology(event.target.value)}
-                    placeholder="Ex.: a cada 12 horas"
-                    required
-                  />
-                </label>
+              <div className="medical-document-inline-actions">
                 <button
                   type="button"
-                  className="secondary medical-document-wide"
+                  className="secondary"
                   onClick={addPrescriptionItem}
                 >
                   <Plus size={15} /> Adicionar item
@@ -678,23 +627,8 @@ export function MedicalDocumentsArea({
                   >
                     <div>
                       <strong>{item.name}{item.presentation ? ` · ${item.presentation}` : ""}</strong>
-                      <div className="medical-prescription-edit-fields">
-                        <label>Dose
-                          <input
-                            value={item.dose}
-                            onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, dose: event.target.value } : row))}
-                            required
-                          />
-                        </label>
-                        <label>Posologia
-                          <input
-                            value={item.posology}
-                            onChange={(event) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, posology: event.target.value } : row))}
-                            required
-                          />
-                        </label>
-                      </div>
-                      <small>{medicationRouteLabel(item.route)}</small>
+                      <small>Dose: {item.dose} · Via: {medicationRouteLabel(item.route)}</small>
+                      <small>Posologia: {item.posology}</small>
                     </div>
                     <button
                       type="button"
