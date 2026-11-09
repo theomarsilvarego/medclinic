@@ -34,6 +34,7 @@ import { DoctorAgendaPage } from "../DoctorAgendaPage/DoctorAgendaPage";
 import { MedicalRecordsPage } from "../MedicalRecordsPage/MedicalRecordsPage";
 import { ExamGroupsPage } from "../ExamGroupsPage/ExamGroupsPage";
 import { CertificateSettingsPage } from "../CertificateSettingsPage/CertificateSettingsPage";
+import { MedicationCatalogPage } from "../MedicationCatalogPage/MedicationCatalogPage";
 import { ReportsPage } from "../ReportsPage/ReportsPage";
 import { FinancialPage } from "../FinancialPage/FinancialPage";
 import { CrmPage } from "../CrmPage/CrmPage";
@@ -224,6 +225,12 @@ export function App() {
           ) : module === "certificates" ? (
             normalizedProfile === "ADMINISTRADOR" ? (
               <CertificateSettingsPage />
+            ) : (
+              <Dashboard setModule={setModule} user={user} />
+            )
+          ) : module === "medication-catalog" ? (
+            normalizedProfile === "ADMINISTRADOR" ? (
+              <MedicationCatalogPage />
             ) : (
               <Dashboard setModule={setModule} user={user} />
             )

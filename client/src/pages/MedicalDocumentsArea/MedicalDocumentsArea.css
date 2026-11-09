@@ -235,6 +235,30 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+.medical-prescription-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 620px);
+}
+.medical-prescription-edit-fields label {
+  display: grid;
+  gap: 4px;
+  color: #66565d;
+  font-size: 10px;
+  font-weight: 700;
+}
+.medical-prescription-edit-fields input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  padding: 7px 8px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
 .medical-prescription-chip button {
   flex: none;
 }
@@ -368,6 +392,9 @@
   }
   .medical-document-history-actions {
     justify-content: flex-start;
+  }
+  .medical-prescription-edit-fields {
+    grid-template-columns: 1fr;
   }
 }
 

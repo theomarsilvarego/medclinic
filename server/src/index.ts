@@ -944,6 +944,25 @@ async function getDoctorCertificateDetails(doctorId: number, assignedUserId: num
     throw new Error("O titular do certificado não corresponde ao nome da médica cadastrada.");
   return { ...attributes, certificate, pfx, password, doctor: certificate.doctor };
 }
+async function resolveClinicalDocumentSigningSetup(doctorId: number, assignedUserId: number) {
+  const preferredProvider = clinicalDocumentSigningProvider();
+  if (
+    preferredProvider === ClinicalSignatureProvider.VIDAAS &&
+    getVidassConfiguration().ready
+  ) {
+    return {
+      provider: ClinicalSignatureProvider.VIDAAS,
+      certificate: null,
+      usingLocalFallback: false,
+    };
+  }
+  const certificate = await getDoctorCertificateDetails(doctorId, assignedUserId);
+  return {
+    provider: ClinicalSignatureProvider.LOCAL_P12,
+    certificate,
+    usingLocalFallback: preferredProvider === ClinicalSignatureProvider.VIDAAS,
+  };
+}
 async function signPdfWithDoctorCertificate(pdfPath: string, details: any, reason: string) {
   const pdfBuffer = fs.readFileSync(pdfPath);
   const placeholder = plainAddPlaceholder({
@@ -1007,8 +1026,9 @@ async function generateClinicalDocumentPdf(data: any, pdfPath: string) {
           doc.y = 58;
         }
         doc.moveDown(0.7);
-        doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(10).text(`${index + 1}. ${item.medicationName} — ${item.presentation}`);
-        doc.fillColor(gray).font("Helvetica").fontSize(9).text(`Dose: ${item.dose}  ·  Via: ${item.route}`);
+        doc.fillColor("#29242a").font("Helvetica-Bold").fontSize(10).text(`${index + 1}. ${item.medicationName}${item.presentation ? ` — ${item.presentation}` : ""}`);
+        const routeLabel = ({ ORAL: "Oral", VAGINAL: "Vaginal", TOPICO: "Tópico" } as Record<string, string>)[item.route] || item.route;
+        doc.fillColor(gray).font("Helvetica").fontSize(9).text(`Dose: ${item.dose}  ·  Via: ${routeLabel}`);
         doc.text(`Posologia: ${item.posology}`);
         doc.text(`Duração: ${item.duration}  ·  Quantidade: ${item.quantity}`);
       });
@@ -2352,7 +2372,7 @@ app.get(
 const prescriptionItemSchema = z.object({
   medicationId: z.coerce.number().int().positive(),
   dose: z.string().trim().min(1).max(100),
-  route: z.string().trim().min(1).max(60),
+  route: z.enum(["ORAL", "VAGINAL", "TOPICO"]),
   posology: z.string().trim().min(1).max(300),
   duration: z.string().trim().min(1).max(80),
   quantity: z.string().trim().min(1).max(80),
@@ -2376,6 +2396,77 @@ const clinicalDocumentIssueSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+const medicationCatalogInputSchema = z.object({
+  name: z.string().trim().min(2).max(180),
+  route: z.enum(["ORAL", "VAGINAL", "TOPICO"]),
+  dose: z.string().trim().min(1).max(100),
+  posology: z.string().trim().min(1).max(300),
+});
+const medicationCatalogSelect = {
+  id: true,
+  name: true,
+  presentation: true,
+  route: true,
+  dose: true,
+  posology: true,
+};
+
+app.get("/api/admin/medication-catalog", auth, adminOnly, async (_req, res) => {
+  res.json(await prisma.medicationCatalogItem.findMany({
+    orderBy: [{ active: "desc" }, { name: "asc" }, { route: "asc" }, { dose: "asc" }],
+    select: { ...medicationCatalogSelect, active: true, controlled: true },
+  }));
+});
+app.post("/api/admin/medication-catalog", auth, adminOnly, async (req: AuthRequest, res) => {
+  const parsed = medicationCatalogInputSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: "Informe nome, via, dose e posologia válidos." });
+  try {
+    const item = await prisma.medicationCatalogItem.create({
+      data: { ...parsed.data, controlled: false, createdById: req.user!.id },
+      select: { ...medicationCatalogSelect, active: true, controlled: true },
+    });
+    res.status(201).json(item);
+  } catch (error: any) {
+    if (error?.code === "P2002")
+      return res.status(409).json({ message: "Já existe um medicamento com este nome, via e dose." });
+    throw error;
+  }
+});
+app.put("/api/admin/medication-catalog/:id", auth, adminOnly, async (req: AuthRequest, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  const parsed = medicationCatalogInputSchema.extend({ active: z.boolean() }).safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: "Informe nome, via, dose, posologia e status válidos." });
+  try {
+    const item = await prisma.medicationCatalogItem.update({
+      where: { id },
+      data: parsed.data,
+      select: { ...medicationCatalogSelect, active: true, controlled: true },
+    });
+    res.json(item);
+  } catch (error: any) {
+    if (error?.code === "P2002")
+      return res.status(409).json({ message: "Já existe um medicamento com este nome, via e dose." });
+    if (error?.code === "P2025")
+      return res.status(404).json({ message: "Medicamento não encontrado." });
+    throw error;
+  }
+});
+app.delete("/api/admin/medication-catalog/:id", auth, adminOnly, async (req: AuthRequest, res) => {
+  const id = routeId(req, res);
+  if (id === null) return;
+  try {
+    await prisma.medicationCatalogItem.update({ where: { id }, data: { active: false } });
+    res.status(204).end();
+  } catch (error: any) {
+    if (error?.code === "P2025")
+      return res.status(404).json({ message: "Medicamento não encontrado." });
+    throw error;
+  }
+});
+
 app.get("/api/medication-catalog", auth, doctorOnly, async (req, res) => {
   const search = String(req.query.search || "").trim();
   res.json(await prisma.medicationCatalogItem.findMany({
@@ -2385,29 +2476,28 @@ app.get("/api/medication-catalog", auth, doctorOnly, async (req, res) => {
       ...(search ? { OR: [
         { name: { contains: search } },
         { presentation: { contains: search } },
+        { dose: { contains: search } },
+        { posology: { contains: search } },
       ] } : {}),
     },
-    orderBy: [{ name: "asc" }, { presentation: "asc" }],
+    orderBy: [{ name: "asc" }, { route: "asc" }, { dose: "asc" }],
     take: 30,
-    select: { id: true, name: true, presentation: true },
+    select: medicationCatalogSelect,
   }));
 });
 app.post("/api/medication-catalog", auth, doctorOnly, async (req: AuthRequest, res) => {
-  const parsed = z.object({
-    name: z.string().trim().min(2).max(180),
-    presentation: z.string().trim().min(2).max(180),
-  }).safeParse(req.body);
+  const parsed = medicationCatalogInputSchema.safeParse(req.body);
   if (!parsed.success)
-    return res.status(400).json({ message: "Informe medicamento e apresentação válidos." });
+    return res.status(400).json({ message: "Informe nome, via, dose e posologia válidos." });
   try {
     const item = await prisma.medicationCatalogItem.create({
       data: { ...parsed.data, controlled: false, createdById: req.user!.id },
-      select: { id: true, name: true, presentation: true },
+      select: medicationCatalogSelect,
     });
     res.status(201).json(item);
   } catch (error: any) {
     if (error?.code === "P2002")
-      return res.status(409).json({ message: "Este medicamento e apresentação já constam no catálogo." });
+      return res.status(409).json({ message: "Já existe um medicamento com este nome, via e dose." });
     throw error;
   }
 });
@@ -2651,6 +2741,7 @@ app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorO
     return res.json({ ready: false, message: "Salve o atendimento vinculado antes de emitir documentos." });
   if (record.patientId !== record.appointment.patientId)
     return res.status(409).json({ ready: false, message: "O paciente do prontuário não corresponde ao paciente do atendimento." });
+  let provider = clinicalDocumentSigningProvider();
   try {
     const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || "");
     if (!publicBaseUrl)
@@ -2659,11 +2750,12 @@ app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorO
     if (publicBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(publicBase.hostname))
       return res.json({ ready: false, message: "PUBLIC_BASE_URL deve usar um endereço público HTTPS para validar o QR code." });
 
-    const provider = clinicalDocumentSigningProvider();
+    const signingSetup = await resolveClinicalDocumentSigningSetup(
+      record.appointment.doctorId,
+      req.user!.id,
+    );
+    provider = signingSetup.provider;
     if (provider === ClinicalSignatureProvider.VIDAAS) {
-      const configuration = getVidassConfiguration();
-      if (!configuration.ready)
-        return res.json({ ready: false, signatureProvider: provider, message: configuration.message });
       const session = await prisma.clinicalSigningSession.findFirst({
         where: {
           userId: req.user!.id,
@@ -2684,12 +2776,24 @@ app.get("/api/medical-records/:id/clinical-documents/eligibility", auth, doctorO
       });
     }
 
-    const certificate = await getDoctorCertificateDetails(record.appointment.doctorId, req.user!.id);
+    const certificate = signingSetup.certificate;
     if (!certificate)
-      return res.json({ ready: false, signatureProvider: provider, message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite o cadastro de um certificado ICP-Brasil válido ao administrador." });
-    return res.json({ ready: true, signatureProvider: provider, message: "Certificado local da médica e verificação pública configurados." });
+      return res.json({
+        ready: false,
+        signatureProvider: provider,
+        message: signingSetup.usingLocalFallback
+          ? "VIDaaS não está configurado e não há certificado local ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro em Certificados Digitais."
+          : "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite o cadastro de um certificado ICP-Brasil válido ao administrador.",
+      });
+    return res.json({
+      ready: true,
+      signatureProvider: provider,
+      message: signingSetup.usingLocalFallback
+        ? "VIDaaS não está configurado. A receita será gerada com o certificado local cadastrado."
+        : "Certificado local da médica e verificação pública configurados.",
+    });
   } catch (error: any) {
-    return res.json({ ready: false, signatureProvider: clinicalDocumentSigningProvider(), message: error?.message || "Não foi possível validar a configuração de assinatura." });
+    return res.json({ ready: false, signatureProvider: provider, message: error?.message || "Não foi possível validar a configuração de assinatura." });
   }
 });
 app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async (req: AuthRequest, res) => {
@@ -2774,18 +2878,25 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
   } catch {
     return res.status(409).json({ message: "Configure PUBLIC_BASE_URL com o endereço público HTTPS do sistema para ativar a validação pelo QR code." });
   }
-  const signingProvider = clinicalDocumentSigningProvider();
-  let certificate: any = null;
+  let signingSetup: Awaited<ReturnType<typeof resolveClinicalDocumentSigningSetup>>;
+  try {
+    signingSetup = await resolveClinicalDocumentSigningSetup(doctor.id, req.user!.id);
+  } catch (error: any) {
+    return res.status(409).json({
+      message: error.message || "Não foi possível validar o certificado da médica.",
+    });
+  }
+  const signingProvider = signingSetup.provider;
+  let certificate: any = signingSetup.certificate;
   let remoteSession: any = null;
   const vidassConfiguration = getVidassConfiguration();
   if (signingProvider === ClinicalSignatureProvider.LOCAL_P12) {
-    try {
-      certificate = await getDoctorCertificateDetails(doctor.id, req.user!.id);
-    } catch (error: any) {
-      return res.status(409).json({ message: error.message || "Não foi possível validar o certificado da médica." });
-    }
     if (!certificate)
-      return res.status(409).json({ message: "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro de um certificado ICP-Brasil válido antes de emitir." });
+      return res.status(409).json({
+        message: signingSetup.usingLocalFallback
+          ? "VIDaaS não está configurado e não há certificado local ativo vinculado a esta médica e à sua conta. Solicite o cadastro em Certificados Digitais."
+          : "Não há certificado digital ativo vinculado a esta médica e à sua conta. Solicite ao administrador o cadastro de um certificado ICP-Brasil válido antes de emitir.",
+      });
   } else {
     if (!vidassConfiguration.ready)
       return res.status(409).json({ code: "VIDAAS_NOT_CONFIGURED", message: vidassConfiguration.message });

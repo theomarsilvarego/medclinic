@@ -97,7 +97,7 @@ export function CertificateSettingsPage() {
         <div>
           <p className="eyebrow">ADMINISTRAÇÃO</p>
           <h1>Certificados digitais</h1>
-          <p className="muted">Associe o certificado individual à médica e à conta autorizada. O sistema confere a chave correspondente, o titular cadastrado e a validade temporal.</p>
+          <p className="muted">Associe o certificado individual à médica e à conta autorizada. O sistema confere a chave correspondente, o titular cadastrado e a validade temporal. Se o VIDaaS não estiver configurado, este certificado local será usado para gerar os PDFs assinados de receitas e atestados.</p>
         </div>
         <KeyRound size={30} className="certificate-heading-icon" />
       </div>
@@ -121,7 +121,7 @@ export function CertificateSettingsPage() {
               ))}
             </div>
           ) : (
-            <div className="certificate-empty"><KeyRound size={25} /><strong>Nenhum certificado ativo</strong><span>A emissão de receitas e atestados ficará indisponível até cadastrar um certificado individual válido.</span></div>
+            <div className="certificate-empty"><KeyRound size={25} /><strong>Nenhum certificado ativo</strong><span>Sem certificado local, a emissão depende do VIDaaS estar configurado e autenticado pela médica.</span></div>
           )}
         </section>
         <section className="certificate-card">
