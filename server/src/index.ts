@@ -2366,6 +2366,8 @@ app.get(
 
 const prescriptionItemSchema = z.object({
   medicationId: z.coerce.number().int().positive(),
+  dose: z.string().trim().min(1).max(100),
+  posology: z.string().trim().min(1).max(300),
 });
 const clinicalDocumentIssueSchema = z.discriminatedUnion("type", [
   z.object({
@@ -2813,21 +2815,21 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
     const ids = [...new Set(parsed.data.items.map((item) => item.medicationId))];
     const medications = await prisma.medicationCatalogItem.findMany({
       where: { id: { in: ids }, active: true, controlled: false },
-      select: { id: true, name: true, presentation: true, route: true, dose: true, posology: true },
+      select: { id: true, name: true, presentation: true, route: true },
     });
     if (medications.length !== ids.length)
       return res.status(400).json({ message: "Receitas desta versão aceitam apenas medicamentos não controlados ativos no catálogo." });
-    if (medications.some((item) => !item.route || !item.dose?.trim() || !item.posology?.trim()))
-      return res.status(409).json({ message: "Um ou mais medicamentos estão sem via, dose ou posologia cadastradas. Solicite ao Administrador que complete o catálogo." });
+    if (medications.some((item) => !item.route))
+      return res.status(409).json({ message: "Um ou mais medicamentos estão sem via cadastrada. Solicite ao Administrador que complete o catálogo." });
     const byId = new Map(medications.map((item) => [item.id, item]));
     content = {
       items: parsed.data.items.map((item) => {
         const medication = byId.get(item.medicationId)!;
         return {
           medicationId: medication.id,
-          dose: medication.dose!,
+          dose: item.dose,
           route: medication.route!,
-          posology: medication.posology!,
+          posology: item.posology,
           medicationName: medication.name,
           presentation: medication.presentation,
         };
