@@ -56,13 +56,11 @@ function attestationTemplate(
   subtype: string,
   date: string,
   days: string,
-  entry: string,
-  exit: string,
 ) {
   const name = patient || "[nome do paciente]";
   const formattedDate = datePt(date) || "[data]";
   if (subtype === "COMPARECIMENTO")
-    return `Atesto, para os devidos fins, que ${name} compareceu a esta clínica na data de ${formattedDate}, no período de ${entry || "[horário de entrada]"} a ${exit || "[horário de saída]"}.`;
+    return `Atesto, para os devidos fins, que ${name} compareceu a esta clínica na data de ${formattedDate}.`;
   if (subtype === "AFASTAMENTO")
     return `Atesto que ${name} necessita de afastamento de suas atividades por ${days || "[número de dias]"} dia(s), a partir de ${formattedDate}.`;
   return `Atesto, para os devidos fins, que ${name} foi avaliada(o) nesta data (${formattedDate}) e encontra-se apta(o), conforme avaliação médica.`;
@@ -101,8 +99,6 @@ export function MedicalDocumentsArea({
   const [subtype, setSubtype] = useState("COMPARECIMENTO");
   const [attestationDate, setAttestationDate] = useState(dateToday());
   const [daysAway, setDaysAway] = useState("1");
-  const [entryTime, setEntryTime] = useState("");
-  const [exitTime, setExitTime] = useState("");
   const [template, setTemplate] = useState("");
   const [templateEdited, setTemplateEdited] = useState(false);
   const [cidAuthorized, setCidAuthorized] = useState(false);
@@ -210,8 +206,6 @@ export function MedicalDocumentsArea({
         subtype,
         attestationDate,
         daysAway,
-        entryTime,
-        exitTime,
       ),
     );
   }, [
@@ -219,8 +213,6 @@ export function MedicalDocumentsArea({
     subtype,
     attestationDate,
     daysAway,
-    entryTime,
-    exitTime,
     tab,
     templateEdited,
   ]);
@@ -378,8 +370,6 @@ export function MedicalDocumentsArea({
               subtype,
               date: attestationDate,
               daysAway: subtype === "AFASTAMENTO" ? Number(daysAway) : null,
-              entryTime,
-              exitTime,
               template,
               cidAuthorized,
               cid,
@@ -744,34 +734,6 @@ export function MedicalDocumentsArea({
                     required
                   />
                 </label>
-              )}
-              {subtype === "COMPARECIMENTO" && (
-                <>
-                  <label>
-                    Horário de entrada
-                    <input
-                      type="time"
-                      value={entryTime}
-                      onChange={(event) => {
-                        setEntryTime(event.target.value);
-                        setTemplateEdited(false);
-                      }}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Horário de saída
-                    <input
-                      type="time"
-                      value={exitTime}
-                      onChange={(event) => {
-                        setExitTime(event.target.value);
-                        setTemplateEdited(false);
-                      }}
-                      required
-                    />
-                  </label>
-                </>
               )}
               <label className="medical-document-wide">
                 Texto-modelo editável
