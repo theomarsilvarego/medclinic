@@ -4031,6 +4031,17 @@
   background: #e8f5f1;
   color: #064b45;
 }
+.appointment-chip .anamnesis-chip-action.submitted {
+  border-color: #37a765;
+  background: #e2f6e9;
+  color: #155d32;
+  box-shadow: 0 0 0 2px rgb(55 167 101 / 16%);
+}
+.appointment-chip .anamnesis-chip-action.submitted:hover {
+  border-color: #24854b;
+  background: #c9edd5;
+  color: #104b28;
+}
 .appointment-chip .appointment-delete-button {
   min-width: 32px;
   min-height: 32px;
@@ -4063,6 +4074,17 @@
   background: #075f57;
   color: #fff;
   transform: translateY(-1px);
+}
+.doctor-anamnesis-icon.submitted {
+  border-color: #37a765;
+  background: #e2f6e9;
+  color: #155d32;
+  box-shadow: 0 0 0 2px rgb(55 167 101 / 16%);
+}
+.doctor-anamnesis-icon.submitted:hover {
+  border-color: #24854b;
+  background: #c9edd5;
+  color: #104b28;
 }
 .doctor-agenda-actions button:focus-visible {
   outline: 3px solid #6eb7aa;

@@ -4995,7 +4995,10 @@ app.get("/api/appointments", auth, appointmentAccess, async (req, res) => {
   const appointments = await prisma.appointment.findMany({
     where: { appointmentDate: new Date(`${date}T00:00:00.000Z`) },
     orderBy: [{ scheduledTime: "asc" }, { doctor: { fullName: "asc" } }],
-    include: appointmentInclude,
+    include: {
+      ...appointmentInclude,
+      anamnesis: { select: { patientId: true, submittedAt: true, revokedAt: true } },
+    },
   });
   const insuranceCodes = [
     ...new Set(
@@ -5016,16 +5019,24 @@ app.get("/api/appointments", auth, appointmentAccess, async (req, res) => {
     patientInsurances.map((insurance) => [insurance.id, insurance.name]),
   );
   res.json(
-    appointments.map((appointment) => ({
-      ...appointment,
-      patient: {
-        ...appointment.patient,
-        insuranceName:
-          appointment.patient.insuranceCode === null
-            ? null
-            : insuranceNames.get(appointment.patient.insuranceCode) || null,
-      },
-    })),
+    appointments.map((appointment) => {
+      const { anamnesis, ...appointmentData } = appointment;
+      return {
+        ...appointmentData,
+        anamnesisSubmitted: Boolean(
+          anamnesis?.submittedAt &&
+          !anamnesis.revokedAt &&
+          anamnesis.patientId === appointment.patientId,
+        ),
+        patient: {
+          ...appointment.patient,
+          insuranceName:
+            appointment.patient.insuranceCode === null
+              ? null
+              : insuranceNames.get(appointment.patient.insuranceCode) || null,
+        },
+      };
+    }),
   );
 });
 app.patch("/api/appointments/:id/start", auth, doctorOnly, async (req, res) => {

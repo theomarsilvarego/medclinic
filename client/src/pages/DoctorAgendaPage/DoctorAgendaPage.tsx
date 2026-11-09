@@ -246,10 +246,10 @@ export function DoctorAgendaPage({
                 <div className="doctor-agenda-actions">
                   {isAnamnesisEligible(row) && (
                     <button
-                      className="doctor-anamnesis-icon"
+                      className={`doctor-anamnesis-icon${row.anamnesisSubmitted ? " submitted" : ""}`}
                       type="button"
-                      title="Ficha de anamnese · QR e WhatsApp"
-                      aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`}
+                      title={row.anamnesisSubmitted ? "Ficha de anamnese preenchida pelo paciente" : "Ficha de anamnese · QR e WhatsApp"}
+                      aria-label={`${row.anamnesisSubmitted ? "Abrir ficha de anamnese preenchida" : "Abrir ficha de anamnese"} de ${row.patient?.fullName}`}
                       onClick={() => setSelectedAnamnesis(row)}
                     >
                       <QrCode size={18} />
@@ -288,7 +288,12 @@ export function DoctorAgendaPage({
       {selectedAnamnesis && (
         <AnamnesisAppointmentModal
           appointment={selectedAnamnesis}
-          onClose={() => setSelectedAnamnesis(null)}
+          onClose={() => {
+            setSelectedAnamnesis(null);
+            void request(`/appointments?date=${date}`)
+              .then((result: Row[]) => setRows(result || []))
+              .catch((cause: any) => setError(cause.message || "Não foi possível atualizar o status da ficha."));
+          }}
         />
       )}
       {selected && (

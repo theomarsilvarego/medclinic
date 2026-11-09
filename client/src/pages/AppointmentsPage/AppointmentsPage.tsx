@@ -242,14 +242,14 @@ export function AppointmentsPage({
                       </small>
                       {canManage && isEligibleAppointment(row) && (
                         <button
-                          className="anamnesis-chip-action"
+                          className={`anamnesis-chip-action${row.anamnesisSubmitted ? " submitted" : ""}`}
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedAnamnesis(row);
                           }}
-                          aria-label={`Abrir ficha de anamnese de ${row.patient?.fullName}`}
-                          title="Ficha de anamnese · QR e WhatsApp"
+                          aria-label={`${row.anamnesisSubmitted ? "Abrir ficha de anamnese preenchida" : "Abrir ficha de anamnese"} de ${row.patient?.fullName}`}
+                          title={row.anamnesisSubmitted ? "Ficha de anamnese preenchida pelo paciente" : "Ficha de anamnese · QR e WhatsApp"}
                         >
                           <QrCode size={14} />
                           Ficha
@@ -301,7 +301,10 @@ export function AppointmentsPage({
       {selectedAnamnesis && (
         <AnamnesisAppointmentModal
           appointment={selectedAnamnesis}
-          onClose={() => setSelectedAnamnesis(null)}
+          onClose={() => {
+            setSelectedAnamnesis(null);
+            void load(date);
+          }}
         />
       )}
     </>
