@@ -954,7 +954,7 @@ const examGroupInclude = {
     orderBy: { id: "asc" as const },
     include: {
       examType: {
-        select: { id: true, code: true, name: true, value: true, active: true },
+        select: { id: true, code: true, name: true, invoiceValue: true, value: true, active: true },
       },
     },
   },
@@ -2354,7 +2354,7 @@ app.get("/api/exam-types/catalog", auth, doctorOnly, async (_req, res) => {
     await prisma.examType.findMany({
       where: { active: true },
       orderBy: [{ name: "asc" }, { code: "asc" }],
-      select: { id: true, code: true, name: true, value: true, active: true },
+      select: { id: true, code: true, name: true, invoiceValue: true, value: true, active: true },
     }),
   );
 });
