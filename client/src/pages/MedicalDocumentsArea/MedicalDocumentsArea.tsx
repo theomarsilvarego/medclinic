@@ -25,8 +25,6 @@ type PrescriptionItem = Medication & {
   dose: string;
   route: string;
   posology: string;
-  duration: string;
-  quantity: string;
 };
 type DocumentTab = "RECEITA" | "ATESTADO";
 type SigningSessionState =
@@ -94,10 +92,7 @@ export function MedicalDocumentsArea({
   const [dose, setDose] = useState("");
   const [route, setRoute] = useState("");
   const [posology, setPosology] = useState("");
-  const [duration, setDuration] = useState("");
-  const [quantity, setQuantity] = useState("");
   const [items, setItems] = useState<PrescriptionItem[]>([]);
-  const [instructions, setInstructions] = useState("");
   const [catalogName, setCatalogName] = useState("");
   const [catalogRoute, setCatalogRoute] = useState("ORAL");
   const [catalogDose, setCatalogDose] = useState("");
@@ -237,8 +232,6 @@ export function MedicalDocumentsArea({
     setDose("");
     setRoute("");
     setPosology("");
-    setDuration("");
-    setQuantity("");
     setSearch("");
   }
 
@@ -247,12 +240,10 @@ export function MedicalDocumentsArea({
       !selectedMedication ||
       !dose.trim() ||
       !route.trim() ||
-      !posology.trim() ||
-      !duration.trim() ||
-      !quantity.trim()
+      !posology.trim()
     ) {
       setError(
-        "Selecione um medicamento e preencha dose, via, posologia, duração e quantidade.",
+        "Selecione um medicamento e preencha dose, via e posologia.",
       );
       return;
     }
@@ -263,8 +254,6 @@ export function MedicalDocumentsArea({
         dose: dose.trim(),
         route: route.trim(),
         posology: posology.trim(),
-        duration: duration.trim(),
-        quantity: quantity.trim(),
       },
     ]);
     setError("");
@@ -381,18 +370,13 @@ export function MedicalDocumentsArea({
                   dose: itemDose,
                   route: itemRoute,
                   posology: itemPosology,
-                  duration: itemDuration,
-                  quantity: itemQuantity,
                 }) => ({
                   medicationId: id,
                   dose: itemDose,
                   route: itemRoute,
                   posology: itemPosology,
-                  duration: itemDuration,
-                  quantity: itemQuantity,
                 }),
               ),
-              instructions,
             }
           : {
               type: "ATESTADO",
@@ -414,7 +398,6 @@ export function MedicalDocumentsArea({
         setSigningPollKey((value) => value + 1);
       }
       setItems([]);
-      setInstructions("");
       setCid("");
       setCidAuthorized(false);
       setMessage(
@@ -677,24 +660,6 @@ export function MedicalDocumentsArea({
                     required
                   />
                 </label>
-                <label>
-                  Duração
-                  <input
-                    value={duration}
-                    onChange={(event) => setDuration(event.target.value)}
-                    placeholder="Ex.: 7 dias"
-                    required
-                  />
-                </label>
-                <label>
-                  Quantidade
-                  <input
-                    value={quantity}
-                    onChange={(event) => setQuantity(event.target.value)}
-                    placeholder="Ex.: 14 comprimidos"
-                    required
-                  />
-                </label>
                 <button
                   type="button"
                   className="secondary medical-document-wide"
@@ -729,7 +694,7 @@ export function MedicalDocumentsArea({
                           />
                         </label>
                       </div>
-                      <small>{medicationRouteLabel(item.route)} · {item.duration} · {item.quantity}</small>
+                      <small>{medicationRouteLabel(item.route)}</small>
                     </div>
                     <button
                       type="button"
@@ -746,15 +711,6 @@ export function MedicalDocumentsArea({
                 ))}
               </div>
             )}
-            <label className="medical-document-label">
-              Orientações adicionais (opcional)
-              <textarea
-                value={instructions}
-                onChange={(event) => setInstructions(event.target.value)}
-                rows={2}
-                maxLength={1200}
-              />
-            </label>
             <button
               type="submit"
               className="primary medical-document-issue"

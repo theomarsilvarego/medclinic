@@ -1030,12 +1030,7 @@ async function generateClinicalDocumentPdf(data: any, pdfPath: string) {
         const routeLabel = ({ ORAL: "Oral", VAGINAL: "Vaginal", TOPICO: "Tópico" } as Record<string, string>)[item.route] || item.route;
         doc.fillColor(gray).font("Helvetica").fontSize(9).text(`Dose: ${item.dose}  ·  Via: ${routeLabel}`);
         doc.text(`Posologia: ${item.posology}`);
-        doc.text(`Duração: ${item.duration}  ·  Quantidade: ${item.quantity}`);
       });
-      if (content.instructions) {
-        doc.moveDown();
-        doc.fillColor("#29242a").font("Helvetica").fontSize(9).text(String(content.instructions), { width: 490 });
-      }
     } else {
       doc.fillColor(wine).font("Helvetica-Bold").fontSize(10).text(content.subtypeLabel || "Atestado");
       doc.moveDown();
@@ -2374,14 +2369,11 @@ const prescriptionItemSchema = z.object({
   dose: z.string().trim().min(1).max(100),
   route: z.enum(["ORAL", "VAGINAL", "TOPICO"]),
   posology: z.string().trim().min(1).max(300),
-  duration: z.string().trim().min(1).max(80),
-  quantity: z.string().trim().min(1).max(80),
 });
 const clinicalDocumentIssueSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("RECEITA"),
     items: z.array(prescriptionItemSchema).min(1).max(30),
-    instructions: z.string().trim().max(1200).optional().default(""),
   }),
   z.object({
     type: z.literal("ATESTADO"),
@@ -2835,7 +2827,6 @@ app.post("/api/medical-records/:id/clinical-documents", auth, doctorOnly, async 
         medicationName: byId.get(item.medicationId)!.name,
         presentation: byId.get(item.medicationId)!.presentation,
       })),
-      instructions: parsed.data.instructions,
     };
     subtype = "NAO_CONTROLADA";
   } else {
