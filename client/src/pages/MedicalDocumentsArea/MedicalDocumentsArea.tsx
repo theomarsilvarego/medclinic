@@ -13,13 +13,18 @@ import type { Row } from "../../lib/app";
 import { API, request } from "../../lib/app";
 import "./MedicalDocumentsArea.css";
 
-type Medication = { id: number; name: string; presentation: string };
+type Medication = {
+  id: number;
+  name: string;
+  presentation?: string | null;
+  route?: string | null;
+  dose?: string | null;
+  posology?: string | null;
+};
 type PrescriptionItem = Medication & {
   dose: string;
   route: string;
   posology: string;
-  duration: string;
-  quantity: string;
 };
 type DocumentTab = "RECEITA" | "ATESTADO";
 type SigningSessionState =
@@ -30,6 +35,7 @@ type SigningSessionState =
   | "USED"
   | "FAILED"
   | "EXPIRED";
+type SignatureProvider = "VIDAAS" | "LOCAL_P12" | "UNSIGNED";
 
 function dateToday() {
   const now = new Date();
@@ -39,6 +45,11 @@ function datePt(value: string) {
   if (!value) return "";
   const [year, month, day] = value.split("-");
   return `${day}/${month}/${year}`;
+}
+function medicationRouteLabel(value?: string | null) {
+  return ({ ORAL: "Oral", VAGINAL: "Vaginal", TOPICO: "Tópico" } as Record<string, string>)[
+    String(value || "").toUpperCase()
+  ] || value || "Via não cadastrada";
 }
 function attestationTemplate(
   patient: string,
@@ -80,14 +91,12 @@ export function MedicalDocumentsArea({
   const [selectedMedication, setSelectedMedication] =
     useState<Medication | null>(null);
   const [dose, setDose] = useState("");
-  const [route, setRoute] = useState("");
   const [posology, setPosology] = useState("");
-  const [duration, setDuration] = useState("");
-  const [quantity, setQuantity] = useState("");
   const [items, setItems] = useState<PrescriptionItem[]>([]);
-  const [instructions, setInstructions] = useState("");
   const [catalogName, setCatalogName] = useState("");
-  const [catalogPresentation, setCatalogPresentation] = useState("");
+  const [catalogRoute, setCatalogRoute] = useState("ORAL");
+  const [catalogDose, setCatalogDose] = useState("");
+  const [catalogPosology, setCatalogPosology] = useState("");
   const [showCatalogForm, setShowCatalogForm] = useState(false);
   const [subtype, setSubtype] = useState("COMPARECIMENTO");
   const [attestationDate, setAttestationDate] = useState(dateToday());
@@ -102,7 +111,7 @@ export function MedicalDocumentsArea({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [issueReady, setIssueReady] = useState(false);
-  const [signatureProvider, setSignatureProvider] = useState<"VIDAAS" | "LOCAL_P12">("VIDAAS");
+  const [signatureProvider, setSignatureProvider] = useState<SignatureProvider>("VIDAAS");
   const [signingSessionState, setSigningSessionState] = useState<SigningSessionState>("NONE");
   const [signerName, setSignerName] = useState("");
   const [startingVidass, setStartingVidass] = useState(false);
@@ -137,11 +146,17 @@ export function MedicalDocumentsArea({
     }
     let mounted = true;
     setIssueReady(false);
-    request(`/medical-records/${recordId}/clinical-documents/eligibility`)
+    request(`/medical-records/${recordId}/clinical-documents/eligibility?type=${encodeURIComponent(tab)}`)
       .then((result: { ready: boolean; message: string; signatureProvider?: string; signingSessionState?: SigningSessionState }) => {
         if (!mounted) return;
         setIssueReady(Boolean(result.ready));
-        setSignatureProvider(result.signatureProvider === "LOCAL_P12" ? "LOCAL_P12" : "VIDAAS");
+        setSignatureProvider(
+          result.signatureProvider === "LOCAL_P12"
+            ? "LOCAL_P12"
+            : result.signatureProvider === "UNSIGNED"
+              ? "UNSIGNED"
+              : "VIDAAS",
+        );
         if (result.signingSessionState)
           setSigningSessionState(result.signingSessionState);
         setEligibilityMessage(result.message || "Emissão indisponível.");
@@ -156,7 +171,7 @@ export function MedicalDocumentsArea({
     return () => {
       mounted = false;
     };
-  }, [active, canIssue, recordId]);
+  }, [active, canIssue, recordId, tab]);
 
   useEffect(() => {
     if (!active || !canIssue || !issueReady || !recordId || signatureProvider !== "VIDAAS")
@@ -221,36 +236,31 @@ export function MedicalDocumentsArea({
   function clearPrescriptionFields() {
     setSelectedMedication(null);
     setDose("");
-    setRoute("");
     setPosology("");
-    setDuration("");
-    setQuantity("");
     setSearch("");
   }
 
   function addPrescriptionItem() {
-    if (
-      !selectedMedication ||
-      !dose.trim() ||
-      !route.trim() ||
-      !posology.trim() ||
-      !duration.trim() ||
-      !quantity.trim()
-    ) {
-      setError(
-        "Selecione um medicamento e preencha dose, via, posologia, duração e quantidade.",
-      );
+    if (!selectedMedication) {
+      setError("Selecione um medicamento do catálogo.");
+      return;
+    }
+    const medicationDose = dose.trim();
+    const medicationRoute = selectedMedication.route;
+    const medicationPosology = posology.trim();
+    if (!medicationDose || !medicationRoute || !medicationPosology) {
+      setError(!medicationRoute
+        ? "O medicamento não possui via cadastrada. Solicite ao Administrador que atualize o catálogo."
+        : "Preencha dose e posologia antes de adicionar o item à receita.");
       return;
     }
     setItems((current) => [
       ...current,
       {
         ...selectedMedication,
-        dose: dose.trim(),
-        route: route.trim(),
-        posology: posology.trim(),
-        duration: duration.trim(),
-        quantity: quantity.trim(),
+        dose: medicationDose,
+        route: medicationRoute,
+        posology: medicationPosology,
       },
     ]);
     setError("");
@@ -258,11 +268,8 @@ export function MedicalDocumentsArea({
   }
 
   async function addCatalogItem() {
-    if (
-      catalogName.trim().length < 2 ||
-      catalogPresentation.trim().length < 2
-    ) {
-      setError("Informe o nome do medicamento e sua apresentação.");
+    if (catalogName.trim().length < 2 || !catalogDose.trim() || !catalogPosology.trim()) {
+      setError("Informe nome do medicamento, dose e posologia.");
       return;
     }
     try {
@@ -270,13 +277,19 @@ export function MedicalDocumentsArea({
         method: "POST",
         body: JSON.stringify({
           name: catalogName,
-          presentation: catalogPresentation,
+          route: catalogRoute,
+          dose: catalogDose,
+          posology: catalogPosology,
         }),
       });
       setCatalog((current) => [item, ...current]);
       setSelectedMedication(item);
+      setDose(item.dose || "");
+      setPosology(item.posology || "");
       setCatalogName("");
-      setCatalogPresentation("");
+      setCatalogRoute("ORAL");
+      setCatalogDose("");
+      setCatalogPosology("");
       setShowCatalogForm(false);
       setMessage(
         "Medicamento adicionado ao catálogo local. Confira a classificação regulatória antes de prescrever.",
@@ -334,10 +347,7 @@ export function MedicalDocumentsArea({
       setError(eligibilityMessage);
       return;
     }
-    if (
-      signatureProvider === "VIDAAS" &&
-      signingSessionState !== "READY"
-    ) {
+    if (signatureProvider === "VIDAAS" && signingSessionState !== "READY") {
       setError("Autentique o certificado VIDaaS da médica antes de emitir.");
       return;
     }
@@ -357,24 +367,11 @@ export function MedicalDocumentsArea({
         tab === "RECEITA"
           ? {
               type: "RECEITA",
-              items: items.map(
-                ({
-                  id,
-                  dose: itemDose,
-                  route: itemRoute,
-                  posology: itemPosology,
-                  duration: itemDuration,
-                  quantity: itemQuantity,
-                }) => ({
-                  medicationId: id,
-                  dose: itemDose,
-                  route: itemRoute,
-                  posology: itemPosology,
-                  duration: itemDuration,
-                  quantity: itemQuantity,
-                }),
-              ),
-              instructions,
+              items: items.map(({ id, dose: itemDose, posology: itemPosology }) => ({
+                medicationId: id,
+                dose: itemDose,
+                posology: itemPosology,
+              })),
             }
           : {
               type: "ATESTADO",
@@ -396,7 +393,6 @@ export function MedicalDocumentsArea({
         setSigningPollKey((value) => value + 1);
       }
       setItems([]);
-      setInstructions("");
       setCid("");
       setCidAuthorized(false);
       setMessage(
@@ -472,6 +468,17 @@ export function MedicalDocumentsArea({
           <span>{eligibilityMessage}</span>
         </div>
       )}
+      {canIssue && active && issueReady && signatureProvider === "LOCAL_P12" && (
+        <div className="medical-signature-card" role="status">
+          <div className="medical-signature-icon" aria-hidden="true">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="medical-signature-copy">
+            <strong>Assinatura digital · certificado local</strong>
+            <span>{eligibilityMessage}</span>
+          </div>
+        </div>
+      )}
       {canIssue && active && issueReady && signatureProvider === "VIDAAS" && (
         <div className="medical-signature-card" role="status">
           <div className="medical-signature-icon" aria-hidden="true">
@@ -517,6 +524,12 @@ export function MedicalDocumentsArea({
           )}
         </div>
       )}
+      {canIssue && active && issueReady && signatureProvider === "UNSIGNED" && tab === "RECEITA" && (
+        <div className="medical-document-readiness" role="status">
+          <ShieldCheck size={15} />
+          <span>{eligibilityMessage}</span>
+        </div>
+      )}
 
       {canIssue &&
         active &&
@@ -533,15 +546,17 @@ export function MedicalDocumentsArea({
               <div className="medical-document-suggestions">
                 {suggestions.map((item) => (
                   <button
-                    type="button"
-                    key={item.id}
-                    onClick={() => {
-                      setSelectedMedication(item);
-                      setSearch(item.name);
-                    }}
+                  type="button"
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedMedication(item);
+                    setDose(item.dose || "");
+                    setPosology(item.posology || "");
+                    setSearch(item.name);
+                  }}
                   >
                     <strong>{item.name}</strong>
-                    <span>{item.presentation}</span>
+                    <span>{medicationRouteLabel(item.route)} · {item.dose || "Dose não cadastrada"} · {item.posology || "Posologia não cadastrada"}</span>
                   </button>
                 ))}
               </div>
@@ -549,7 +564,7 @@ export function MedicalDocumentsArea({
             {selectedMedication && (
               <div className="medical-document-selected">
                 <strong>{selectedMedication.name}</strong>
-                <span>{selectedMedication.presentation}</span>
+                <span>Via: {medicationRouteLabel(selectedMedication.route)}</span>
                 <button
                   type="button"
                   aria-label="Remover medicamento selecionado"
@@ -557,6 +572,29 @@ export function MedicalDocumentsArea({
                 >
                   <X size={15} />
                 </button>
+              </div>
+            )}
+            {selectedMedication && (
+              <div className="medical-document-form-grid">
+                <label>
+                  Dose
+                  <input
+                    value={dose}
+                    onChange={(event) => setDose(event.target.value)}
+                    maxLength={100}
+                    required
+                  />
+                </label>
+                <label className="medical-document-wide">
+                  Posologia
+                  <input
+                    value={posology}
+                    onChange={(event) => setPosology(event.target.value)}
+                    maxLength={300}
+                    required
+                  />
+                </label>
+                <small className="medical-document-wide">Dose e posologia podem ser ajustadas antes de adicionar. Depois disso, ficam somente para leitura.</small>
               </div>
             )}
             {showCatalogForm ? (
@@ -571,15 +609,20 @@ export function MedicalDocumentsArea({
                     />
                   </label>
                   <label>
-                    Apresentação
-                    <input
-                      value={catalogPresentation}
-                      onChange={(event) =>
-                        setCatalogPresentation(event.target.value)
-                      }
-                      placeholder="Ex.: comprimido 500 mg"
-                      maxLength={180}
-                    />
+                    Via
+                    <select value={catalogRoute} onChange={(event) => setCatalogRoute(event.target.value)}>
+                      <option value="ORAL">Oral</option>
+                      <option value="VAGINAL">Vaginal</option>
+                      <option value="TOPICO">Tópico</option>
+                    </select>
+                  </label>
+                  <label>
+                    Dose
+                    <input value={catalogDose} onChange={(event) => setCatalogDose(event.target.value)} maxLength={100} />
+                  </label>
+                  <label className="medical-document-wide">
+                    Posologia
+                    <input value={catalogPosology} onChange={(event) => setCatalogPosology(event.target.value)} maxLength={300} />
                   </label>
                 </div>
                 <div className="medical-document-inline-actions">
@@ -599,8 +642,7 @@ export function MedicalDocumentsArea({
                   </button>
                 </div>
                 <small>
-                  Cadastre somente itens confirmados pela médica e não sujeitos
-                  a controle especial.
+                  Cadastre somente itens confirmados pela médica e não sujeitos a controle especial.
                 </small>
               </div>
             ) : (
@@ -613,55 +655,10 @@ export function MedicalDocumentsArea({
               </button>
             )}
             {selectedMedication && (
-              <div className="medical-document-form-grid prescription-fields">
-                <label>
-                  Dose
-                  <input
-                    value={dose}
-                    onChange={(event) => setDose(event.target.value)}
-                    placeholder="Ex.: 1 comprimido"
-                    required
-                  />
-                </label>
-                <label>
-                  Via
-                  <input
-                    value={route}
-                    onChange={(event) => setRoute(event.target.value)}
-                    placeholder="Ex.: oral"
-                    required
-                  />
-                </label>
-                <label className="medical-document-wide">
-                  Posologia
-                  <input
-                    value={posology}
-                    onChange={(event) => setPosology(event.target.value)}
-                    placeholder="Ex.: a cada 12 horas"
-                    required
-                  />
-                </label>
-                <label>
-                  Duração
-                  <input
-                    value={duration}
-                    onChange={(event) => setDuration(event.target.value)}
-                    placeholder="Ex.: 7 dias"
-                    required
-                  />
-                </label>
-                <label>
-                  Quantidade
-                  <input
-                    value={quantity}
-                    onChange={(event) => setQuantity(event.target.value)}
-                    placeholder="Ex.: 14 comprimidos"
-                    required
-                  />
-                </label>
+              <div className="medical-document-inline-actions">
                 <button
                   type="button"
-                  className="secondary medical-document-wide"
+                  className="secondary"
                   onClick={addPrescriptionItem}
                 >
                   <Plus size={15} /> Adicionar item
@@ -676,13 +673,9 @@ export function MedicalDocumentsArea({
                     key={`${item.id}-${index}`}
                   >
                     <div>
-                      <strong>
-                        {item.name} · {item.presentation}
-                      </strong>
-                      <small>
-                        {item.dose} · {item.route} · {item.posology} ·{" "}
-                        {item.duration} · {item.quantity}
-                      </small>
+                      <strong>{item.name}{item.presentation ? ` · ${item.presentation}` : ""}</strong>
+                      <small>Dose: {item.dose} · Via: {medicationRouteLabel(item.route)}</small>
+                      <small>Posologia: {item.posology}</small>
                     </div>
                     <button
                       type="button"
@@ -699,15 +692,6 @@ export function MedicalDocumentsArea({
                 ))}
               </div>
             )}
-            <label className="medical-document-label">
-              Orientações adicionais (opcional)
-              <textarea
-                value={instructions}
-                onChange={(event) => setInstructions(event.target.value)}
-                rows={2}
-                maxLength={1200}
-              />
-            </label>
             <button
               type="submit"
               className="primary medical-document-issue"

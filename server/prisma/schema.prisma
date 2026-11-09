@@ -615,7 +615,10 @@ model DigitalCertificate {
 model MedicationCatalogItem {
   id           Int      @id @default(autoincrement())
   name         String   @db.VarChar(180)
-  presentation String   @db.VarChar(180)
+  presentation String?  @db.VarChar(180)
+  route        MedicationRoute?
+  dose         String?  @db.VarChar(100)
+  posology     String?  @db.VarChar(300)
   active       Boolean  @default(true)
   controlled   Boolean  @default(false)
   createdById  Int      @map("created_by_id")
@@ -623,9 +626,15 @@ model MedicationCatalogItem {
   updatedAt    DateTime @updatedAt @map("updated_at")
   createdBy    User     @relation(fields: [createdById], references: [id], onUpdate: Cascade, onDelete: Restrict)
 
-  @@unique([name, presentation])
+  @@unique([name, route, dose])
   @@index([active, controlled, name])
   @@map("medication_catalog_items")
+}
+
+enum MedicationRoute {
+  ORAL
+  VAGINAL
+  TOPICO
 }
 
 enum ClinicalDocumentType {
@@ -642,6 +651,7 @@ enum ClinicalDocumentStatus {
 enum ClinicalSignatureProvider {
   LOCAL_P12
   VIDAAS
+  UNSIGNED
 }
 
 model ClinicalDocument {

@@ -12,6 +12,7 @@ import {
   FileText,
   FlaskConical,
   KeyRound,
+  Pill,
   Receipt,
   ShieldCheck,
   ShoppingCart,
@@ -100,6 +101,12 @@ export const modules: {
     icon: <KeyRound size={18} />,
   },
   {
+    key: "medication-catalog",
+    label: "Catálogo de medicamentos",
+    singular: "medicamento",
+    icon: <Pill size={18} />,
+  },
+  {
     key: "injectables",
     label: "Injetáveis",
     singular: "injetável",
@@ -174,6 +181,7 @@ export const menuGroups: {
     keys: [
       "users",
       "certificates",
+      "medication-catalog",
       "doctors",
       "insurances",
       "clinic",
@@ -202,6 +210,7 @@ export function canAccessModule(profile: string, key: ModuleKey) {
     return normalizedProfile === "MEDICO";
   if (
     key === "certificates" ||
+    key === "medication-catalog" ||
     key === "reports" ||
     key === "finance" ||
     key === "cash" ||

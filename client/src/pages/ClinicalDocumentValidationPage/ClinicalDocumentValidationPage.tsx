@@ -58,6 +58,8 @@ export function ClinicalDocumentValidationPage({ code }: { code: string }) {
 
   const signature = result?.signatureVerification;
   const integrityValid = result?.status === "EMITIDO" && signature?.integrityValid === true;
+  const unsigned = result?.signatureProvider === "UNSIGNED";
+  const documentValid = Boolean(result?.status === "EMITIDO" && (unsigned || integrityValid));
   const certificateTrusted = signature?.certificateTrust === "TRUSTED";
   const cancelled = result?.status === "CANCELADO";
 
@@ -83,11 +85,11 @@ export function ClinicalDocumentValidationPage({ code }: { code: string }) {
           </div>
         ) : result ? (
           <>
-            <div className={`document-validation-status ${integrityValid && !cancelled ? "valid" : "invalid"}`}>
-              {integrityValid && !cancelled ? <CircleCheck size={27} /> : <CircleAlert size={27} />}
+            <div className={`document-validation-status ${documentValid && !cancelled ? "valid" : "invalid"}`}>
+              {documentValid && !cancelled ? <CircleCheck size={27} /> : <CircleAlert size={27} />}
             </div>
             <p className="document-validation-eyebrow">RESULTADO DA CONSULTA</p>
-            <h1>{cancelled ? "Documento cancelado" : integrityValid ? "Documento localizado e íntegro" : "Documento não validado"}</h1>
+            <h1>{cancelled ? "Documento cancelado" : unsigned ? "Receita localizada e registrada" : integrityValid ? "Documento localizado e íntegro" : "Documento não validado"}</h1>
             <p className="document-validation-message">{result.message || "Não foi possível confirmar este documento."}</p>
 
             <dl className="document-validation-details">
@@ -98,13 +100,15 @@ export function ClinicalDocumentValidationPage({ code }: { code: string }) {
               <div><dt>Situação</dt><dd>{cancelled ? "Cancelado" : result.status === "EMITIDO" ? "Emitido" : "Pendente"}</dd></div>
             </dl>
 
-            <div className={`document-validation-check ${integrityValid ? "check-ok" : "check-fail"}`}>
+            <div className={`document-validation-check ${unsigned ? "check-fail" : integrityValid ? "check-ok" : "check-fail"}`}>
               <ShieldCheck size={19} />
-              <div><strong>Integridade criptográfica do PDF</strong><span>{signature?.message || "Não foi possível verificar a assinatura do arquivo."}</span></div>
+              <div><strong>{unsigned ? "Assinatura digital" : "Integridade criptográfica do PDF"}</strong><span>{unsigned ? "Esta receita foi emitida sem certificado digital; a consulta confirma o registro do documento." : signature?.message || "Não foi possível verificar a assinatura do arquivo."}</span></div>
             </div>
             <div className="document-validation-note">
               <strong>Confiança da cadeia de certificação</strong>
-              <span>{certificateTrusted
+              <span>{unsigned
+                ? "Não há cadeia de certificação digital para esta receita."
+                : certificateTrusted
                 ? "O verificador deste servidor reconheceu como confiável a cadeia apresentada. Para uma validação oficial ICP-Brasil, consulte também o serviço VALIDAR do ITI."
                 : "A integridade do PDF não comprova, por si só, a confiança da cadeia ICP-Brasil. Confirme o arquivo assinado no serviço oficial VALIDAR do ITI."}</span>
             </div>
