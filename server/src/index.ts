@@ -2960,8 +2960,6 @@ const clinicalDocumentIssueSchema = z.discriminatedUnion("type", [
     subtype: z.enum(["COMPARECIMENTO", "AFASTAMENTO", "APTIDAO"]),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     daysAway: z.coerce.number().int().min(1).max(365).optional().nullable(),
-    entryTime: z.string().max(5).optional().default(""),
-    exitTime: z.string().max(5).optional().default(""),
     template: z.string().trim().min(10).max(3000),
     cidAuthorized: z.boolean().default(false),
     cid: z.string().trim().max(20).optional().default(""),
@@ -3660,31 +3658,6 @@ app.post(
         return res
           .status(400)
           .json({ message: "Informe uma data válida para o atestado." });
-      if (
-        value.subtype === "COMPARECIMENTO" &&
-        (!value.entryTime || !value.exitTime)
-      )
-        return res.status(400).json({
-          message:
-            "Informe os horários de entrada e saída para o atestado de comparecimento.",
-        });
-      if (
-        value.subtype === "COMPARECIMENTO" &&
-        ![value.entryTime, value.exitTime].every((time) =>
-          /^([01]\d|2[0-3]):[0-5]\d$/.test(time),
-        )
-      )
-        return res
-          .status(400)
-          .json({ message: "Informe horários de entrada e saída válidos." });
-      if (
-        value.subtype === "COMPARECIMENTO" &&
-        value.exitTime <= value.entryTime
-      )
-        return res.status(400).json({
-          message:
-            "O horário de saída deve ser posterior ao horário de entrada.",
-        });
       if (value.subtype === "AFASTAMENTO" && !value.daysAway)
         return res
           .status(400)
@@ -3710,8 +3683,6 @@ app.post(
         subtypeLabel: labels[value.subtype],
         date: value.date,
         daysAway: value.daysAway || null,
-        entryTime: value.subtype === "COMPARECIMENTO" ? value.entryTime : "",
-        exitTime: value.subtype === "COMPARECIMENTO" ? value.exitTime : "",
         template: value.template,
         cidAuthorized: value.cidAuthorized,
         cid: value.cidAuthorized ? value.cid : "",
