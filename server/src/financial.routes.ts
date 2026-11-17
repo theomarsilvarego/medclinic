@@ -601,14 +601,18 @@ export async function createSalesFromRequests(
   const fromCents = (value: number) => new Prisma.Decimal(value).div(100);
   const normalizeName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, " ").trim();
   return prisma.$transaction(async (tx) => {
-    const [exams, ultrasounds, injectables, procedures, consultations, imagingProcedures] = await Promise.all([
+    const [exams, ultrasounds, injectables, procedures, consultationAppointments, imagingProcedures] = await Promise.all([
       grouped.has("EXAME") ? tx.examRequest.findMany({ where: { id: { in: grouped.get("EXAME") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } }, examGroup: { include: { items: { include: { examType: true } } } } } }) : [],
       grouped.has("ULTRASSOM") ? tx.ultrasoundRequest.findMany({ where: { id: { in: grouped.get("ULTRASSOM") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
       grouped.has("INJETAVEL") ? tx.injectableRequest.findMany({ where: { id: { in: grouped.get("INJETAVEL") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } }, injectable: true } }) : [],
       grouped.has("PROCEDIMENTO") ? tx.procedureRequest.findMany({ where: { id: { in: grouped.get("PROCEDIMENTO") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
-      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO", OR: [{ patient: { insuranceCode: null } }, { insurance: { name: { contains: "particular" } } }, { attendance: { name: { contains: "particular" } } }] }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
+      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO" }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
       tx.procedure.findMany({ where: { type: "DIAGNOSTICO_POR_IMAGEM", active: true }, select: { name: true, value: true } }),
     ]);
+    const consultations = consultationAppointments.filter((appointment) =>
+      normalizeName(appointment.insurance.name).includes("particular") &&
+      normalizeName(appointment.attendance?.name || "").includes("consulta"),
+    );
     if (exams.length + ultrasounds.length + injectables.length + procedures.length + consultations.length !== requestCount)
       throw Object.assign(new Error("Uma ou mais solicitações já foram faturadas ou não estão disponíveis. Atualize a lista."), { status: 409 });
 

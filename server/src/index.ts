@@ -4748,7 +4748,7 @@ app.get(
         },
         orderBy: [{ appointmentDate: "desc" }, { scheduledTime: "desc" }],
         include: {
-          patient: { select: { id: true, fullName: true, insuranceCode: true } },
+          patient: { select: { id: true, fullName: true } },
           insurance: { select: { id: true, name: true } },
           doctor: { select: { id: true, fullName: true } },
           attendance: { select: { name: true, value: true } },
@@ -4834,9 +4834,8 @@ app.get(
           doctor: appointment.doctor,
           requests: [
             ...(appointment.itemType === AppointmentItemType.ATENDIMENTO &&
-            (appointment.patient.insuranceCode === null ||
-              normalizeName(appointment.insurance.name).includes("particular") ||
-              normalizeName(appointment.attendance?.name || "").includes("particular"))
+            (normalizeName(appointment.insurance.name).includes("particular") &&
+              normalizeName(appointment.attendance?.name || "").includes("consulta"))
               ? [{
                   id: appointment.id,
                   kind: "CONSULTA",
