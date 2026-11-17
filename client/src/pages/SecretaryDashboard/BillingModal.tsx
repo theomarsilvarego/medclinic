@@ -17,7 +17,11 @@ const methodOptions: [PaymentMethod, string][] = [
 const methodLabel: Record<PaymentMethod, string> = Object.fromEntries(methodOptions) as Record<PaymentMethod, string>;
 
 function parseAmount(value: string) {
-  const normalized = value.replace(/\./g, "").replace(",", ".");
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  const normalized = trimmed.includes(",")
+    ? trimmed.replace(/\./g, "").replace(",", ".")
+    : trimmed;
   return Number(normalized) || 0;
 }
 
