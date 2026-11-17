@@ -4834,7 +4834,8 @@ app.get(
           doctor: appointment.doctor,
           requests: [
             ...(appointment.itemType === AppointmentItemType.ATENDIMENTO &&
-            appointment.insurance.name.toLocaleLowerCase("pt-BR").includes("particular")
+            (normalizeName(appointment.insurance.name).includes("particular") ||
+              normalizeName(appointment.attendance?.name || "").includes("particular"))
               ? [{
                   id: appointment.id,
                   kind: "CONSULTA",

@@ -606,7 +606,7 @@ export async function createSalesFromRequests(
       grouped.has("ULTRASSOM") ? tx.ultrasoundRequest.findMany({ where: { id: { in: grouped.get("ULTRASSOM") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
       grouped.has("INJETAVEL") ? tx.injectableRequest.findMany({ where: { id: { in: grouped.get("INJETAVEL") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } }, injectable: true } }) : [],
       grouped.has("PROCEDIMENTO") ? tx.procedureRequest.findMany({ where: { id: { in: grouped.get("PROCEDIMENTO") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
-      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO", insurance: { name: { contains: "particular" } } }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
+      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO", OR: [{ insurance: { name: { contains: "particular" } } }, { attendance: { name: { contains: "particular" } } }] }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
       tx.procedure.findMany({ where: { type: "DIAGNOSTICO_POR_IMAGEM", active: true }, select: { name: true, value: true } }),
     ]);
     if (exams.length + ultrasounds.length + injectables.length + procedures.length + consultations.length !== requestCount)
@@ -721,7 +721,7 @@ export async function createSalesFromRequests(
       grouped.has("INJETAVEL") ? tx.injectableRequest.updateMany({ where: { id: { in: grouped.get("INJETAVEL") }, billingStatus: "A_FATURAR" }, data: { billingStatus: "FATURADO" } }) : null,
       grouped.has("PROCEDIMENTO") ? tx.procedureRequest.updateMany({ where: { id: { in: grouped.get("PROCEDIMENTO") }, billingStatus: "A_FATURAR" }, data: { billingStatus: "FATURADO" } }) : null,
     ]);
-    const updated = updateResults.reduce((sum, result) => sum + (result?.count || 0), 0);
+    const updated = updateResults.reduce((sum, result) => sum + (result?.count || 0), 0) + consultations.length;
     if (updated !== requestCount) throw Object.assign(new Error("Uma ou mais solicitações foram faturadas em outra operação. Nenhum registro foi alterado."), { status: 409 });
     return createdSales;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
