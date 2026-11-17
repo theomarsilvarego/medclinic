@@ -38,6 +38,7 @@ import { MedicationCatalogPage } from "../MedicationCatalogPage/MedicationCatalo
 import { ReportsPage } from "../ReportsPage/ReportsPage";
 import { FinancialPage } from "../FinancialPage/FinancialPage";
 import { CrmPage } from "../CrmPage/CrmPage";
+import { SecretaryDashboard } from "../SecretaryDashboard/SecretaryDashboard";
 import "./App.css";
 
 export function App() {
@@ -231,6 +232,12 @@ export function App() {
           ) : module === "medication-catalog" ? (
             normalizedProfile === "ADMINISTRADOR" ? (
               <MedicationCatalogPage />
+            ) : (
+              <Dashboard setModule={setModule} user={user} />
+            )
+          ) : module === "attended-patients" ? (
+            normalizedProfile === "ADMINISTRADOR" || normalizedProfile === "SECRETARIA" ? (
+              <SecretaryDashboard />
             ) : (
               <Dashboard setModule={setModule} user={user} />
             )

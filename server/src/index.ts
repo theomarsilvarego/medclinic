@@ -293,10 +293,13 @@ function doctorOnly(req: AuthRequest, res: Response, next: NextFunction) {
 }
 
 function secretaryOnly(req: AuthRequest, res: Response, next: NextFunction) {
-  if (req.user?.profile !== Profile.SECRETARIA)
+  if (
+    req.user?.profile !== Profile.SECRETARIA &&
+    req.user?.profile !== Profile.ADMINISTRADOR
+  )
     return res
       .status(403)
-      .json({ message: "Acesso restrito ao perfil Secretária." });
+      .json({ message: "Acesso restrito aos perfis Secretária ou Administrador." });
   next();
 }
 

@@ -59,6 +59,12 @@ export const modules: {
     icon: <CalendarCheck size={18} />,
   },
   {
+    key: "attended-patients",
+    label: "Pacientes atendidas",
+    singular: "paciente atendida",
+    icon: <ClipboardCheck size={18} />,
+  },
+  {
     key: "doctors",
     label: "Médicos",
     singular: "médico",
@@ -171,6 +177,7 @@ export const menuGroups: {
       "exam-groups",
       "attendances",
       "appointments",
+      "attended-patients",
       "crm",
       "exam-types",
     ],
@@ -208,6 +215,8 @@ export function canAccessModule(profile: string, key: ModuleKey) {
     );
   if (key === "medical-records" || key === "exam-groups")
     return normalizedProfile === "MEDICO";
+  if (key === "attended-patients")
+    return normalizedProfile === "ADMINISTRADOR" || normalizedProfile === "SECRETARIA";
   if (
     key === "certificates" ||
     key === "medication-catalog" ||
