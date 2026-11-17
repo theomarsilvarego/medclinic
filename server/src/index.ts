@@ -4762,7 +4762,11 @@ app.get(
           attendance: { select: { name: true, value: true } },
           financialSales: {
             where: { status: { not: "CANCELED" } },
-            select: { id: true },
+            select: {
+              id: true,
+              items: { select: { sourceType: true, sourceId: true } },
+              receivable: { select: { paymentBreakdown: true } },
+            },
           },
           medicalRecords: {
             orderBy: { recordDate: "desc" },
@@ -4830,6 +4834,12 @@ app.get(
     };
     const isPreventive = (value: string) =>
       /prevent|papanicolau|citopat|colpocit/.test(normalizeName(value));
+    const paymentBreakdownFor = (appointment: (typeof appointments)[number], kind: string, id: number) => {
+      const sale = appointment.financialSales.find((entry) =>
+        entry.items.some((item) => item.sourceType === kind && item.sourceId === id),
+      ) || appointment.financialSales[0];
+      return sale?.receivable?.paymentBreakdown || null;
+    };
 
     res.json(
       appointments
@@ -4858,6 +4868,7 @@ app.get(
                     label: appointment.attendance?.name || "Consulta particular",
                     value: appointment.attendance ? Number(appointment.attendance.value) : null,
                   }],
+                  paymentBreakdown: paymentBreakdownFor(appointment, "CONSULTA", appointment.id),
                   pdfPath: null,
                 }]
               : []),
@@ -4884,6 +4895,7 @@ app.get(
                   ? examItems.reduce((sum, exam) => sum + exam.value, 0)
                   : null,
                 items: examItems,
+                paymentBreakdown: paymentBreakdownFor(appointment, "EXAME", item.id),
                 pdfPath: `/medical-record-exam-requests/${item.id}/pdf`,
               };
             }),
@@ -4910,6 +4922,7 @@ app.get(
                     value: amount,
                   },
                 ],
+                paymentBreakdown: paymentBreakdownFor(appointment, "ULTRASSOM", item.id),
                 pdfPath: `/medical-record-ultrasound-requests/${item.id}/pdf`,
               };
             }),
@@ -4937,6 +4950,7 @@ app.get(
                     value: amount,
                   },
                 ],
+                paymentBreakdown: paymentBreakdownFor(appointment, "INJETAVEL", item.id),
                 pdfPath: null,
               };
             }),
@@ -4954,6 +4968,7 @@ app.get(
               procedureValue: Number(item.value),
               amount: Number(item.value),
               items: [{ label: item.name, value: Number(item.value) }],
+              paymentBreakdown: paymentBreakdownFor(appointment, "PROCEDIMENTO", item.id),
               pdfPath:
                 item.status === "DISPONIVEL_PARA_VISUALIZACAO"
                   ? `/medical-record-procedure-requests/${item.id}/pdf`

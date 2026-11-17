@@ -2,9 +2,11 @@ import React from "react";
 import { X } from "lucide-react";
 import { money } from "../../lib/app";
 
-type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA"; category: string; title: string; code: string | null; requestedAt: string; amount: number | null; items: { label: string; value: number | null }[] };
+type PaymentBreakdown = { method: "PIX" | "DEBIT_CARD" | "CREDIT_CARD" | "CASH"; amount: number; installments: number };
+type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA"; category: string; title: string; code: string | null; requestedAt: string; amount: number | null; items: { label: string; value: number | null }[]; paymentBreakdown?: PaymentBreakdown[] | null };
 function dateLabel(value: string) { if (!value) return "—"; const date = new Date(`${String(value).slice(0, 10)}T12:00:00`); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("pt-BR"); }
 function requestKindLabel(kind: RequestItem["kind"]) { return { EXAME: "Exame", ULTRASSOM: "Ultrassom", INJETAVEL: "Injetável", PROCEDIMENTO: "Procedimento", CONSULTA: "Consulta particular" }[kind]; }
+const paymentMethodLabel: Record<PaymentBreakdown["method"], string> = { PIX: "Pix", DEBIT_CARD: "Débito", CREDIT_CARD: "Crédito", CASH: "Dinheiro" };
 type Patient = { fullName: string; total: number; unpriced: number };
 type Props = { billing: { patient: Patient; item: RequestItem }; close: () => void };
 export function BillingDetailsModal({ billing, close }: Props) { return (      
@@ -57,6 +59,10 @@ export function BillingDetailsModal({ billing, close }: Props) { return (
                     : money(billing.item.amount)}
                 </strong>
               </div>
+              {billing.item.paymentBreakdown?.length ? <div className="secretary-billing-payment-summary">
+                <strong>Forma de pagamento realizada</strong>
+                {billing.item.paymentBreakdown.map((payment, index) => <div key={`${payment.method}-${index}`}><span>{paymentMethodLabel[payment.method]}{payment.method === "CREDIT_CARD" ? ` · ${payment.installments}x sem juros` : ""}</span><strong>{money(payment.amount)}</strong></div>)}
+              </div> : null}
               <div className="secretary-billing-patient-total">
                 <span>
                   Total conhecido de todas as solicitações da paciente

@@ -704,6 +704,11 @@ export async function createSalesFromRequests(
           dueDate: saleDate,
           installmentCount: installments,
           preferredPaymentMethod: payments?.[0]?.method || paymentMethod,
+          paymentBreakdown: payments?.map(({ method, amount, installments: paymentInstallments }) => ({
+            method,
+            amount,
+            installments: paymentInstallments,
+          })) as Prisma.InputJsonValue | undefined,
           status: FinancialStatus.PENDING,
           installments: { create: Array.from({ length: installments }, (_, index) => {
             const monthDate = new Date(Date.UTC(saleDate.getUTCFullYear(), saleDate.getUTCMonth() + index, 1));

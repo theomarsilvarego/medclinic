@@ -34,6 +34,7 @@ type RequestItem = {
   billingStatus: "A_FATURAR" | "FATURADO" | "NAO_APLICAVEL";
   schedulingStatus: "NAO_AGENDADO" | "AGENDADO";
   items: { label: string; value: number | null }[];
+  paymentBreakdown?: { method: "PIX" | "DEBIT_CARD" | "CREDIT_CARD" | "CASH"; amount: number; installments: number }[] | null;
   pdfPath: string | null;
 };
 type Visit = {
@@ -568,7 +569,6 @@ export function SecretaryDashboard() {
                                 type="button"
                                 title="Abrir resumo de cobrança"
                                 aria-label={`Abrir resumo de cobrança de ${item.title} para ${patient.fullName}`}
-                                disabled={item.billingStatus !== "A_FATURAR"}
                                 onClick={() => setBilling({ patient, item })}
                               >
                                 <CircleDollarSign size={17} />
