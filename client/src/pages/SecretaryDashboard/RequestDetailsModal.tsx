@@ -2,9 +2,9 @@ import React from "react";
 import { X } from "lucide-react";
 import { money } from "../../lib/app";
 
-type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO"; category: string; title: string; code: string | null; requestedAt: string; amount: number | null; items: { label: string; value: number | null }[] };
+type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA"; category: string; title: string; code: string | null; requestedAt: string; amount: number | null; items: { label: string; value: number | null }[] };
 function dateLabel(value: string) { if (!value) return "—"; const date = new Date(`${String(value).slice(0, 10)}T12:00:00`); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("pt-BR"); }
-function requestKindLabel(kind: RequestItem["kind"]) { return { EXAME: "Exame", ULTRASSOM: "Ultrassom", INJETAVEL: "Injetável", PROCEDIMENTO: "Procedimento" }[kind]; }
+function requestKindLabel(kind: RequestItem["kind"]) { return { EXAME: "Exame", ULTRASSOM: "Ultrassom", INJETAVEL: "Injetável", PROCEDIMENTO: "Procedimento", CONSULTA: "Consulta particular" }[kind]; }
 type Props = { viewing: { patient: string; item: RequestItem }; close: () => void };
 export function RequestDetailsModal({ viewing, close }: Props) { return (      
         <div

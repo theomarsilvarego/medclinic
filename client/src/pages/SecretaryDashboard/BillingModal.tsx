@@ -2,7 +2,7 @@ import React from "react";
 import { X } from "lucide-react";
 import { money } from "../../lib/app";
 
-type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO"; category: string; title: string; amount: number | null };
+type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA"; category: string; title: string; amount: number | null };
 type PaymentMethod = "PIX" | "DEBIT_CARD" | "CREDIT_CARD" | "CASH";
 type Props = { billingItems: RequestItem[]; billingItemKeys: string[]; setBillingItemKeys: React.Dispatch<React.SetStateAction<string[]>>; billingSelected: boolean; setError: (value: string) => void; paymentMethod: PaymentMethod; setPaymentMethod: (value: PaymentMethod) => void; discountAllowed: boolean; discountEnabled: boolean; setDiscountEnabled: (value: boolean) => void; installments: number; setInstallments: (value: number) => void; billableItems: RequestItem[]; billingSubtotal: number; billingDiscount: number; billingTotal: number; confirmBilling: () => void; close: () => void };
 export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys, billingSelected, setError, paymentMethod, setPaymentMethod, discountAllowed, discountEnabled, setDiscountEnabled, installments, setInstallments, billableItems, billingSubtotal, billingDiscount, billingTotal, confirmBilling, close }: Props) {

@@ -19,7 +19,7 @@ import "./SecretaryDashboard.css";
 
 type RequestItem = {
   id: number;
-  kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO";
+  kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA";
   category: string;
   title: string;
   code: string | null;
@@ -66,6 +66,7 @@ function requestKindLabel(kind: RequestItem["kind"]) {
     ULTRASSOM: "Ultrassom",
     INJETAVEL: "Injetável",
     PROCEDIMENTO: "Procedimento",
+    CONSULTA: "Consulta particular",
   }[kind];
 }
 function billingStatusLabel(status: RequestItem["billingStatus"]) {
@@ -599,7 +600,10 @@ export function SecretaryDashboard() {
                                 type="button"
                                 title="Abrir novo agendamento"
                                 aria-label={`Abrir novo agendamento para ${patient.fullName}`}
-                                disabled={item.billingStatus === "NAO_APLICAVEL"}
+                                disabled={
+                                  item.billingStatus === "NAO_APLICAVEL" ||
+                                  item.kind === "CONSULTA"
+                                }
                                 onClick={() => void openAppointment(patient, visit, item)}
                               >
                                 <CalendarPlus size={17} />

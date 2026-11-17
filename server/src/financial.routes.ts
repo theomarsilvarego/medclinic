@@ -578,7 +578,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
 }
 
 
-type BillingKind = "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO";
+type BillingKind = "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA";
 type BillingSelection = { kind: BillingKind; id: number };
 
 export async function createSalesFromRequests(
@@ -601,14 +601,15 @@ export async function createSalesFromRequests(
   const fromCents = (value: number) => new Prisma.Decimal(value).div(100);
   const normalizeName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, " ").trim();
   return prisma.$transaction(async (tx) => {
-    const [exams, ultrasounds, injectables, procedures, imagingProcedures] = await Promise.all([
+    const [exams, ultrasounds, injectables, procedures, consultations, imagingProcedures] = await Promise.all([
       grouped.has("EXAME") ? tx.examRequest.findMany({ where: { id: { in: grouped.get("EXAME") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } }, examGroup: { include: { items: { include: { examType: true } } } } } }) : [],
       grouped.has("ULTRASSOM") ? tx.ultrasoundRequest.findMany({ where: { id: { in: grouped.get("ULTRASSOM") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
       grouped.has("INJETAVEL") ? tx.injectableRequest.findMany({ where: { id: { in: grouped.get("INJETAVEL") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } }, injectable: true } }) : [],
       grouped.has("PROCEDIMENTO") ? tx.procedureRequest.findMany({ where: { id: { in: grouped.get("PROCEDIMENTO") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
+      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO", insurance: { name: { contains: "particular" } } }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
       tx.procedure.findMany({ where: { type: "DIAGNOSTICO_POR_IMAGEM", active: true }, select: { name: true, value: true } }),
     ]);
-    if (exams.length + ultrasounds.length + injectables.length + procedures.length !== requestCount)
+    if (exams.length + ultrasounds.length + injectables.length + procedures.length + consultations.length !== requestCount)
       throw Object.assign(new Error("Uma ou mais solicitações já foram faturadas ou não estão disponíveis. Atualize a lista."), { status: 409 });
 
     type Line = { kind: BillingKind; id: number; label: string; amountCents: number; appointment: any };
@@ -644,6 +645,12 @@ export async function createSalesFromRequests(
       const amountCents = toCents(item.value);
       if (!appointment || appointment.status !== "ATENDIDO" || appointment.patientId !== item.patientId || amountCents <= 0) throw Object.assign(new Error(`Não há agendamento finalizado, paciente ou valor válido para o procedimento ${item.name}.`), { status: 400 });
       lines.push({ kind: "PROCEDIMENTO", id: item.id, label: item.name, amountCents, appointment });
+    }
+    for (const appointment of consultations) {
+      const amountCents = appointment.attendance ? toCents(appointment.attendance.value) : 0;
+      if (appointment.financialSales.length || appointment.patientId <= 0 || amountCents <= 0)
+        throw Object.assign(new Error(`A consulta particular ${appointment.attendance?.name || "selecionada"} já foi faturada ou não possui valor válido.`), { status: 409 });
+      lines.push({ kind: "CONSULTA", id: appointment.id, label: appointment.attendance?.name || "Consulta particular", amountCents, appointment });
     }
 
     const byAppointment = new Map<number, Line[]>();

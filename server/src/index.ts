@@ -529,7 +529,7 @@ const secretaryBillingSchema = z.object({
   items: z
     .array(
       z.object({
-        kind: z.enum(["EXAME", "ULTRASSOM", "INJETAVEL", "PROCEDIMENTO"]),
+        kind: z.enum(["EXAME", "ULTRASSOM", "INJETAVEL", "PROCEDIMENTO", "CONSULTA"]),
         id: z.coerce.number().int().positive(),
       }),
     )
@@ -4740,7 +4740,7 @@ app.get(
       parsedDate.toISOString().slice(0, 10) !== selectedDate
     )
       return res.status(400).json({ message: "Informe uma data válida." });
-    const [appointments, imagingProcedures] = await Promise.all([
+  const [appointments, imagingProcedures] = await Promise.all([
       prisma.appointment.findMany({
         where: {
           status: AppointmentStatus.ATENDIDO,
@@ -4751,6 +4751,11 @@ app.get(
           patient: { select: { id: true, fullName: true } },
           insurance: { select: { id: true, name: true } },
           doctor: { select: { id: true, fullName: true } },
+          attendance: { select: { name: true, value: true } },
+          financialSales: {
+            where: { status: { not: "CANCELED" } },
+            select: { id: true },
+          },
           medicalRecords: {
             orderBy: { recordDate: "desc" },
             include: {
@@ -4827,7 +4832,27 @@ app.get(
           patient: appointment.patient,
           insurance: appointment.insurance,
           doctor: appointment.doctor,
-          requests: appointment.medicalRecords.flatMap((record) => [
+          requests: [
+            ...(appointment.itemType === AppointmentItemType.ATENDIMENTO &&
+            appointment.insurance.name.toLocaleLowerCase("pt-BR").includes("particular")
+              ? [{
+                  id: appointment.id,
+                  kind: "CONSULTA",
+                  category: "Consulta particular",
+                  title: appointment.attendance?.name || "Consulta particular",
+                  code: null,
+                  requestedAt: appointment.updatedAt,
+                  billingStatus: appointment.financialSales.length ? "FATURADO" : "A_FATURAR",
+                  schedulingStatus: "NAO_APLICAVEL",
+                  amount: appointment.attendance ? Number(appointment.attendance.value) : null,
+                  items: [{
+                    label: appointment.attendance?.name || "Consulta particular",
+                    value: appointment.attendance ? Number(appointment.attendance.value) : null,
+                  }],
+                  pdfPath: null,
+                }]
+              : []),
+            ...appointment.medicalRecords.flatMap((record) => [
             ...record.examRequests.map((item) => {
               const examItems = item.examGroup.items.map((groupItem) => ({
                 label: groupItem.examType.name,
@@ -4925,7 +4950,8 @@ app.get(
                   ? `/medical-record-procedure-requests/${item.id}/pdf`
                   : null,
             })),
-          ]),
+            ]),
+          ],
         }))
         .filter((appointment) => appointment.requests.length > 0),
     );
