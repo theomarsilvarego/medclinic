@@ -580,12 +580,14 @@ export function createFinancialRouter(prisma: PrismaClient) {
 
 type BillingKind = "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA";
 type BillingSelection = { kind: BillingKind; id: number };
+type BillingPayment = { method: FinancialPaymentMethod; amount: number; installments: number };
 
 export async function createSalesFromRequests(
   prisma: PrismaClient,
   userId: number,
   selections: BillingSelection[],
   paymentMethod: FinancialPaymentMethod | undefined,
+  payments: BillingPayment[] | undefined,
   discountPercent: number,
   installments: number,
   saleDate: Date,
@@ -701,7 +703,7 @@ export async function createSalesFromRequests(
           totalAmount: fromCents(totalCents),
           dueDate: saleDate,
           installmentCount: installments,
-          preferredPaymentMethod: paymentMethod,
+          preferredPaymentMethod: payments?.[0]?.method || paymentMethod,
           status: FinancialStatus.PENDING,
           installments: { create: Array.from({ length: installments }, (_, index) => {
             const monthDate = new Date(Date.UTC(saleDate.getUTCFullYear(), saleDate.getUTCMonth() + index, 1));

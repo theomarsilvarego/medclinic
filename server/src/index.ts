@@ -538,6 +538,11 @@ const secretaryBillingSchema = z.object({
     )
     .min(1, "Selecione ao menos uma solicitação."),
   paymentMethod: z.nativeEnum(FinancialPaymentMethod).optional(),
+  payments: z.array(z.object({
+    method: z.nativeEnum(FinancialPaymentMethod),
+    amount: z.coerce.number().positive(),
+    installments: z.coerce.number().int().min(1).max(12).default(1),
+  })).min(1).max(8).optional(),
   discountPercent: z.coerce.number().min(0).max(5).default(0),
   installments: z.coerce.number().int().min(1).max(12).default(1),
 });
@@ -4974,16 +4979,17 @@ app.post(
     const paymentMethod = parsed.data.paymentMethod;
     if (
       parsed.data.discountPercent > 0 &&
-      paymentMethod !== FinancialPaymentMethod.PIX &&
-      paymentMethod !== FinancialPaymentMethod.CASH
+      (paymentMethod !== FinancialPaymentMethod.PIX &&
+        paymentMethod !== FinancialPaymentMethod.CASH ||
+        parsed.data.payments?.some(({ method }) => method !== FinancialPaymentMethod.PIX && method !== FinancialPaymentMethod.CASH))
     )
       return res.status(400).json({
         message:
           "O desconto de 5% está disponível somente para Pix ou dinheiro.",
       });
     if (
-      parsed.data.installments > 1 &&
-      paymentMethod !== FinancialPaymentMethod.CREDIT_CARD
+      (parsed.data.installments > 1 && paymentMethod !== FinancialPaymentMethod.CREDIT_CARD) ||
+      parsed.data.payments?.some(({ installments, method }) => installments > 1 && method !== FinancialPaymentMethod.CREDIT_CARD)
     )
       return res.status(400).json({
         message: "Parcelamento está disponível somente para cartão de crédito.",
@@ -4995,6 +5001,7 @@ app.post(
         req.user!.id,
         parsed.data.items,
         paymentMethod,
+        parsed.data.payments,
         parsed.data.discountPercent,
         parsed.data.installments,
         billingSaleDate,

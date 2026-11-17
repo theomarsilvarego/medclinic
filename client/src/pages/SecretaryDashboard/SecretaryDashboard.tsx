@@ -13,6 +13,7 @@ import type { Row } from "../../lib/app";
 import { submitAppointment } from "../../lib/appointments";
 import { AppointmentModal } from "../../components/appointments/AppointmentModal";
 import { BillingModal } from "./BillingModal";
+import type { SplitPayment } from "./BillingModal";
 import { BillingDetailsModal } from "./BillingDetailsModal";
 import { RequestDetailsModal } from "./RequestDetailsModal";
 import "./SecretaryDashboard.css";
@@ -52,8 +53,6 @@ type PatientSummary = {
   total: number;
   unpriced: number;
 };
-type PaymentMethod = "PIX" | "DEBIT_CARD" | "CREDIT_CARD" | "CASH";
-
 function dateLabel(value: string) {
   if (!value) return "—";
   const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
@@ -107,9 +106,7 @@ export function SecretaryDashboard() {
   const [appointmentSaving, setAppointmentSaving] = useState(false);
   const [scheduleSuccess, setScheduleSuccess] = useState("");
   const [billingItemKeys, setBillingItemKeys] = useState<string[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
   const [discountEnabled, setDiscountEnabled] = useState(false);
-  const [installments, setInstallments] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -305,9 +302,8 @@ export function SecretaryDashboard() {
     (sum, item) => sum + Number(item.amount),
     0,
   );
-  const discountAllowed = paymentMethod === "PIX" || paymentMethod === "CASH";
   const billingDiscount =
-    discountEnabled && discountAllowed ? billingSubtotal * 0.05 : 0;
+    discountEnabled ? billingSubtotal * 0.05 : 0;
   const billingTotal = billingSubtotal - billingDiscount;
   function requestKey(item: RequestItem) {
     return `${item.kind}:${item.id}`;
@@ -324,12 +320,10 @@ export function SecretaryDashboard() {
   function openBillingModal() {
     if (!selectedItems.length) return;
     setBillingItemKeys(selectedItems.map(requestKey));
-    setPaymentMethod("PIX");
     setDiscountEnabled(false);
-    setInstallments(1);
     setBillingModalOpen(true);
   }
-  async function confirmBilling() {
+  async function confirmBilling(payments: SplitPayment[]) {
     if (!billableItems.length) return;
     setBillingSelected(true);
     setError("");
@@ -338,9 +332,10 @@ export function SecretaryDashboard() {
         method: "POST",
         body: JSON.stringify({
           items: billableItems.map(({ kind, id }) => ({ kind, id })),
-          paymentMethod,
+          payments,
+          paymentMethod: payments[0]?.method,
           discountPercent: billingDiscount ? 5 : 0,
-          installments: paymentMethod === "CREDIT_CARD" ? installments : 1,
+          installments: payments.find((payment) => payment.method === "CREDIT_CARD")?.installments || 1,
         }),
       });
       const billedKeys = new Set(billableItems.map(requestKey));
@@ -648,13 +643,8 @@ export function SecretaryDashboard() {
           setBillingItemKeys={setBillingItemKeys}
           billingSelected={billingSelected}
           setError={setError}
-          paymentMethod={paymentMethod}
-          setPaymentMethod={setPaymentMethod}
-          discountAllowed={discountAllowed}
           discountEnabled={discountEnabled}
           setDiscountEnabled={setDiscountEnabled}
-          installments={installments}
-          setInstallments={setInstallments}
           billableItems={billableItems}
           billingSubtotal={billingSubtotal}
           billingDiscount={billingDiscount}
