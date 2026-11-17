@@ -4834,8 +4834,8 @@ app.get(
           doctor: appointment.doctor,
           requests: [
             ...(appointment.itemType === AppointmentItemType.ATENDIMENTO &&
-            (normalizeName(appointment.insurance.name).includes("particular") &&
-              normalizeName(appointment.attendance?.name || "").includes("consulta"))
+            appointment.attendance !== null &&
+            Number(appointment.attendance.value) > 0
               ? [{
                   id: appointment.id,
                   kind: "CONSULTA",

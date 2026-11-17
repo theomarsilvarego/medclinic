@@ -606,13 +606,10 @@ export async function createSalesFromRequests(
       grouped.has("ULTRASSOM") ? tx.ultrasoundRequest.findMany({ where: { id: { in: grouped.get("ULTRASSOM") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
       grouped.has("INJETAVEL") ? tx.injectableRequest.findMany({ where: { id: { in: grouped.get("INJETAVEL") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } }, injectable: true } }) : [],
       grouped.has("PROCEDIMENTO") ? tx.procedureRequest.findMany({ where: { id: { in: grouped.get("PROCEDIMENTO") }, billingStatus: "A_FATURAR" }, include: { medicalRecord: { include: { appointment: { include: { patient: true, doctor: true } } } } } }) : [],
-      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO" }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
+      grouped.has("CONSULTA") ? tx.appointment.findMany({ where: { id: { in: grouped.get("CONSULTA") }, status: "ATENDIDO", itemType: "ATENDIMENTO", attendance: { value: { gt: 0 } } }, include: { patient: true, doctor: true, insurance: true, attendance: true, financialSales: { where: { status: { not: "CANCELED" } }, select: { id: true } } } }) : [],
       tx.procedure.findMany({ where: { type: "DIAGNOSTICO_POR_IMAGEM", active: true }, select: { name: true, value: true } }),
     ]);
-    const consultations = consultationAppointments.filter((appointment) =>
-      normalizeName(appointment.insurance.name).includes("particular") &&
-      normalizeName(appointment.attendance?.name || "").includes("consulta"),
-    );
+    const consultations = consultationAppointments;
     if (exams.length + ultrasounds.length + injectables.length + procedures.length + consultations.length !== requestCount)
       throw Object.assign(new Error("Uma ou mais solicitações já foram faturadas ou não estão disponíveis. Atualize a lista."), { status: 409 });
 
