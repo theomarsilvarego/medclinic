@@ -14,7 +14,7 @@
 ## Faturamento com pagamento fracionado
 - [x] Redefinir a tela de confirmação para permitir dividir o total entre uma ou mais formas de pagamento: Pix, débito, crédito e dinheiro.
 - [x] Exibir o valor total alocado, o saldo restante e uma barra de progresso da composição.
-- [x] Permitir adicionar, remover e editar pagamentos, incluindo a ação “Usar restante”.
+- [x] Permitir adicionar, remover e editar pagamentos sem o botão “Usar restante”.
 - [x] Exibir parcelamento de 1 a 12 vezes para pagamentos em crédito, com o resumo “x de R$ … sem juros”.
 - [x] Bloquear a confirmação enquanto a soma dos pagamentos não corresponder exatamente ao total a pagar.
 - [x] Manter o desconto de 5% apenas para uma forma Pix ou dinheiro e manter a criação existente de venda e recebível pendentes.

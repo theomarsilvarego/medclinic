@@ -41,7 +41,6 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
     if (changes.method && changes.method !== "PIX" && changes.method !== "CASH") setDiscountEnabled(false);
     setPayments((current) => current.map((payment) => payment.id === id ? { ...payment, ...changes } : payment));
   };
-  const useRemaining = (id: number) => updatePayment(id, { amount: remaining.toFixed(2) });
   const addPayment = () => {
     setDiscountEnabled(false);
     setPayments((current) => [...current, { id: Date.now(), method: "PIX", amount: remaining.toFixed(2), installments: 1 }]);
@@ -98,7 +97,6 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
                 <div className="secretary-payment-methods">{methodOptions.map(([value, label]) => <button type="button" key={value} className={payment.method === value ? "selected" : ""} onClick={() => updatePayment(payment.id, { method: value, installments: value === "CREDIT_CARD" ? Math.max(2, payment.installments) : 1 })} disabled={billingSelected}>{label}</button>)}</div>
                 <div className={`secretary-payment-fields${payment.method === "CREDIT_CARD" ? " with-installments" : ""}`}>
                   <label>Valor<input inputMode="decimal" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} disabled={billingSelected} aria-label={`Valor do pagamento ${index + 1}`} /></label>
-                  <button type="button" className="secretary-use-remaining" onClick={() => useRemaining(payment.id)} disabled={billingSelected || remaining <= 0}>Usar restante</button>
                   {payment.method === "CREDIT_CARD" && <label>Parcelas<select value={payment.installments} onChange={(event) => updatePayment(payment.id, { installments: Number(event.target.value) })} disabled={billingSelected}>{Array.from({ length: 12 }, (_, value) => value + 1).map((value) => <option key={value} value={value}>{value}x de {money(parseAmount(payment.amount) / value)} sem juros</option>)}</select></label>}
                 </div>
               </article>)}
