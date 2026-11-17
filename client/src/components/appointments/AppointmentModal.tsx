@@ -163,7 +163,12 @@ export function AppointmentModal({
         <div className="modal-header appointment-modal-header">
           <div>
             <h2>{initial.id ? "Editar agendamento" : "Novo agendamento"}</h2>
-            <span className="modal-identification-code" aria-label="Código do modal A001">A001</span>
+            <span
+              className="modal-identification-code"
+              aria-label="Código do modal A001"
+            >
+              A001
+            </span>
             <div className="appointment-context">
               <span>
                 <CalendarDays size={19} />
@@ -479,7 +484,7 @@ export function AppointmentModal({
                   <option value="AGENDADO">Agendado</option>
                   <option value="CONFIRMADO">Confirmado</option>
                   <option value="EM_ATENDIMENTO">Em atendimento</option>
-                  <option value="ATENDIDO">Atendido</option>
+
                   <option value="FALTOU">Faltou</option>
                 </select>
               </label>
