@@ -580,7 +580,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
 
 type BillingKind = "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA";
 type BillingSelection = { kind: BillingKind; id: number };
-type BillingPayment = { method: FinancialPaymentMethod; amount: number; installments: number };
+type BillingPayment = { method: FinancialPaymentMethod; amount: number; installments: number; paymentDate?: string };
 
 export async function createSalesFromRequests(
   prisma: PrismaClient,
@@ -704,10 +704,11 @@ export async function createSalesFromRequests(
           dueDate: saleDate,
           installmentCount: installments,
           preferredPaymentMethod: payments?.[0]?.method || paymentMethod,
-          paymentBreakdown: payments?.map(({ method, amount, installments: paymentInstallments }) => ({
+          paymentBreakdown: payments?.map(({ method, amount, installments: paymentInstallments, paymentDate }) => ({
             method,
             amount,
             installments: paymentInstallments,
+            paymentDate: paymentDate || saleDate.toISOString().slice(0, 10),
           })) as Prisma.InputJsonValue | undefined,
           status: FinancialStatus.PENDING,
           installments: { create: Array.from({ length: installments }, (_, index) => {

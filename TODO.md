@@ -20,3 +20,4 @@
 - [x] Manter o desconto de 5% apenas para uma forma Pix ou dinheiro e manter a criação existente de venda e recebível pendentes.
 - [x] Adaptar o endpoint de faturamento para aceitar a composição dos pagamentos sem quebrar requisições antigas.
 - [x] Exibir no ícone “Abrir resumo da cobrança” as formas, valores e parcelas usadas no faturamento, inclusive após a cobrança ser faturada.
+- [x] Permitir informar e armazenar no banco a data individual de cada pagamento fracionado e exibi-la no resumo.

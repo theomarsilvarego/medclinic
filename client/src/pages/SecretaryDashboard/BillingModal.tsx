@@ -4,8 +4,8 @@ import { money } from "../../lib/app";
 
 type RequestItem = { id: number; kind: "EXAME" | "ULTRASSOM" | "INJETAVEL" | "PROCEDIMENTO" | "CONSULTA"; category: string; title: string; amount: number | null };
 export type PaymentMethod = "PIX" | "DEBIT_CARD" | "CREDIT_CARD" | "CASH";
-export type SplitPayment = { method: PaymentMethod; amount: number; installments: number };
-type PaymentDraft = { id: number; method: PaymentMethod; amount: string; installments: number };
+export type SplitPayment = { method: PaymentMethod; amount: number; installments: number; paymentDate: string };
+type PaymentDraft = { id: number; method: PaymentMethod; amount: string; installments: number; paymentDate: string };
 type Props = { billingItems: RequestItem[]; billingItemKeys: string[]; setBillingItemKeys: React.Dispatch<React.SetStateAction<string[]>>; billingSelected: boolean; setError: (value: string) => void; discountEnabled: boolean; setDiscountEnabled: (value: boolean) => void; billableItems: RequestItem[]; billingSubtotal: number; billingDiscount: number; billingTotal: number; confirmBilling: (payments: SplitPayment[]) => void; close: () => void };
 
 const methodOptions: [PaymentMethod, string][] = [
@@ -24,10 +24,14 @@ function parseAmount(value: string) {
     : trimmed;
   return Number(normalized) || 0;
 }
+function localDate() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys, billingSelected, setError, discountEnabled, setDiscountEnabled, billableItems, billingSubtotal, billingDiscount, billingTotal, confirmBilling, close }: Props) {
   const requestKey = (item: RequestItem) => `${item.kind}:${item.id}`;
-  const [payments, setPayments] = useState<PaymentDraft[]>([{ id: 1, method: "PIX", amount: String(billingTotal.toFixed(2)), installments: 1 }]);
+  const [payments, setPayments] = useState<PaymentDraft[]>([{ id: 1, method: "PIX", amount: String(billingTotal.toFixed(2)), installments: 1, paymentDate: localDate() }]);
   const allocated = payments.reduce((sum, payment) => sum + parseAmount(payment.amount), 0);
   const remaining = Math.max(0, billingTotal - allocated);
   const isComplete = Math.abs(allocated - billingTotal) < 0.005;
@@ -43,7 +47,7 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
   };
   const addPayment = () => {
     setDiscountEnabled(false);
-    setPayments((current) => [...current, { id: Date.now(), method: "PIX", amount: remaining.toFixed(2), installments: 1 }]);
+    setPayments((current) => [...current, { id: Date.now(), method: "PIX", amount: remaining.toFixed(2), installments: 1, paymentDate: localDate() }]);
   };
   const removePayment = (id: number) => setPayments((current) => current.length > 1 ? current.filter((payment) => payment.id !== id) : current);
   const submit = () => {
@@ -55,7 +59,7 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
       setError("Informe um valor maior que zero para cada pagamento.");
       return;
     }
-    confirmBilling(payments.map(({ method, amount, installments }) => ({ method, amount: parseAmount(amount), installments })));
+    confirmBilling(payments.map(({ method, amount, installments, paymentDate }) => ({ method, amount: parseAmount(amount), installments, paymentDate })));
   };
 
   return (
@@ -97,6 +101,7 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
                 <div className="secretary-payment-methods">{methodOptions.map(([value, label]) => <button type="button" key={value} className={payment.method === value ? "selected" : ""} onClick={() => updatePayment(payment.id, { method: value, installments: value === "CREDIT_CARD" ? Math.max(2, payment.installments) : 1 })} disabled={billingSelected}>{label}</button>)}</div>
                 <div className={`secretary-payment-fields${payment.method === "CREDIT_CARD" ? " with-installments" : ""}`}>
                   <label>Valor<input inputMode="decimal" value={payment.amount} onChange={(event) => updatePayment(payment.id, { amount: event.target.value })} disabled={billingSelected} aria-label={`Valor do pagamento ${index + 1}`} /></label>
+                  <label>Data<input type="date" value={payment.paymentDate} onChange={(event) => updatePayment(payment.id, { paymentDate: event.target.value })} disabled={billingSelected} aria-label={`Data do pagamento ${index + 1}`} /></label>
                   {payment.method === "CREDIT_CARD" && <label>Parcelas<select value={payment.installments} onChange={(event) => updatePayment(payment.id, { installments: Number(event.target.value) })} disabled={billingSelected}>{Array.from({ length: 12 }, (_, value) => value + 1).map((value) => <option key={value} value={value}>{value}x de {money(parseAmount(payment.amount) / value)} sem juros</option>)}</select></label>}
                 </div>
               </article>)}

@@ -542,6 +542,7 @@ const secretaryBillingSchema = z.object({
     method: z.nativeEnum(FinancialPaymentMethod),
     amount: z.coerce.number().positive(),
     installments: z.coerce.number().int().min(1).max(12).default(1),
+    paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de pagamento inválida.").optional(),
   })).min(1).max(8).optional(),
   discountPercent: z.coerce.number().min(0).max(5).default(0),
   installments: z.coerce.number().int().min(1).max(12).default(1),
