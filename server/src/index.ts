@@ -5444,7 +5444,7 @@ function serializeCrmTreatment(item: any) {
   return {
     ...item,
     doseDates: item.doses.map((dose: any) =>
-      String(dose.doseDate).slice(0, 10),
+      new Date(dose.doseDate).toISOString().slice(0, 10),
     ),
     doseCount: item.doses.length,
   };

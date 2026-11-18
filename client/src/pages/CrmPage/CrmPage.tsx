@@ -346,6 +346,7 @@ export function CrmPage() {
                   <thead>
                     <tr>
                       <th>Paciente</th>
+                      <th>Contato</th>
                       <th>Produto / processo</th>
                       <th>Categoria</th>
                       <th>Doses / sessões</th>
@@ -360,6 +361,7 @@ export function CrmPage() {
                         <td>
                           <strong>{item.patient.fullName}</strong>
                         </td>
+                        <td>{item.patient.phone || "—"}</td>
                         <td>
                           {item.productName}
                           <small>
