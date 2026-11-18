@@ -21,3 +21,12 @@
 - [x] Adaptar o endpoint de faturamento para aceitar a composição dos pagamentos sem quebrar requisições antigas.
 - [x] Exibir no ícone “Abrir resumo da cobrança” as formas, valores e parcelas usadas no faturamento, inclusive após a cobrança ser faturada.
 - [x] Permitir informar e armazenar no banco a data individual de cada pagamento fracionado e exibi-la no resumo.
+
+## Pagamentos fracionados no módulo financeiro
+- [x] Permitir cadastrar uma venda manual com uma ou mais formas de pagamento, valores individuais, datas individuais e parcelamento no crédito.
+- [x] Validar no backend datas válidas, valores positivos, parcelamento somente no crédito e soma exata dos pagamentos contra o total líquido da venda.
+- [x] Persistir a composição em `FinancialReceivable.paymentBreakdown`, mantendo compatibilidade com vendas antigas que usam `paymentMethod` e `installments`.
+- [x] Exibir a composição das vendas e contas a receber nas listas de Financeiro, Vendas e Contas a pagar e receber.
+- [x] Manter as baixas individuais de recebíveis e pagáveis integradas ao Caixa, com forma, data e conta financeira em cada movimentação.
+- [x] Adicionar editor responsivo de pagamentos fracionados sem o botão “Usar restante”.
+- [ ] Aplicar a migration `20261117183000_payment_breakdown` em um ambiente com `DATABASE_URL` configurada.

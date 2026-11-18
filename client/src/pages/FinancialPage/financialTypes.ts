@@ -1,4 +1,5 @@
 export type FormMode = "movement" | "account" | "open-session" | "sale" | "payable";
+export type FinancialSplitPayment = { method: string; amount: string; date: string; installments: string };
 
 export type PaymentTarget = {
   kind: "receivable" | "payable";
@@ -29,4 +30,5 @@ export type FinancialForm = {
   toAccountId: string;
   closingAmount: string;
   idempotencyKey: string;
+  paymentBreakdown: FinancialSplitPayment[];
 };

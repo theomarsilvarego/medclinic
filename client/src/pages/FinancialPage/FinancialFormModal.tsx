@@ -1,7 +1,7 @@
 import React from "react";
-import { Check, X } from "lucide-react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 import type { Row } from "../../lib/app";
-import type { FinancialForm, FormMode } from "./financialTypes";
+import type { FinancialForm, FormMode, FinancialSplitPayment } from "./financialTypes";
 
 type Props = {
   formMode: FormMode | null;
@@ -30,6 +30,10 @@ export function FinancialFormModal({
 }: Props) {
   if (!formMode) return null;
   const change = (patch: Partial<FinancialForm>) => onChange(patch);
+  const payments = form.paymentBreakdown || [];
+  const updatePayment = (index: number, patch: Partial<FinancialSplitPayment>) => change({ paymentBreakdown: payments.map((payment, paymentIndex) => paymentIndex === index ? { ...payment, ...patch } : payment) });
+  const addPayment = () => change({ paymentBreakdown: [...payments, { method: "PIX", amount: "", date: form.date, installments: "1" }] });
+  const removePayment = (index: number) => change({ paymentBreakdown: payments.filter((_, paymentIndex) => paymentIndex !== index) });
   const title = formMode === "sale"
     ? "Nova venda"
     : formMode === "payable"
@@ -144,22 +148,19 @@ export function FinancialFormModal({
                       <label>Vencimento<input required type="date" value={form.dueDate} onChange={(event) => change({ dueDate: event.target.value })} /></label>
                     </div>
                     <div className="financial-form-grid">
-                      <label>
-                        Parcelas
-                        <select value={form.installments} onChange={(event) => change({ installments: event.target.value })}>
-                          {Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}x</option>)}
-                        </select>
-                      </label>
-                      <label>
-                        Forma prevista
-                        <select value={form.method} onChange={(event) => change({ method: event.target.value })}>
-                          <option value="PIX">Pix</option>
-                          <option value="DEBIT_CARD">Débito</option>
-                          <option value="CREDIT_CARD">Crédito</option>
-                          <option value="CASH">Dinheiro</option>
-                          <option value="BANK_TRANSFER">Transferência</option>
-                        </select>
-                      </label>
+                      <label>Parcelas<select value={form.installments} onChange={(event) => change({ installments: event.target.value })}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}x</option>)}</select></label>
+                      <label>Forma prevista<select value={form.method} onChange={(event) => change({ method: event.target.value })}><option value="PIX">Pix</option><option value="DEBIT_CARD">Débito</option><option value="CREDIT_CARD">Crédito</option><option value="CASH">Dinheiro</option><option value="BANK_TRANSFER">Transferência</option></select></label>
+                    </div>
+                    <div className="financial-split-section">
+                      <div className="financial-split-heading"><div><h4>Pagamentos fracionados</h4><small>Distribua o total entre formas, valores e datas diferentes.</small></div><button type="button" className="secondary financial-split-add" onClick={addPayment}><Plus size={15} /> Adicionar</button></div>
+                      {payments.map((payment, index) => <div className="financial-split-row" key={`${index}-${payment.method}`}>
+                        <strong>{index + 1}</strong>
+                        <select aria-label={`Forma do pagamento ${index + 1}`} value={payment.method} onChange={(event) => updatePayment(index, { method: event.target.value, installments: event.target.value === "CREDIT_CARD" ? payment.installments : "1" })}><option value="PIX">Pix</option><option value="DEBIT_CARD">Débito</option><option value="CREDIT_CARD">Crédito</option><option value="CASH">Dinheiro</option><option value="BANK_TRANSFER">Transferência</option></select>
+                        <input required aria-label={`Valor do pagamento ${index + 1}`} type="number" min="0.01" step="0.01" placeholder="Valor" value={payment.amount} onChange={(event) => updatePayment(index, { amount: event.target.value })} />
+                        <input required aria-label={`Data do pagamento ${index + 1}`} type="date" value={payment.date} onChange={(event) => updatePayment(index, { date: event.target.value })} />
+                        {payment.method === "CREDIT_CARD" && <select aria-label={`Parcelas do pagamento ${index + 1}`} value={payment.installments} onChange={(event) => updatePayment(index, { installments: event.target.value })}>{Array.from({ length: 12 }, (_, installment) => <option key={installment + 1} value={installment + 1}>{installment + 1}x</option>)}</select>}
+                        {payments.length > 1 && <button type="button" className="icon-button" onClick={() => removePayment(index)} aria-label={`Remover pagamento ${index + 1}`}><Trash2 size={15} /></button>}
+                      </div>)}
                     </div>
                   </>
                 )}

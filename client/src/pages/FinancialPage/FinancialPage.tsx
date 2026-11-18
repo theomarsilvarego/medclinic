@@ -39,6 +39,8 @@ const localDate = () => { const now = new Date(); return `${now.getFullYear()}-$
 const makeIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `mc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const displayDate = (value?: string) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—";
 const getError = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir a operação.";
+const defaultPaymentBreakdown = (date: string) => [{ method: "PIX", amount: "", date, installments: "1" }];
+const splitLabel = (breakdown: any) => Array.isArray(breakdown) && breakdown.length ? ` · ${breakdown.map((payment: any) => `${methodLabel[payment.method] || payment.method} ${money(Number(payment.amount || 0))}${payment.installments > 1 ? ` ${payment.installments}x` : ""}`).join(" + ")}` : "";
 
 export function FinancialPage({ module }: { module: FinancialModule }) {
   const config = pageConfig[module];
@@ -62,7 +64,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
   const [accountsTab, setAccountsTab] = useState<"receber" | "pagar">("receber");
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [settlement, setSettlement] = useState<PaymentTarget | null>(null);
-  const [form, setForm] = useState<FinancialForm>({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: "", accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: "", toAccountId: "", closingAmount: "", idempotencyKey: makeIdempotencyKey() });
+  const [form, setForm] = useState<FinancialForm>({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: "", accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: "", toAccountId: "", closingAmount: "", idempotencyKey: makeIdempotencyKey(), paymentBreakdown: defaultPaymentBreakdown(localDate()) });
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -106,7 +108,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
   }, [settlement]);
 
   const entries = useMemo<Entry[]>(() => {
-    if (module === "sales" || module === "finance") return sales.map((row) => ({ id: row.id, description: `${row.code} · ${row.serviceDescription}`, person: row.patient?.fullName || "—", date: row.saleDate, status: statusLabel[row.status] || row.status, value: Number(row.totalAmount || 0), paid: Number(row.receivable?.paidAmount || 0), balance: Math.max(0, Number(row.totalAmount || 0) - Number(row.receivable?.paidAmount || 0)), kind: "Venda", raw: row }));
+    if (module === "sales" || module === "finance") return sales.map((row) => ({ id: row.id, description: `${row.code} · ${row.serviceDescription}${splitLabel(row.receivable?.paymentBreakdown)}`, person: row.patient?.fullName || "—", date: row.saleDate, status: statusLabel[row.status] || row.status, value: Number(row.totalAmount || 0), paid: Number(row.receivable?.paidAmount || 0), balance: Math.max(0, Number(row.totalAmount || 0) - Number(row.receivable?.paidAmount || 0)), kind: "Venda", raw: row }));
     if (module === "accounts") {
       const rows = accountsTab === "receber" ? receivables : payables;
       return rows.map((row) => {
@@ -117,7 +119,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
         const lastPayment = row.payments?.[0];
         const person = isReceivable ? row.sale?.patient?.fullName || "—" : row.supplier?.name || row.supplier?.legalName || "—";
         const latestPayment = lastPayment ? ` · ${methodLabel[lastPayment.method] || lastPayment.method} ${displayDate(lastPayment.paymentDate)}` : "";
-        return { id: row.id, description: isReceivable ? `${row.sale?.code || "Venda"} · ${row.sale?.serviceDescription || "Serviço"}` : row.description, person: `${person}${latestPayment}`, date: row.dueDate, status, value: total, paid, balance: Math.max(0, total - paid), kind: isReceivable ? "A receber" : "A pagar", raw: row };
+        return { id: row.id, description: `${isReceivable ? `${row.sale?.code || "Venda"} · ${row.sale?.serviceDescription || "Serviço"}` : row.description}${splitLabel(row.paymentBreakdown)}`, person: `${person}${latestPayment}`, date: row.dueDate, status, value: total, paid, balance: Math.max(0, total - paid), kind: isReceivable ? "A receber" : "A pagar", raw: row };
       });
     }
     return movements.map((row) => ({ id: row.id, description: row.description, person: row.account?.name || "—", date: row.movementDate, status: movementLabel[row.type] || row.type, value: Number(row.amount || 0), kind: row.type, method: row.originType, raw: row }));
@@ -141,7 +143,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
 
   function openForm(mode: FormMode) {
     setError("");
-    setForm({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: String(accounts[0]?.id || ""), accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: String(accounts[0]?.id || ""), toAccountId: String(accounts[1]?.id || ""), closingAmount: "", idempotencyKey: makeIdempotencyKey() });
+    setForm({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: String(accounts[0]?.id || ""), accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: String(accounts[0]?.id || ""), toAccountId: String(accounts[1]?.id || ""), closingAmount: "", idempotencyKey: makeIdempotencyKey(), paymentBreakdown: defaultPaymentBreakdown(localDate()) });
     setFormMode(mode);
   }
   async function submitForm(event: React.FormEvent) {
@@ -156,7 +158,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
           : { kind: form.kind, accountId: Number(form.accountId), amount: Number(form.value), movementDate: form.date, description: form.description, idempotencyKey: form.idempotencyKey };
         await request("/financial/movements", { method: "POST", body: JSON.stringify(body) });
       }
-      if (formMode === "sale") await request("/financial/sales", { method: "POST", body: JSON.stringify({ serviceDescription: form.description, patientId: Number(form.patientId), professionalId: Number(form.professionalId), saleDate: form.date, dueDate: form.dueDate, amount: Number(form.value), discountAmount: Number(form.discountAmount || 0), installments: Number(form.installments), paymentMethod: form.method, idempotencyKey: form.idempotencyKey }) });
+      if (formMode === "sale") await request("/financial/sales", { method: "POST", body: JSON.stringify({ serviceDescription: form.description, patientId: Number(form.patientId), professionalId: Number(form.professionalId), saleDate: form.date, dueDate: form.dueDate, amount: Number(form.value), discountAmount: Number(form.discountAmount || 0), installments: Number(form.installments), paymentMethod: form.method, payments: form.paymentBreakdown.map((payment) => ({ method: payment.method, amount: Number(payment.amount), installments: Number(payment.installments), paymentDate: payment.date })), idempotencyKey: form.idempotencyKey }) });
       if (formMode === "payable") await request("/financial/payables", { method: "POST", body: JSON.stringify({ description: form.description, category: form.category, supplierId: Number(form.supplierId), amount: Number(form.value), dueDate: form.dueDate, idempotencyKey: form.idempotencyKey }) });
       setFormMode(null); await reload();
     } catch (cause) { setError(getError(cause)); }

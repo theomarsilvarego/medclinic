@@ -38,6 +38,7 @@ const saleSchema = z.object({
   discountAmount: z.coerce.number().finite().min(0).default(0),
   installments: z.coerce.number().int().min(1).max(12).default(1),
   paymentMethod: paymentMethodSchema.optional(),
+  payments: z.array(z.object({ method: paymentMethodSchema, amount: positiveMoney, installments: z.coerce.number().int().min(1).max(12).default(1), paymentDate: dateSchema })).min(1).max(8).optional(),
   idempotencyKey: z.string().trim().min(8).max(100).optional(),
 });
 const paymentSchema = z.object({
@@ -205,7 +206,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
       ...(from || to ? { saleDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       ...(typeof req.query.status === "string" && Object.values(FinancialStatus).includes(req.query.status as FinancialStatus) ? { status: req.query.status as FinancialStatus } : {}),
     };
-    res.json(await prisma.financialSale.findMany({ where, include: { patient: { select: { id: true, fullName: true } }, professional: { select: { id: true, fullName: true } }, items: true, receivable: { select: { id: true, totalAmount: true, paidAmount: true, status: true } } }, orderBy: [{ saleDate: "desc" }, { id: "desc" }], take: 500 }));
+    res.json(await prisma.financialSale.findMany({ where, include: { patient: { select: { id: true, fullName: true } }, professional: { select: { id: true, fullName: true } }, items: true, receivable: { select: { id: true, totalAmount: true, paidAmount: true, status: true, paymentBreakdown: true } } }, orderBy: [{ saleDate: "desc" }, { id: "desc" }], take: 500 }));
   }));
 
   router.post("/sales", asyncRoute(async (req, res) => {
@@ -219,6 +220,13 @@ export function createFinancialRouter(prisma: PrismaClient) {
     if (discountCents > grossCents) return res.status(400).json({ message: "O desconto não pode superar o valor da venda." });
     const totalCents = grossCents - discountCents;
     if (totalCents <= 0) return res.status(400).json({ message: "O total da venda após o desconto deve ser maior que zero." });
+    const payments = parsed.data.payments;
+    if (payments) {
+      const allocatedCents = payments.reduce((sum, payment) => sum + cents(payment.amount), 0);
+      if (allocatedCents !== totalCents) return res.status(400).json({ message: "A soma dos pagamentos deve ser exatamente igual ao total da venda." });
+      for (const payment of payments) if (!validatedDate(payment.paymentDate)) return res.status(400).json({ message: "Informe datas válidas para os pagamentos." });
+      if (payments.some((payment) => payment.installments > 1 && payment.method !== FinancialPaymentMethod.CREDIT_CARD)) return res.status(400).json({ message: "Parcelamento está disponível somente para cartão de crédito." });
+    }
     try {
       const sale = await prisma.$transaction(async (tx) => {
         const [patient, doctor] = await Promise.all([
@@ -236,7 +244,9 @@ export function createFinancialRouter(prisma: PrismaClient) {
           items: { create: [{ sourceType: "MANUAL", description: parsed.data.serviceDescription, amount: decimal(totalCents) }] },
           receivable: { create: {
             totalAmount: decimal(totalCents), dueDate, installmentCount: parsed.data.installments,
-            preferredPaymentMethod: parsed.data.paymentMethod, status: FinancialStatus.PENDING,
+            preferredPaymentMethod: payments?.[0]?.method || parsed.data.paymentMethod,
+            paymentBreakdown: payments?.map((payment) => ({ method: payment.method, amount: payment.amount, installments: payment.installments, paymentDate: payment.paymentDate })) as Prisma.InputJsonValue | undefined,
+            status: FinancialStatus.PENDING,
             installments: { create: Array.from({ length: parsed.data.installments }, (_, index) => {
               const dueMonth = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + index, 1));
               const day = Math.min(dueDate.getUTCDate(), new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate());
