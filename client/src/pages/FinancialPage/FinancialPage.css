@@ -107,6 +107,50 @@
   background: #fbf2dc;
   color: #a97928;
 }
+.financial-forecast-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: -10px 0 24px;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fffaf9;
+}
+.financial-forecast-panel > div:first-child {
+  display: grid;
+  flex: 1 1 230px;
+  gap: 4px;
+}
+.financial-forecast-panel strong {
+  color: #4e3d43;
+  font-size: 12px;
+}
+.financial-forecast-panel small,
+.financial-forecast-panel span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.financial-forecast-panel > span {
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #f8ecef;
+}
+.financial-forecast-panel > span b {
+  color: var(--brand);
+}
+.financial-forecast-list {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  padding-top: 10px;
+  border-top: 1px solid #f0e6e8;
+}
+.financial-forecast-list strong {
+  flex-basis: 100%;
+}
 .financial-summary-trend {
   display: inline-flex;
   align-items: center;

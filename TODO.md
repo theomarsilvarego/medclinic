@@ -30,3 +30,10 @@
 - [x] Manter as baixas individuais de recebíveis e pagáveis integradas ao Caixa, com forma, data e conta financeira em cada movimentação.
 - [x] Adicionar editor responsivo de pagamentos fracionados sem o botão “Usar restante”.
 - [ ] Aplicar a migration `20261117183000_payment_breakdown` em um ambiente com `DATABASE_URL` configurada.
+
+## Recebíveis fracionados e repasse
+- [x] Gerar um recebível operacional por componente da venda: Pix de R$ 300,00 e crédito 2x como duas parcelas de R$ 100,00.
+- [x] Permitir confirmar cada componente individualmente, vinculando a baixa ao recebível/parcela correto.
+- [x] Mostrar no Caixa somente confirmações efetivadas no saldo e exibir componentes pendentes como “Previsto” e “Aguarda repasse”.
+- [x] Exibir no Financeiro o faturado, o recebido, a receber, a composição por forma e as entradas previstas por data.
+- [ ] Aplicar também a migration `20261118143000_receivable_payment_method` em um ambiente com `DATABASE_URL` configurada.

@@ -24,7 +24,7 @@ import type { FinancialForm, FormMode, PaymentTarget } from "./financialTypes";
 import "./FinancialPage.css";
 
 type FinancialModule = Extract<ModuleKey, "finance" | "cash" | "accounts" | "sales">;
-type Entry = { id: number; description: string; person: string; date: string; status: string; value: number; paid?: number; balance?: number; kind?: string; method?: string; raw: Row };
+type Entry = { id: number; description: string; person: string; date: string; status: string; value: number; paid?: number; balance?: number; kind?: string; method?: string; installmentId?: number; paymentMethod?: string; raw: Row };
 
 const pageConfig: Record<FinancialModule, { eyebrow: string; title: string; description: string; icon: React.ComponentType<{ size?: number }>; action: string; empty: string; headers: string[] }> = {
   finance: { eyebrow: "GESTÃO FINANCEIRA", title: "Financeiro", description: "Acompanhe vendas, recebimentos, despesas e saldos por conta.", icon: CircleDollarSign, action: "", empty: "Ainda não há vendas ou movimentações financeiras.", headers: ["Origem", "Paciente / origem", "Data", "Status", "Valor"] },
@@ -73,7 +73,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
       const promises: Promise<any>[] = [request(`/financial/summary?days=${period}`), request("/financial/accounts")];
       if (module === "sales" || module === "finance") promises.push(request("/financial/sales"));
       if (module === "accounts") promises.push(request("/financial/receivables"), request("/financial/payables"), request("/admin/suppliers"), request("/financial/cash-sessions"));
-      if (module === "cash") promises.push(request("/financial/movements"), request("/financial/cash-sessions"));
+      if (module === "cash") promises.push(request("/financial/movements"), request("/financial/cash-sessions"), request("/financial/receivables"));
       if (module === "sales") promises.push(request("/patients"), request("/admin/doctors"));
       const results = await Promise.all(promises);
       let index = 0;
@@ -89,6 +89,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
       if (module === "cash") {
         setMovements(results[index++] || []);
         setSessions(results[index++] || []);
+        setReceivables(results[index++] || []);
       }
       if (module === "sales") {
         setPatients(results[index++] || []);
@@ -111,7 +112,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
     if (module === "sales" || module === "finance") return sales.map((row) => ({ id: row.id, description: `${row.code} · ${row.serviceDescription}${splitLabel(row.receivable?.paymentBreakdown)}`, person: row.patient?.fullName || "—", date: row.saleDate, status: statusLabel[row.status] || row.status, value: Number(row.totalAmount || 0), paid: Number(row.receivable?.paidAmount || 0), balance: Math.max(0, Number(row.totalAmount || 0) - Number(row.receivable?.paidAmount || 0)), kind: "Venda", raw: row }));
     if (module === "accounts") {
       const rows = accountsTab === "receber" ? receivables : payables;
-      return rows.map((row) => {
+      return rows.flatMap((row) => {
         const isReceivable = accountsTab === "receber";
         const total = Number(isReceivable ? row.totalAmount : row.amount || 0);
         const paid = Number(row.paidAmount || 0);
@@ -119,10 +120,20 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
         const lastPayment = row.payments?.[0];
         const person = isReceivable ? row.sale?.patient?.fullName || "—" : row.supplier?.name || row.supplier?.legalName || "—";
         const latestPayment = lastPayment ? ` · ${methodLabel[lastPayment.method] || lastPayment.method} ${displayDate(lastPayment.paymentDate)}` : "";
-        return { id: row.id, description: `${isReceivable ? `${row.sale?.code || "Venda"} · ${row.sale?.serviceDescription || "Serviço"}` : row.description}${splitLabel(row.paymentBreakdown)}`, person: `${person}${latestPayment}`, date: row.dueDate, status, value: total, paid, balance: Math.max(0, total - paid), kind: isReceivable ? "A receber" : "A pagar", raw: row };
+        if (!isReceivable || !row.installments?.length) return [{ id: row.id, description: `${isReceivable ? `${row.sale?.code || "Venda"} · ${row.sale?.serviceDescription || "Serviço"}` : row.description}${splitLabel(row.paymentBreakdown)}`, person: `${person}${latestPayment}`, date: row.dueDate, status, value: total, paid, balance: Math.max(0, total - paid), kind: isReceivable ? "A receber" : "A pagar", raw: row }];
+        return row.installments.map((installment: Row) => {
+          const installmentAmount = Number(installment.amount || 0);
+          const installmentPaid = Number(installment.paidAmount || 0);
+          const installmentStatus = statusLabel[installment.status] || installment.status;
+          const method = installment.paymentMethod || row.preferredPaymentMethod;
+          const label = installmentAmount === total && !row.installments?.length ? "" : ` · ${methodLabel[method] || "Pagamento"}${row.installments.length > 1 ? ` · Parcela ${installment.number}/${row.installments.length}` : ""}`;
+          return { id: row.id, installmentId: installment.id, paymentMethod: method, description: `${row.sale?.code || "Venda"} · ${row.sale?.serviceDescription || "Serviço"}${label}`, person, date: installment.dueDate, status: installmentStatus, value: installmentAmount, paid: installmentPaid, balance: Math.max(0, installmentAmount - installmentPaid), kind: "A receber", raw: row };
+        });
       });
     }
-    return movements.map((row) => ({ id: row.id, description: row.description, person: row.account?.name || "—", date: row.movementDate, status: movementLabel[row.type] || row.type, value: Number(row.amount || 0), kind: row.type, method: row.originType, raw: row }));
+    const confirmed = movements.map((row) => ({ id: row.id, description: row.description, person: row.account?.name || "—", date: row.movementDate, status: "Confirmado", value: Number(row.amount || 0), kind: row.type, method: row.originType, raw: row }));
+    const forecast = module === "cash" ? receivables.flatMap((row) => (row.installments || []).filter((item: Row) => Number(item.amount || 0) > Number(item.paidAmount || 0)).map((item: Row) => ({ id: row.id, installmentId: item.id, description: `${row.sale?.code || "Venda"} · ${methodLabel[item.paymentMethod] || "Pagamento"}${row.installments.length > 1 ? ` · Parcela ${item.number}/${row.installments.length}` : ""}`, person: row.sale?.patient?.fullName || "—", date: item.dueDate, status: "Previsto", value: Number(item.amount) - Number(item.paidAmount || 0), kind: "PREVISTO", method: item.paymentMethod, raw: { ...row, forecast: true } }))) : [];
+    return [...confirmed, ...forecast];
   }, [accountsTab, module, movements, payables, receivables, sales]);
 
   const periodStart = Date.now() - Number(period) * 86_400_000;
@@ -138,7 +149,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
   const cashIn = Number(summary.cashIn || 0);
   const cashOut = Number(summary.cashOut || 0);
   const currentBalance = (summary.accounts || []).reduce((sum: number, account: Row) => sum + Number(account.balance || 0), 0);
-  const mainTotal = module === "sales" ? totalSales : module === "cash" ? currentBalance : module === "accounts" ? Number(accountsTab === "receber" ? summary.receivablesOutstanding : summary.payablesOutstanding || 0) : Number(summary.netCashFlow || 0);
+  const mainTotal = module === "sales" || module === "finance" ? totalSales : module === "cash" ? currentBalance : module === "accounts" ? Number(accountsTab === "receber" ? summary.receivablesOutstanding : summary.payablesOutstanding || 0) : Number(summary.netCashFlow || 0);
   const outstandingCount = entries.filter((entry) => entry.status === "Pendente" || entry.status === "Parcial").length;
 
   function openForm(mode: FormMode) {
@@ -170,10 +181,14 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
     setSaving(true); setError("");
     try {
       const endpoint = settlement.kind === "receivable" ? "receivables" : "payables";
-      await request(`/financial/${endpoint}/${settlement.id}/payments`, { method: "POST", body: JSON.stringify({ amount: Number(form.value), accountId: Number(form.accountId), paymentDate: form.date, method: form.method, idempotencyKey: settlement.idempotencyKey }) });
+      await request(`/financial/${endpoint}/${settlement.id}/payments`, { method: "POST", body: JSON.stringify({ amount: Number(form.value), accountId: Number(form.accountId), paymentDate: form.date, method: form.method, installmentId: settlement.installmentId, idempotencyKey: settlement.idempotencyKey }) });
       setSettlement(null); await reload();
     } catch (cause) { setError(getError(cause)); }
     finally { setSaving(false); }
+  }
+  function beginSettlement(target: { kind: "receivable" | "payable"; id: number; description: string; balance: number; installmentId?: number; paymentMethod?: string }) {
+    setSettlement({ ...target, idempotencyKey: makeIdempotencyKey() });
+    setForm((current) => ({ ...current, value: target.balance.toFixed(2), accountId: String(accounts[0]?.id || ""), date: localDate(), method: target.paymentMethod || "PIX" }));
   }
   async function closeSession(session: Row) {
     const counted = window.prompt("Informe o valor contado no fechamento do caixa:");
@@ -199,10 +214,12 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
 
     <section className="financial-summary" aria-label="Resumo financeiro">
       <article className="financial-summary-card financial-summary-main"><span className="financial-summary-icon"><Icon size={20} /></span><div><small>{module === "sales" ? "Vendas no período" : module === "cash" ? "Saldo total em contas" : module === "accounts" ? accountsTab === "receber" ? "Saldo a receber" : "Saldo a pagar" : "Fluxo de caixa líquido"}</small><strong>{loading ? "—" : money(mainTotal)}</strong></div></article>
-      <article className="financial-summary-card"><span className="financial-summary-icon soft-green"><ArrowDownLeft size={19} /></span><div><small>Entradas realizadas</small><strong>{loading ? "—" : money(cashIn)}</strong></div></article>
+      <article className="financial-summary-card"><span className="financial-summary-icon soft-green"><ArrowDownLeft size={19} /></span><div><small>{module === "finance" ? "Recebido" : "Entradas realizadas"}</small><strong>{loading ? "—" : money(module === "finance" ? Number(summary.receivedTotal || 0) : cashIn)}</strong></div></article>
       <article className="financial-summary-card"><span className="financial-summary-icon soft-red"><ArrowUpRight size={19} /></span><div><small>Saídas realizadas</small><strong>{loading ? "—" : money(cashOut)}</strong></div></article>
       <article className="financial-summary-card"><span className="financial-summary-icon soft-gold"><Clock3 size={19} /></span><div><small>{module === "accounts" ? "Em aberto" : "Pendências"}</small><strong>{loading ? "—" : module === "accounts" ? outstandingCount : Number(summary.receivablesOpenCount || 0) + Number(summary.payablesOpenCount || 0)}</strong></div></article>
     </section>
+
+    {module === "finance" && <section className="financial-forecast-panel"><div><strong>Composição por forma de pagamento</strong><small>Distribuição do faturamento pelas formas cadastradas.</small></div>{Object.entries((summary.paymentMethodBreakdown || {}) as Record<string, number>).map(([method, amount]) => <span key={method}><b>{methodLabel[method] || method}</b> {money(Number(amount))} ({totalSales ? Math.round(Number(amount) / totalSales * 100) : 0}%)</span>)}<div className="financial-forecast-list"><strong>Entradas previstas</strong>{((summary.receivablesForecast || []) as Row[]).slice(0, 6).map((item, index) => <span key={`${item.dueDate}-${item.method}-${index}`}>{displayDate(item.dueDate)} · {methodLabel[item.method] || item.method} · {money(Number(item.amount))}</span>)}</div></section>}
 
     {module === "cash" && <section className="financial-shortcuts" aria-label="Saldos de contas">{(summary.accounts || []).length ? (summary.accounts as Row[]).map((account) => <div key={account.id}><Landmark size={18} /><div><strong>{account.name}</strong><small>{account.type === "CASH" ? "Caixa físico" : account.type === "BANK" ? "Conta bancária" : "Outra conta"} · Saldo {money(Number(account.balance || 0))}</small></div></div>) : <div><Landmark size={18} /><div><strong>Cadastre uma conta financeira</strong><small>Separe caixa físico, bancos e outras contas.</small></div></div>}</section>}
     {module === "cash" && sessions.filter((session) => session.status === "ABERTA").map((session) => <div className="success page-success" role="status" key={session.id}>Caixa aberto · {session.account?.name} · Abertura {money(Number(session.openingAmount || 0))}<button className="secondary" type="button" onClick={() => void closeSession(session)}>Fechar caixa</button></div>)}
@@ -215,7 +232,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
         <label className="financial-filter"><Filter size={15} /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="TODOS">Todos os status</option><option value="Pendente">Pendentes</option><option value="Parcial">Parciais</option><option value="Pago">Pagos</option><option value="Cancelado">Cancelados</option></select></label>
       </div>
       <div className="financial-table-wrap">
-        {loading ? <div className="financial-empty" role="status">Carregando dados financeiros…</div> : filtered.length === 0 ? <div className="financial-empty"><span><Icon size={25} /></span><strong>{config.empty}</strong><p>Os dados desta tela são carregados do razão financeiro.</p>{module === "sales" && <button className="secondary" type="button" onClick={() => openForm("sale")}><FilePlus2 size={16} /> Nova venda</button>}</div> : <table className="financial-table"><thead><tr>{config.headers.map((header) => <th key={header}>{header}</th>)}{(module === "accounts" || module === "cash") && <th>Ações</th>}</tr></thead><tbody>{filtered.map((entry) => <tr key={`${entry.kind}-${entry.id}`}><td><strong>{entry.description}</strong>{module === "accounts" && entry.paid ? <small className="financial-row-subtitle">Pago {money(entry.paid)} de {money(entry.value)}</small> : null}</td><td>{entry.person}</td><td>{displayDate(entry.date)}</td><td><span className={`financial-status ${entry.status === "Pago" || entry.status === "Entrada" || entry.status === "Suprimento" ? "confirmed" : entry.status === "Cancelado" || entry.status === "Saída" || entry.status === "Sangria" ? "pending" : "pending"}`}>{entry.status}</span></td><td><strong>{money(module === "accounts" ? Number(entry.balance || 0) : entry.value)}</strong></td>{(module === "accounts" || module === "cash") && <td>{module === "accounts" && entry.balance! > 0 && (entry.status === "Pendente" || entry.status === "Parcial") ? <button className="secondary financial-row-action" type="button" onClick={() => { setSettlement({ kind: accountsTab === "receber" ? "receivable" : "payable", id: entry.id, description: entry.description, balance: Number(entry.balance) }); setForm({ ...form, value: String(Number(entry.balance).toFixed(2)), accountId: String(accounts[0]?.id || ""), date: localDate(), method: "PIX" }); }}>Baixar</button> : module === "cash" ? <small>{entry.raw.originType || "—"}</small> : "—"}</td>}</tr>)}</tbody></table>}
+        {loading ? <div className="financial-empty" role="status">Carregando dados financeiros…</div> : filtered.length === 0 ? <div className="financial-empty"><span><Icon size={25} /></span><strong>{config.empty}</strong><p>Os dados desta tela são carregados do razão financeiro.</p>{module === "sales" && <button className="secondary" type="button" onClick={() => openForm("sale")}><FilePlus2 size={16} /> Nova venda</button>}</div> : <table className="financial-table"><thead><tr>{config.headers.map((header) => <th key={header}>{header}</th>)}{(module === "accounts" || module === "cash" || module === "sales") && <th>Ações</th>}</tr></thead><tbody>{filtered.map((entry) => <tr key={`${entry.kind}-${entry.id}-${entry.installmentId || "sale"}`}><td><strong>{entry.description}</strong>{module === "accounts" && entry.paid ? <small className="financial-row-subtitle">Pago {money(entry.paid)} de {money(entry.value)}</small> : null}</td><td>{entry.person}</td><td>{displayDate(entry.date)}</td><td><span className={`financial-status ${entry.status === "Pago" || entry.status === "Confirmado" ? "confirmed" : "pending"}`}>{entry.status}</span></td><td><strong>{money(module === "accounts" ? Number(entry.balance || 0) : entry.value)}</strong></td>{(module === "accounts" || module === "cash" || module === "sales") && <td>{module === "sales" ? <div className="financial-payment-actions">{(entry.raw.receivable?.installments || []).filter((item: Row) => Number(item.amount || 0) > Number(item.paidAmount || 0)).map((item: Row) => <button key={item.id} className="secondary financial-row-action" type="button" onClick={() => beginSettlement({ kind: "receivable", id: entry.raw.receivable.id, installmentId: item.id, description: `${entry.raw.code} · ${methodLabel[item.paymentMethod] || "Pagamento"}${entry.raw.receivable.installments.length > 1 ? ` · Parcela ${item.number}/${entry.raw.receivable.installments.length}` : ""}`, balance: Number(item.amount) - Number(item.paidAmount || 0), paymentMethod: item.paymentMethod })}>Confirmar {methodLabel[item.paymentMethod] || "pagamento"}{entry.raw.receivable.installments.length > 1 ? ` ${item.number}/${entry.raw.receivable.installments.length}` : ""}</button>)}</div> : module === "accounts" && entry.balance! > 0 && (entry.status === "Pendente" || entry.status === "Parcial") ? <button className="secondary financial-row-action" type="button" onClick={() => beginSettlement({ kind: accountsTab === "receber" ? "receivable" : "payable", id: entry.id, installmentId: entry.installmentId, description: entry.description, balance: Number(entry.balance), paymentMethod: entry.paymentMethod })}>Confirmar</button> : module === "cash" ? <small>{entry.raw.forecast ? "Aguarda repasse" : entry.raw.originType || "—"}</small> : "—"}</td>}</tr>)}</tbody></table>}
       </div>
     </section>
 

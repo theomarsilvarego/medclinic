@@ -6,6 +6,8 @@ export type PaymentTarget = {
   id: number;
   description: string;
   balance: number;
+  installmentId?: number;
+  paymentMethod?: string;
   idempotencyKey?: string;
 };
 

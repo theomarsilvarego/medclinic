@@ -141,12 +141,13 @@ export function createFinancialRouter(prisma: PrismaClient) {
   router.get("/summary", asyncRoute(async (req, res) => {
     const days = Math.min(365, Math.max(1, Number(req.query.days || 30)));
     const from = new Date(Date.now() - days * 86_400_000);
-    const [accounts, movements, sales, receivables, payables] = await Promise.all([
+    const [accounts, movements, sales, receivables, payables, receivableInstallments] = await Promise.all([
       prisma.financialAccount.findMany({ where: { active: true }, include: { movements: { select: { type: true, amount: true } } }, orderBy: { id: "asc" } }),
       prisma.financialMovement.findMany({ where: { movementDate: { gte: new Date(from.toISOString().slice(0, 10) + "T00:00:00.000Z") } }, select: { type: true, amount: true } }),
       prisma.financialSale.aggregate({ where: { saleDate: { gte: new Date(from.toISOString().slice(0, 10) + "T00:00:00.000Z") }, status: { not: FinancialStatus.CANCELED } }, _sum: { totalAmount: true } }),
       prisma.financialReceivable.findMany({ where: { status: { not: FinancialStatus.CANCELED } }, select: { totalAmount: true, paidAmount: true } }),
       prisma.financialPayable.findMany({ where: { status: { not: FinancialStatus.CANCELED } }, select: { amount: true, paidAmount: true } }),
+      prisma.financialReceivableInstallment.findMany({ where: { receivable: { status: { not: FinancialStatus.CANCELED } } }, select: { amount: true, paidAmount: true, dueDate: true, paymentMethod: true, status: true }, orderBy: { dueDate: "asc" }, take: 1000 }),
     ]);
     const accountBalances = accounts.map(({ movements: rows, ...account }) => ({
       id: account.id,
@@ -156,12 +157,22 @@ export function createFinancialRouter(prisma: PrismaClient) {
     }));
     const revenue = movements.filter((item) => isRevenue(item.type)).reduce((sum, item) => sum + Number(item.amount), 0);
     const expenses = movements.filter((item) => isExpense(item.type)).reduce((sum, item) => sum + Number(item.amount), 0);
+    const paymentMethodBreakdown = receivableInstallments.reduce<Record<string, number>>((result, item) => {
+      const method = item.paymentMethod || "OTHER";
+      result[method] = (result[method] || 0) + Number(item.amount);
+      return result;
+    }, {});
+    const receivedTotal = receivables.reduce((sum, item) => sum + Number(item.paidAmount), 0);
+    const receivablesForecast = receivableInstallments.filter((item) => Number(item.amount) > Number(item.paidAmount)).map((item) => ({ dueDate: item.dueDate, amount: Number(item.amount) - Number(item.paidAmount), method: item.paymentMethod || "OTHER", status: item.status }));
     res.json({
       periodDays: days,
       salesTotal: Number(sales._sum.totalAmount || 0),
       cashIn: revenue,
       cashOut: expenses,
       netCashFlow: revenue - expenses,
+      receivedTotal,
+      receivablesForecast,
+      paymentMethodBreakdown,
       receivablesOutstanding: receivables.reduce((sum, item) => sum + Math.max(0, Number(item.totalAmount) - Number(item.paidAmount)), 0),
       payablesOutstanding: payables.reduce((sum, item) => sum + Math.max(0, Number(item.amount) - Number(item.paidAmount)), 0),
       receivablesOpenCount: receivables.filter((item) => Number(item.totalAmount) > Number(item.paidAmount)).length,
@@ -206,7 +217,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
       ...(from || to ? { saleDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       ...(typeof req.query.status === "string" && Object.values(FinancialStatus).includes(req.query.status as FinancialStatus) ? { status: req.query.status as FinancialStatus } : {}),
     };
-    res.json(await prisma.financialSale.findMany({ where, include: { patient: { select: { id: true, fullName: true } }, professional: { select: { id: true, fullName: true } }, items: true, receivable: { select: { id: true, totalAmount: true, paidAmount: true, status: true, paymentBreakdown: true } } }, orderBy: [{ saleDate: "desc" }, { id: "desc" }], take: 500 }));
+    res.json(await prisma.financialSale.findMany({ where, include: { patient: { select: { id: true, fullName: true } }, professional: { select: { id: true, fullName: true } }, items: true, receivable: { select: { id: true, totalAmount: true, paidAmount: true, status: true, paymentBreakdown: true, installments: { orderBy: { number: "asc" } } } } }, orderBy: [{ saleDate: "desc" }, { id: "desc" }], take: 500 }));
   }));
 
   router.post("/sales", asyncRoute(async (req, res) => {
@@ -227,6 +238,20 @@ export function createFinancialRouter(prisma: PrismaClient) {
       for (const payment of payments) if (!validatedDate(payment.paymentDate)) return res.status(400).json({ message: "Informe datas válidas para os pagamentos." });
       if (payments.some((payment) => payment.installments > 1 && payment.method !== FinancialPaymentMethod.CREDIT_CARD)) return res.status(400).json({ message: "Parcelamento está disponível somente para cartão de crédito." });
     }
+    const paymentPlans = payments
+      ? payments.flatMap((payment) => Array.from({ length: payment.installments }, (_, index) => {
+        const baseDate = validatedDate(payment.paymentDate)!;
+        const dueMonth = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + index, 1));
+        const day = Math.min(baseDate.getUTCDate(), new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate());
+        const amountCents = Math.floor(cents(payment.amount) / payment.installments) + (index < cents(payment.amount) % payment.installments ? 1 : 0);
+        return { method: payment.method, numberOffset: index, dueDate: new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth(), day)), amountCents, label: payment.installments > 1 ? `${payment.method} ${index + 1}/${payment.installments}` : payment.method };
+      }))
+      : Array.from({ length: parsed.data.installments }, (_, index) => {
+        const dueMonth = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + index, 1));
+        const day = Math.min(dueDate.getUTCDate(), new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate());
+        const baseCents = Math.floor(totalCents / parsed.data.installments);
+        return { method: parsed.data.paymentMethod, numberOffset: index, dueDate: new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth(), day)), amountCents: baseCents + (index < totalCents % parsed.data.installments ? 1 : 0), label: parsed.data.installments > 1 ? `${parsed.data.paymentMethod || "Pagamento"} ${index + 1}/${parsed.data.installments}` : parsed.data.paymentMethod || "Pagamento" };
+      });
     try {
       const sale = await prisma.$transaction(async (tx) => {
         const [patient, doctor] = await Promise.all([
@@ -243,16 +268,11 @@ export function createFinancialRouter(prisma: PrismaClient) {
           status: FinancialStatus.PENDING, idempotencyKey: `manual-sale:${saleKey}`, createdById: (req as AuthRequest).user!.id,
           items: { create: [{ sourceType: "MANUAL", description: parsed.data.serviceDescription, amount: decimal(totalCents) }] },
           receivable: { create: {
-            totalAmount: decimal(totalCents), dueDate, installmentCount: parsed.data.installments,
+            totalAmount: decimal(totalCents), dueDate, installmentCount: paymentPlans.length,
             preferredPaymentMethod: payments?.[0]?.method || parsed.data.paymentMethod,
             paymentBreakdown: payments?.map((payment) => ({ method: payment.method, amount: payment.amount, installments: payment.installments, paymentDate: payment.paymentDate })) as Prisma.InputJsonValue | undefined,
             status: FinancialStatus.PENDING,
-            installments: { create: Array.from({ length: parsed.data.installments }, (_, index) => {
-              const dueMonth = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + index, 1));
-              const day = Math.min(dueDate.getUTCDate(), new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate());
-              const baseCents = Math.floor(totalCents / parsed.data.installments);
-              return { number: index + 1, dueDate: new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth(), day)), amount: decimal(baseCents + (index < totalCents % parsed.data.installments ? 1 : 0)) };
-            }) },
+            installments: { create: paymentPlans.map((plan, index) => ({ number: index + 1, dueDate: plan.dueDate, amount: decimal(plan.amountCents), paymentMethod: plan.method })) },
           } },
         }, include: { patient: { select: { fullName: true } }, professional: { select: { fullName: true } }, receivable: true } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
