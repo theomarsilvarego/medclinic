@@ -49,6 +49,10 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
     setDiscountEnabled(false);
     setPayments((current) => [...current, { id: Date.now(), method: "PIX", amount: remaining.toFixed(2), installments: 1, paymentDate: localDate() }]);
   };
+  const useRemaining = () => {
+    if (remaining <= 0) return;
+    setPayments((current) => current.map((payment, index) => index === current.length - 1 ? { ...payment, amount: (parseAmount(payment.amount) + remaining).toFixed(2) } : payment));
+  };
   const removePayment = (id: number) => setPayments((current) => current.length > 1 ? current.filter((payment) => payment.id !== id) : current);
   const submit = () => {
     if (!isComplete) {
@@ -106,6 +110,7 @@ export function BillingModal({ billingItems, billingItemKeys, setBillingItemKeys
                 </div>
               </article>)}
             </div>
+            <button type="button" className="secretary-use-remaining" onClick={useRemaining} disabled={billingSelected || remaining <= 0}><span>Usar restante</span><strong>{money(remaining)}</strong></button>
             <button type="button" className="secretary-add-payment" onClick={addPayment} disabled={billingSelected || remaining <= 0}><Plus size={16} /> Adicionar forma de pagamento</button>
             <div className="secretary-billing-summary"><div><span>Subtotal ({billableItems.length} {billableItems.length === 1 ? "item" : "itens"})</span><strong>{money(billingSubtotal)}</strong></div><div className="discount"><span>Desconto {billingDiscount ? "5%" : "0%"}</span><strong>− {money(billingDiscount)}</strong></div><div className="total"><span>Total a pagar</span><strong>{money(billingTotal)}</strong></div><small>{payments.map((payment) => `${methodLabel[payment.method]}${payment.method === "CREDIT_CARD" ? ` ${payment.installments}x` : ""} ${money(parseAmount(payment.amount))}`).join(" + ")}</small></div>
           </div>

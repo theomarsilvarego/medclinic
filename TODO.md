@@ -37,3 +37,10 @@
 - [x] Mostrar no Caixa somente confirmações efetivadas no saldo e exibir componentes pendentes como “Previsto” e “Aguarda repasse”.
 - [x] Exibir no Financeiro o faturado, o recebido, a receber, a composição por forma e as entradas previstas por data.
 - [ ] Aplicar também a migration `20261118143000_receivable_payment_method` em um ambiente com `DATABASE_URL` configurada.
+
+## Confirmação e repasse de crédito
+- [x] Confirmar crédito sem criar imediatamente uma entrada no Caixa.
+- [x] Permitir liquidar posteriormente o repasse de crédito por endpoint próprio, criando a entrada no Caixa somente nessa etapa.
+- [x] Exibir o crédito confirmado como “Aguarda repasse” nas previsões do Caixa e do Financeiro.
+- [x] Permitir estornar crédito confirmado antes do repasse sem criar saída de caixa; pagamentos já repassados geram estorno financeiro.
+- [x] Manter taxas de adquirência sem percentual fixo no código, aguardando configuração definida pelo usuário.

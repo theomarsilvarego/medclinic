@@ -49,6 +49,11 @@ const paymentSchema = z.object({
   installmentId: z.coerce.number().int().positive().optional(),
   idempotencyKey: z.string().trim().min(8).max(100).optional(),
 });
+const settlementSchema = z.object({
+  accountId: z.coerce.number().int().positive(),
+  paymentDate: dateSchema,
+  idempotencyKey: z.string().trim().min(8).max(100).optional(),
+});
 const reversalSchema = z.object({
   paymentId: z.coerce.number().int().positive(),
   amount: positiveMoney,
@@ -128,6 +133,12 @@ async function requireOpenCashSession(tx: Prisma.TransactionClient, accountId: n
   return account;
 }
 
+async function requireActiveAccount(tx: Prisma.TransactionClient, accountId: number) {
+  const account = await tx.financialAccount.findUnique({ where: { id: accountId } });
+  if (!account || !account.active) throw Object.assign(new Error("Conta financeira não encontrada ou inativa."), { status: 404 });
+  return account;
+}
+
 async function assertSufficientCash(tx: Prisma.TransactionClient, account: { id: number; type: FinancialAccountType; openingBalance: Prisma.Decimal }, amountCents: number) {
   if (account.type !== FinancialAccountType.CASH) return;
   const movements = await tx.financialMovement.findMany({ where: { accountId: account.id }, select: { type: true, amount: true } });
@@ -147,7 +158,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
       prisma.financialSale.aggregate({ where: { saleDate: { gte: new Date(from.toISOString().slice(0, 10) + "T00:00:00.000Z") }, status: { not: FinancialStatus.CANCELED } }, _sum: { totalAmount: true } }),
       prisma.financialReceivable.findMany({ where: { status: { not: FinancialStatus.CANCELED } }, select: { totalAmount: true, paidAmount: true } }),
       prisma.financialPayable.findMany({ where: { status: { not: FinancialStatus.CANCELED } }, select: { amount: true, paidAmount: true } }),
-      prisma.financialReceivableInstallment.findMany({ where: { receivable: { status: { not: FinancialStatus.CANCELED } } }, select: { amount: true, paidAmount: true, dueDate: true, paymentMethod: true, status: true }, orderBy: { dueDate: "asc" }, take: 1000 }),
+      prisma.financialReceivableInstallment.findMany({ where: { receivable: { status: { not: FinancialStatus.CANCELED } } }, select: { amount: true, paidAmount: true, dueDate: true, paymentMethod: true, status: true, payments: { select: { method: true, movement: { select: { id: true } } } } }, orderBy: { dueDate: "asc" }, take: 1000 }),
     ]);
     const accountBalances = accounts.map(({ movements: rows, ...account }) => ({
       id: account.id,
@@ -163,7 +174,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
       return result;
     }, {});
     const receivedTotal = receivables.reduce((sum, item) => sum + Number(item.paidAmount), 0);
-    const receivablesForecast = receivableInstallments.filter((item) => Number(item.amount) > Number(item.paidAmount)).map((item) => ({ dueDate: item.dueDate, amount: Number(item.amount) - Number(item.paidAmount), method: item.paymentMethod || "OTHER", status: item.status }));
+    const receivablesForecast = receivableInstallments.filter((item) => Number(item.amount) > Number(item.paidAmount) || (item.paymentMethod === FinancialPaymentMethod.CREDIT_CARD && item.payments.some((payment) => !payment.movement))).map((item) => ({ dueDate: item.dueDate, amount: Number(item.amount) > Number(item.paidAmount) ? Number(item.amount) - Number(item.paidAmount) : Number(item.amount), method: item.paymentMethod || "OTHER", status: item.paymentMethod === FinancialPaymentMethod.CREDIT_CARD && item.payments.some((payment) => !payment.movement) ? "AGUARDA_REPASSE" : item.status }));
     res.json({
       periodDays: days,
       salesTotal: Number(sales._sum.totalAmount || 0),
@@ -217,7 +228,7 @@ export function createFinancialRouter(prisma: PrismaClient) {
       ...(from || to ? { saleDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       ...(typeof req.query.status === "string" && Object.values(FinancialStatus).includes(req.query.status as FinancialStatus) ? { status: req.query.status as FinancialStatus } : {}),
     };
-    res.json(await prisma.financialSale.findMany({ where, include: { patient: { select: { id: true, fullName: true } }, professional: { select: { id: true, fullName: true } }, items: true, receivable: { select: { id: true, totalAmount: true, paidAmount: true, status: true, paymentBreakdown: true, installments: { orderBy: { number: "asc" } } } } }, orderBy: [{ saleDate: "desc" }, { id: "desc" }], take: 500 }));
+    res.json(await prisma.financialSale.findMany({ where, include: { patient: { select: { id: true, fullName: true } }, professional: { select: { id: true, fullName: true } }, items: true, receivable: { select: { id: true, totalAmount: true, paidAmount: true, status: true, paymentBreakdown: true, installments: { orderBy: { number: "asc" } }, payments: { include: { movement: true }, orderBy: { createdAt: "desc" } } } } }, orderBy: [{ saleDate: "desc" }, { id: "desc" }], take: 500 }));
   }));
 
   router.post("/sales", asyncRoute(async (req, res) => {
@@ -243,14 +254,16 @@ export function createFinancialRouter(prisma: PrismaClient) {
         const baseDate = validatedDate(payment.paymentDate)!;
         const dueMonth = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + index, 1));
         const day = Math.min(baseDate.getUTCDate(), new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate());
-        const amountCents = Math.floor(cents(payment.amount) / payment.installments) + (index < cents(payment.amount) % payment.installments ? 1 : 0);
+        const baseCents = Math.floor(cents(payment.amount) / payment.installments);
+        const amountCents = index === payment.installments - 1 ? cents(payment.amount) - baseCents * (payment.installments - 1) : baseCents;
         return { method: payment.method, numberOffset: index, dueDate: new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth(), day)), amountCents, label: payment.installments > 1 ? `${payment.method} ${index + 1}/${payment.installments}` : payment.method };
       }))
       : Array.from({ length: parsed.data.installments }, (_, index) => {
         const dueMonth = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + index, 1));
         const day = Math.min(dueDate.getUTCDate(), new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate());
         const baseCents = Math.floor(totalCents / parsed.data.installments);
-        return { method: parsed.data.paymentMethod, numberOffset: index, dueDate: new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth(), day)), amountCents: baseCents + (index < totalCents % parsed.data.installments ? 1 : 0), label: parsed.data.installments > 1 ? `${parsed.data.paymentMethod || "Pagamento"} ${index + 1}/${parsed.data.installments}` : parsed.data.paymentMethod || "Pagamento" };
+        const amountCents = index === parsed.data.installments - 1 ? totalCents - baseCents * (parsed.data.installments - 1) : baseCents;
+        return { method: parsed.data.paymentMethod, numberOffset: index, dueDate: new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth(), day)), amountCents, label: parsed.data.installments > 1 ? `${parsed.data.paymentMethod || "Pagamento"} ${index + 1}/${parsed.data.installments}` : parsed.data.paymentMethod || "Pagamento" };
       });
     try {
       const sale = await prisma.$transaction(async (tx) => {
@@ -316,7 +329,6 @@ export function createFinancialRouter(prisma: PrismaClient) {
       const payment = await prisma.$transaction(async (tx) => {
         const receivable = await tx.financialReceivable.findUnique({ where: { id }, include: { installments: true, sale: true } });
         if (!receivable || receivable.status === FinancialStatus.CANCELED) throw Object.assign(new Error("Conta a receber não encontrada ou cancelada."), { status: 404 });
-        const account = await requireOpenCashSession(tx, parsed.data.accountId);
         const amountCents = cents(parsed.data.amount);
         const outstandingCents = cents(receivable.totalAmount) - cents(receivable.paidAmount);
         if (amountCents > outstandingCents) throw Object.assign(new Error("O recebimento excede o saldo pendente."), { status: 409 });
@@ -326,11 +338,15 @@ export function createFinancialRouter(prisma: PrismaClient) {
           if (!installment) throw Object.assign(new Error("Parcela não pertence a esta conta a receber."), { status: 400 });
           if (amountCents > cents(installment.amount) - cents(installment.paidAmount)) throw Object.assign(new Error("O recebimento excede o saldo da parcela."), { status: 409 });
         }
+        const method = installment?.paymentMethod || parsed.data.method;
+        const account = method === FinancialPaymentMethod.CREDIT_CARD
+          ? await requireActiveAccount(tx, parsed.data.accountId)
+          : await requireOpenCashSession(tx, parsed.data.accountId);
         const created = await tx.financialReceivablePayment.create({ data: {
           receivableId: id, installmentId: installment?.id, accountId: account.id, amount: decimal(amountCents), paymentDate,
-          method: parsed.data.method, idempotencyKey: key, createdById: (req as AuthRequest).user!.id,
+          method, idempotencyKey: key, createdById: (req as AuthRequest).user!.id,
         } });
-        await tx.financialMovement.create({ data: {
+        if (method !== FinancialPaymentMethod.CREDIT_CARD) await tx.financialMovement.create({ data: {
           accountId: account.id, type: FinancialMovementType.ENTRADA, amount: decimal(amountCents), movementDate: paymentDate,
           description: `Recebimento da venda ${receivable.sale.code}`, originType: "RECEBIMENTO_VENDA", originId: receivable.saleId,
           idempotencyKey: `receivable-payment:${key}`, receivablePaymentId: created.id, createdById: (req as AuthRequest).user!.id,
@@ -358,6 +374,36 @@ export function createFinancialRouter(prisma: PrismaClient) {
       res.status(201).json(payment);
     } catch (error: any) {
       if (error?.code === "P2002") return res.status(409).json({ message: "Este pagamento já foi registrado." });
+      if (error?.status) return res.status(error.status).json({ message: error.message });
+      throw error;
+    }
+  }));
+
+  router.post("/receivables/:id/payments/:paymentId/settle", asyncRoute(async (req, res) => {
+    const id = Number(req.params.id);
+    const paymentId = Number(req.params.paymentId);
+    const parsed = settlementSchema.safeParse(req.body);
+    if (!Number.isInteger(id) || id < 1 || !Number.isInteger(paymentId) || paymentId < 1 || !parsed.success)
+      return res.status(400).json({ message: "Informe a conta, pagamento, conta financeira e data do repasse." });
+    const paymentDate = validatedDate(parsed.data.paymentDate);
+    if (!paymentDate) return res.status(400).json({ message: "Informe uma data de repasse válida." });
+    const key = parsed.data.idempotencyKey || randomUUID();
+    try {
+      const movement = await prisma.$transaction(async (tx) => {
+        const payment = await tx.financialReceivablePayment.findFirst({ where: { id: paymentId, receivableId: id }, include: { movement: true, receivable: { include: { sale: true }, }, } });
+        if (!payment) throw Object.assign(new Error("Pagamento não encontrado."), { status: 404 });
+        if (payment.method !== FinancialPaymentMethod.CREDIT_CARD) throw Object.assign(new Error("Somente pagamentos de crédito aguardam repasse."), { status: 400 });
+        if (payment.movement) throw Object.assign(new Error("Este pagamento já foi repassado ao Caixa."), { status: 409 });
+        const account = await requireOpenCashSession(tx, parsed.data.accountId);
+        return tx.financialMovement.create({ data: {
+          accountId: account.id, type: FinancialMovementType.ENTRADA, amount: payment.amount, movementDate: paymentDate,
+          description: `Repasse de crédito da venda ${payment.receivable.sale.code}`, originType: "REPASSE_CARTAO", originId: payment.receivable.saleId,
+          idempotencyKey: `receivable-settlement:${key}`, receivablePaymentId: payment.id, createdById: (req as AuthRequest).user!.id,
+        } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      res.status(201).json(movement);
+    } catch (error: any) {
+      if (error?.code === "P2002") return res.status(409).json({ message: "Este repasse já foi registrado." });
       if (error?.status) return res.status(error.status).json({ message: error.message });
       throw error;
     }
@@ -410,17 +456,19 @@ export function createFinancialRouter(prisma: PrismaClient) {
       const reversal = await prisma.$transaction(async (tx) => {
         const payment = await tx.financialReceivablePayment.findFirst({ where: { id: parsed.data.paymentId, receivableId: id }, include: { movement: true, allocations: { include: { installment: true }, orderBy: { installmentId: "desc" } } } });
         const receivable = await tx.financialReceivable.findUnique({ where: { id }, include: { sale: true } });
-        if (!payment || !payment.movement || !receivable) throw Object.assign(new Error("Pagamento da conta a receber não encontrado."), { status: 404 });
+        if (!payment || !receivable) throw Object.assign(new Error("Pagamento da conta a receber não encontrado."), { status: 404 });
         const remaining = netPaid(payment.amount, payment.reversedAmount);
         const reversalCents = cents(parsed.data.amount);
         if (reversalCents > remaining) throw Object.assign(new Error("O estorno excede o saldo do pagamento original."), { status: 409 });
-        const account = await requireOpenCashSession(tx, payment.accountId);
-        await assertSufficientCash(tx, account, reversalCents);
-        const created = await tx.financialMovement.create({ data: {
-          accountId: account.id, type: FinancialMovementType.ESTORNO_SAIDA, amount: decimal(reversalCents), movementDate: new Date(),
-          description: `Estorno de recebimento: ${parsed.data.reason}`, originType: "ESTORNO_RECEBIMENTO", originId: payment.id,
-          idempotencyKey: `receivable-reversal:${key}`, reversalOfId: payment.movement.id, createdById: (req as AuthRequest).user!.id,
-        } });
+        const created = payment.movement ? await (async () => {
+          const account = await requireOpenCashSession(tx, payment.accountId);
+          await assertSufficientCash(tx, account, reversalCents);
+          return tx.financialMovement.create({ data: {
+            accountId: account.id, type: FinancialMovementType.ESTORNO_SAIDA, amount: decimal(reversalCents), movementDate: new Date(),
+            description: `Estorno de recebimento: ${parsed.data.reason}`, originType: "ESTORNO_RECEBIMENTO", originId: payment.id,
+            idempotencyKey: `receivable-reversal:${key}`, reversalOfId: payment.movement!.id, createdById: (req as AuthRequest).user!.id,
+          } });
+        })() : null;
         await tx.financialReceivablePayment.update({ where: { id: payment.id }, data: { reversedAmount: decimal(cents(payment.reversedAmount) + reversalCents) } });
         const paid = cents(receivable.paidAmount) - reversalCents;
         await tx.financialReceivable.update({ where: { id }, data: { paidAmount: decimal(paid), status: statusFor(cents(receivable.totalAmount), paid) } });
@@ -698,6 +746,10 @@ export async function createSalesFromRequests(
       const grossCents = saleLines.reduce((sum, line) => sum + line.amountCents, 0);
       const discountCents = Math.round(grossCents * discountPercent / 100);
       const totalCents = grossCents - discountCents;
+      if (payments?.length) {
+        const allocatedCents = payments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
+        if (allocatedCents !== totalCents) throw Object.assign(new Error("A soma dos pagamentos deve ser exatamente igual ao total após o desconto."), { status: 400 });
+      }
       const saleKey = createHash("sha256").update(`${appointmentId}|${saleLines.map(({ kind, id }) => `${kind}:${id}`).sort().join(",")}`).digest("hex");
       const code = `VEN-${Date.now().toString(36).toUpperCase()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
       let allocatedItemCents = 0;
@@ -714,6 +766,24 @@ export async function createSalesFromRequests(
           amount: fromCents(itemCents),
         };
       });
+      const paymentPlans = payments?.length
+        ? payments.flatMap((payment) => Array.from({ length: payment.installments }, (_, index) => {
+            const startDate = payment.paymentDate ? validatedDate(payment.paymentDate) || saleDate : saleDate;
+            const monthDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + index, 1));
+            const lastDay = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 0)).getUTCDate();
+            const dueDate = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth(), Math.min(startDate.getUTCDate(), lastDay)));
+            const paymentCents = toCents(payment.amount);
+            const baseCents = Math.floor(paymentCents / payment.installments);
+            const amountCents = index === payment.installments - 1 ? paymentCents - baseCents * (payment.installments - 1) : baseCents;
+            return { method: payment.method, dueDate, amountCents };
+          }))
+        : Array.from({ length: installments }, (_, index) => {
+            const monthDate = new Date(Date.UTC(saleDate.getUTCFullYear(), saleDate.getUTCMonth() + index, 1));
+            const lastDay = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 0)).getUTCDate();
+            const dueDate = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth(), Math.min(saleDate.getUTCDate(), lastDay)));
+            const baseCents = Math.floor(totalCents / installments);
+            return { method: paymentMethod, dueDate, amountCents: index === installments - 1 ? totalCents - baseCents * (installments - 1) : baseCents };
+          });
       const sale = await tx.financialSale.create({ data: {
         code,
         serviceDescription: saleLines.length === 1 ? saleLines[0].label : `${saleLines.length} serviços solicitados`,
@@ -732,7 +802,7 @@ export async function createSalesFromRequests(
         receivable: { create: {
           totalAmount: fromCents(totalCents),
           dueDate: saleDate,
-          installmentCount: installments,
+          installmentCount: paymentPlans.length,
           preferredPaymentMethod: payments?.[0]?.method || paymentMethod,
           paymentBreakdown: payments?.map(({ method, amount, installments: paymentInstallments, paymentDate }) => ({
             method,
@@ -741,14 +811,7 @@ export async function createSalesFromRequests(
             paymentDate: paymentDate || saleDate.toISOString().slice(0, 10),
           })) as Prisma.InputJsonValue | undefined,
           status: FinancialStatus.PENDING,
-          installments: { create: Array.from({ length: installments }, (_, index) => {
-            const monthDate = new Date(Date.UTC(saleDate.getUTCFullYear(), saleDate.getUTCMonth() + index, 1));
-            const lastDay = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 0)).getUTCDate();
-            const dueDate = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth(), Math.min(saleDate.getUTCDate(), lastDay)));
-            const baseCents = Math.floor(totalCents / installments);
-            const installmentCents = baseCents + (index < totalCents % installments ? 1 : 0);
-            return { number: index + 1, dueDate, amount: fromCents(installmentCents) };
-          }) },
+          installments: { create: paymentPlans.map((plan, index) => ({ number: index + 1, dueDate: plan.dueDate, amount: fromCents(plan.amountCents), paymentMethod: plan.method })) },
         } },
       }, include: { receivable: true } });
       createdSales.push(sale);
