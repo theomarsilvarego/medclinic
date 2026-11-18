@@ -585,7 +585,7 @@ export async function createSalesFromRequests(
   prisma: PrismaClient,
   userId: number,
   selections: BillingSelection[],
-  paymentAllocations: { method: FinancialPaymentMethod; amountCents: number }[],
+  paymentMethod: FinancialPaymentMethod | undefined,
   discountPercent: number,
   installments: number,
   saleDate: Date,
@@ -660,30 +660,12 @@ export async function createSalesFromRequests(
       group.push(line);
       byAppointment.set(line.appointment.id, group);
     }
-    const expectedTotalCents = [...byAppointment.values()].reduce((sum, saleLines) => {
-      const grossCents = saleLines.reduce((lineSum, line) => lineSum + line.amountCents, 0);
-      return sum + grossCents - Math.round(grossCents * discountPercent / 100);
-    }, 0);
-    const suppliedTotalCents = paymentAllocations.reduce((sum, allocation) => sum + allocation.amountCents, 0);
-    if (suppliedTotalCents !== expectedTotalCents)
-      throw Object.assign(new Error("A soma das formas de pagamento deve ser igual ao total do faturamento."), { status: 400 });
     const createdSales = [];
-    let allocatedSalesCents = 0;
-    for (const [appointmentIndex, [appointmentId, saleLines]] of [...byAppointment.entries()].entries()) {
+    for (const [appointmentId, saleLines] of byAppointment) {
       const appointment = saleLines[0].appointment;
       const grossCents = saleLines.reduce((sum, line) => sum + line.amountCents, 0);
       const discountCents = Math.round(grossCents * discountPercent / 100);
       const totalCents = grossCents - discountCents;
-      const previouslyAllocatedCents = allocatedSalesCents;
-      allocatedSalesCents += totalCents;
-      const plannedPaymentBreakdown = paymentAllocations.map((allocation) => {
-        const before = Math.floor(allocation.amountCents * previouslyAllocatedCents / expectedTotalCents);
-        const after = appointmentIndex === byAppointment.size - 1
-          ? allocation.amountCents
-          : Math.floor(allocation.amountCents * allocatedSalesCents / expectedTotalCents);
-        const amountCents = after - before;
-        return { method: allocation.method, amountCents, installments: allocation.method === FinancialPaymentMethod.CREDIT_CARD ? installments : 1 };
-      }).filter(({ amountCents }) => amountCents > 0);
       const saleKey = createHash("sha256").update(`${appointmentId}|${saleLines.map(({ kind, id }) => `${kind}:${id}`).sort().join(",")}`).digest("hex");
       const code = `VEN-${Date.now().toString(36).toUpperCase()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
       let allocatedItemCents = 0;
@@ -718,15 +700,15 @@ export async function createSalesFromRequests(
         receivable: { create: {
           totalAmount: fromCents(totalCents),
           dueDate: saleDate,
-          installmentCount: 1,
-          preferredPaymentMethod: paymentAllocations.length === 1 ? paymentAllocations[0].method : null,
-          plannedPaymentBreakdown: plannedPaymentBreakdown as Prisma.InputJsonValue,
+          installmentCount: installments,
+          preferredPaymentMethod: paymentMethod,
           status: FinancialStatus.PENDING,
-          installments: { create: Array.from({ length: 1 }, (_, index) => {
+          installments: { create: Array.from({ length: installments }, (_, index) => {
             const monthDate = new Date(Date.UTC(saleDate.getUTCFullYear(), saleDate.getUTCMonth() + index, 1));
             const lastDay = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 0)).getUTCDate();
             const dueDate = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth(), Math.min(saleDate.getUTCDate(), lastDay)));
-            const installmentCents = totalCents;
+            const baseCents = Math.floor(totalCents / installments);
+            const installmentCents = baseCents + (index < totalCents % installments ? 1 : 0);
             return { number: index + 1, dueDate, amount: fromCents(installmentCents) };
           }) },
         } },
