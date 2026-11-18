@@ -347,9 +347,9 @@ export function CrmPage() {
                     <tr>
                       <th>Paciente</th>
                       <th>Contato</th>
-                      <th>Produto / processo</th>
-                      <th>Categoria</th>
-                      <th>Doses / sessões</th>
+                      <th>Produto</th>
+
+                      <th>Doses</th>
                       <th>Datas das doses</th>
                       <th>Status</th>
                       <th>Ações</th>
@@ -370,7 +370,7 @@ export function CrmPage() {
                               : "Processo"}
                           </small>
                         </td>
-                        <td>{categoryLabels[item.category]}</td>
+
                         <td>{item.doseCount}</td>
                         <td>
                           <div className="crm-date-list">
