@@ -537,7 +537,7 @@ const secretaryBillingSchema = z.object({
       }),
     )
     .min(1, "Selecione ao menos uma solicitação."),
-  paymentMethod: z.nativeEnum(FinancialPaymentMethod).optional(),
+  paymentAllocations: z.array(z.object({ method: z.nativeEnum(FinancialPaymentMethod), amountCents: z.coerce.number().int().min(0) })).min(1),
   discountPercent: z.coerce.number().min(0).max(5).default(0),
   installments: z.coerce.number().int().min(1).max(12).default(1),
 });
@@ -4971,30 +4971,21 @@ app.post(
       return res
         .status(400)
         .json({ message: "Selecione ao menos uma solicitação." });
-    const paymentMethod = parsed.data.paymentMethod;
-    if (
-      parsed.data.discountPercent > 0 &&
-      paymentMethod !== FinancialPaymentMethod.PIX &&
-      paymentMethod !== FinancialPaymentMethod.CASH
-    )
-      return res.status(400).json({
-        message:
-          "O desconto de 5% está disponível somente para Pix ou dinheiro.",
-      });
-    if (
-      parsed.data.installments > 1 &&
-      paymentMethod !== FinancialPaymentMethod.CREDIT_CARD
-    )
-      return res.status(400).json({
-        message: "Parcelamento está disponível somente para cartão de crédito.",
-      });
+    const paymentAllocations = parsed.data.paymentAllocations.filter(({ amountCents }) => amountCents > 0);
+    const allocatedMethods = new Set(paymentAllocations.map(({ method }) => method));
+    if (!paymentAllocations.length)
+      return res.status(400).json({ message: "Informe o valor de ao menos uma forma de pagamento." });
+    if (parsed.data.discountPercent > 0 && [...allocatedMethods].some((method) => method !== FinancialPaymentMethod.PIX && method !== FinancialPaymentMethod.CASH))
+      return res.status(400).json({ message: "O desconto de 5% está disponível somente para Pix ou dinheiro." });
+    if (parsed.data.installments > 1 && !allocatedMethods.has(FinancialPaymentMethod.CREDIT_CARD))
+      return res.status(400).json({ message: "Parcelamento está disponível somente para a parte paga no cartão de crédito." });
     const billingSaleDate = new Date(`${clinicTodayDate()}T00:00:00.000Z`);
     try {
       const sales = await createSalesFromRequests(
         prisma,
         req.user!.id,
         parsed.data.items,
-        paymentMethod,
+        paymentAllocations,
         parsed.data.discountPercent,
         parsed.data.installments,
         billingSaleDate,

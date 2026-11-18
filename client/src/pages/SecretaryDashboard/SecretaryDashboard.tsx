@@ -107,7 +107,7 @@ export function SecretaryDashboard() {
   const [appointmentSaving, setAppointmentSaving] = useState(false);
   const [scheduleSuccess, setScheduleSuccess] = useState("");
   const [billingItemKeys, setBillingItemKeys] = useState<string[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
+  const [paymentAllocations, setPaymentAllocations] = useState<Record<PaymentMethod, number>>({ PIX: 0, DEBIT_CARD: 0, CREDIT_CARD: 0, CASH: 0 });
   const [discountEnabled, setDiscountEnabled] = useState(false);
   const [installments, setInstallments] = useState(1);
 
@@ -305,7 +305,8 @@ export function SecretaryDashboard() {
     (sum, item) => sum + Number(item.amount),
     0,
   );
-  const discountAllowed = paymentMethod === "PIX" || paymentMethod === "CASH";
+  const usedPaymentMethods = (Object.entries(paymentAllocations) as [PaymentMethod, number][]).filter(([, amountCents]) => amountCents > 0).map(([method]) => method);
+  const discountAllowed = usedPaymentMethods.length > 0 && usedPaymentMethods.every((method) => method === "PIX" || method === "CASH");
   const billingDiscount =
     discountEnabled && discountAllowed ? billingSubtotal * 0.05 : 0;
   const billingTotal = billingSubtotal - billingDiscount;
@@ -324,7 +325,8 @@ export function SecretaryDashboard() {
   function openBillingModal() {
     if (!selectedItems.length) return;
     setBillingItemKeys(selectedItems.map(requestKey));
-    setPaymentMethod("PIX");
+    const initialTotalCents = selectedItems.reduce((sum, item) => sum + (item.amount !== null ? Math.round(Number(item.amount) * 100) : 0), 0);
+    setPaymentAllocations({ PIX: initialTotalCents, DEBIT_CARD: 0, CREDIT_CARD: 0, CASH: 0 });
     setDiscountEnabled(false);
     setInstallments(1);
     setBillingModalOpen(true);
@@ -338,9 +340,9 @@ export function SecretaryDashboard() {
         method: "POST",
         body: JSON.stringify({
           items: billableItems.map(({ kind, id }) => ({ kind, id })),
-          paymentMethod,
+          paymentAllocations: (Object.entries(paymentAllocations) as [PaymentMethod, number][]).map(([method, amountCents]) => ({ method, amountCents })),
           discountPercent: billingDiscount ? 5 : 0,
-          installments: paymentMethod === "CREDIT_CARD" ? installments : 1,
+          installments: paymentAllocations.CREDIT_CARD > 0 ? installments : 1,
         }),
       });
       const billedKeys = new Set(billableItems.map(requestKey));
@@ -648,8 +650,8 @@ export function SecretaryDashboard() {
           setBillingItemKeys={setBillingItemKeys}
           billingSelected={billingSelected}
           setError={setError}
-          paymentMethod={paymentMethod}
-          setPaymentMethod={setPaymentMethod}
+          paymentAllocations={paymentAllocations}
+          setPaymentAllocations={setPaymentAllocations}
           discountAllowed={discountAllowed}
           discountEnabled={discountEnabled}
           setDiscountEnabled={setDiscountEnabled}

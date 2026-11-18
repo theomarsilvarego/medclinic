@@ -839,6 +839,7 @@ model FinancialReceivable {
   dueDate                DateTime                        @map("due_date") @db.Date
   installmentCount       Int                             @default(1) @map("installment_count")
   preferredPaymentMethod FinancialPaymentMethod?         @map("preferred_payment_method")
+  plannedPaymentBreakdown Json?                           @map("planned_payment_breakdown")
   status                 FinancialStatus                @default(PENDING)
   sale                   FinancialSale                  @relation(fields: [saleId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   installments           FinancialReceivableInstallment[]
