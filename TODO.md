@@ -44,3 +44,9 @@
 - [x] Exibir o crédito confirmado como “Aguarda repasse” nas previsões do Caixa e do Financeiro.
 - [x] Permitir estornar crédito confirmado antes do repasse sem criar saída de caixa; pagamentos já repassados geram estorno financeiro.
 - [x] Manter taxas de adquirência sem percentual fixo no código, aguardando configuração definida pelo usuário.
+
+## Rotina diária do Caixa
+- [x] Registrar abertura e fechamento diários do caixa, identificar as sessões pela data e mostrar o valor de abertura, o valor esperado, o valor contado e a diferença no fechamento.
+
+## Organização das listas financeiras
+- [x] Organizar as listas de Vendas, Financeiro e Contas a pagar e receber por data e paciente/pessoa, com opções explícitas de ordenação e pesquisa que considere data e paciente/pessoa.

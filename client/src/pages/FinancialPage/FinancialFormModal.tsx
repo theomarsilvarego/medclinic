@@ -7,6 +7,7 @@ type Props = {
   formMode: FormMode | null;
   form: FinancialForm;
   accounts: Row[];
+  sessions: Row[];
   suppliers: Row[];
   patients: Row[];
   doctors: Row[];
@@ -20,6 +21,7 @@ export function FinancialFormModal({
   formMode,
   form,
   accounts,
+  sessions,
   suppliers,
   patients,
   doctors,
@@ -31,6 +33,7 @@ export function FinancialFormModal({
   if (!formMode) return null;
   const change = (patch: Partial<FinancialForm>) => onChange(patch);
   const payments = form.paymentBreakdown || [];
+  const availableCashAccounts = accounts.filter((account) => account.type === "CASH" && !sessions.some((session) => session.status === "ABERTA" && Number(session.accountId) === Number(account.id)));
   const updatePayment = (index: number, patch: Partial<FinancialSplitPayment>) => change({ paymentBreakdown: payments.map((payment, paymentIndex) => paymentIndex === index ? { ...payment, ...patch } : payment) });
   const addPayment = () => change({ paymentBreakdown: [...payments, { method: "PIX", amount: "", date: form.date, installments: "1" }] });
   const removePayment = (index: number) => change({ paymentBreakdown: payments.filter((_, paymentIndex) => paymentIndex !== index) });
@@ -180,8 +183,8 @@ export function FinancialFormModal({
                 <label>
                   Conta física
                   <select required value={form.accountId} onChange={(event) => change({ accountId: event.target.value })}>
-                    <option value="">Selecione</option>
-                    {accounts.filter((item) => item.type === "CASH").map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+                    <option value="">{availableCashAccounts.length ? "Selecione" : "Nenhuma conta física disponível"}</option>
+                    {availableCashAccounts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
                   </select>
                 </label>
                 <label>Valor de abertura<input required type="number" min="0" step="0.01" value={form.openingAmount} onChange={(event) => change({ openingAmount: event.target.value })} /></label>
@@ -236,7 +239,7 @@ export function FinancialFormModal({
 
         <footer className="modal-footer appointment-modal-footer">
           <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" form="financial-form" className="primary" disabled={saving}>
+          <button type="submit" form="financial-form" className="primary" disabled={saving || (formMode === "open-session" && !availableCashAccounts.length)}>
             <Check size={16} />{saving ? "Salvando…" : "Salvar registro"}
           </button>
         </footer>

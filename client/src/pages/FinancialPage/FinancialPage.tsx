@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
+  ArrowDownUp,
   ArrowUpRight,
   CalendarDays,
   CircleDollarSign,
@@ -35,9 +36,12 @@ const pageConfig: Record<FinancialModule, { eyebrow: string; title: string; desc
 const statusLabel: Record<string, string> = { PENDING: "Pendente", PARTIAL: "Parcial", PAID: "Pago", CANCELED: "Cancelado" };
 const methodLabel: Record<string, string> = { PIX: "Pix", DEBIT_CARD: "Débito", CREDIT_CARD: "Crédito", CASH: "Dinheiro", BANK_TRANSFER: "Transferência", OTHER: "Outro" };
 const movementLabel: Record<string, string> = { ENTRADA: "Entrada", SAIDA: "Saída", TRANSFERENCIA_ENTRADA: "Transferência recebida", TRANSFERENCIA_SAIDA: "Transferência enviada", SUPRIMENTO: "Suprimento", SANGRIA: "Sangria", ABERTURA: "Abertura", AJUSTE_ENTRADA: "Ajuste de entrada", AJUSTE_SAIDA: "Ajuste de saída", ESTORNO_ENTRADA: "Estorno recebido", ESTORNO_SAIDA: "Estorno pago" };
-const localDate = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; };
+const localDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const localDate = () => localDateKey(new Date());
 const makeIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `mc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const displayDate = (value?: string) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—";
+const displayDateTime = (value?: string) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
+const timestampLocalDate = (value?: string) => { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? localDateKey(date) : ""; };
 const getError = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir a operação.";
 const defaultPaymentBreakdown = (date: string) => [{ method: "PIX", amount: "", date, installments: "1" }];
 const splitLabel = (breakdown: any) => Array.isArray(breakdown) && breakdown.length ? ` · ${breakdown.map((payment: any) => `${methodLabel[payment.method] || payment.method} ${money(Number(payment.amount || 0))}${payment.installments > 1 ? ` ${payment.installments}x` : ""}`).join(" + ")}` : "";
@@ -61,6 +65,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
   const [period, setPeriod] = useState("30");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [sortOrder, setSortOrder] = useState("date-desc");
   const [accountsTab, setAccountsTab] = useState<"receber" | "pagar">("receber");
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [settlement, setSettlement] = useState<PaymentTarget | null>(null);
@@ -138,13 +143,20 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
   }, [accountsTab, module, movements, payables, receivables, sales]);
 
   const periodStart = Date.now() - Number(period) * 86_400_000;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
   const filtered = useMemo(() => entries.filter((entry) => {
-    const matchesText = `${entry.description} ${entry.person}`.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
+    const matchesText = `${entry.description} ${entry.person} ${entry.date} ${displayDate(entry.date)}`.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
     const date = new Date(`${String(entry.date).slice(0, 10)}T23:59:59`).getTime();
-    const matchesPeriod = !Number.isNaN(date) && date >= periodStart;
+    const isOverdueAccount = module === "accounts" && (entry.status === "Pendente" || entry.status === "Parcial") && date < todayStart.getTime();
+    const matchesPeriod = !Number.isNaN(date) && (date >= periodStart || isOverdueAccount);
     const matchesStatus = statusFilter === "TODOS" || entry.status === statusFilter;
     return matchesText && matchesPeriod && matchesStatus;
-  }), [entries, periodStart, query, statusFilter]);
+  }).sort((left, right) => {
+    const order = sortOrder.endsWith("asc") ? 1 : -1;
+    if (sortOrder.startsWith("person")) return left.person.localeCompare(right.person, "pt-BR", { sensitivity: "base" }) * order || String(left.date).localeCompare(String(right.date)) * -1;
+    return String(left.date).slice(0, 10).localeCompare(String(right.date).slice(0, 10)) * order || left.person.localeCompare(right.person, "pt-BR", { sensitivity: "base" });
+  }), [entries, module, periodStart, query, sortOrder, statusFilter, todayStart]);
 
   const totalSales = Number(summary.salesTotal || 0);
   const cashIn = Number(summary.cashIn || 0);
@@ -152,10 +164,16 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
   const currentBalance = (summary.accounts || []).reduce((sum: number, account: Row) => sum + Number(account.balance || 0), 0);
   const mainTotal = module === "sales" || module === "finance" ? totalSales : module === "cash" ? currentBalance : module === "accounts" ? Number(accountsTab === "receber" ? summary.receivablesOutstanding : summary.payablesOutstanding || 0) : Number(summary.netCashFlow || 0);
   const outstandingCount = entries.filter((entry) => entry.status === "Pendente" || entry.status === "Parcial").length;
+  const todayKey = localDate();
+  const openSessions = sessions.filter((session) => session.status === "ABERTA");
+  const todaySessions = sessions.filter((session) => timestampLocalDate(session.openedAt) === todayKey);
+  const cashSessionsToShow = [...openSessions, ...todaySessions.filter((session) => session.status !== "ABERTA"), ...sessions.filter((session) => session.status !== "ABERTA" && timestampLocalDate(session.openedAt) !== todayKey).slice(0, 6)];
+  const availableCashAccounts = accounts.filter((account) => account.type === "CASH" && !openSessions.some((session) => Number(session.accountId) === Number(account.id)));
 
   function openForm(mode: FormMode) {
     setError("");
-    setForm({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: String(accounts[0]?.id || ""), accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: String(accounts[0]?.id || ""), toAccountId: String(accounts[1]?.id || ""), closingAmount: "", idempotencyKey: makeIdempotencyKey(), paymentBreakdown: defaultPaymentBreakdown(localDate()) });
+    const defaultAccount = mode === "open-session" ? availableCashAccounts[0] : accounts[0];
+    setForm({ description: "", category: "", person: "", supplierId: "", patientId: "", professionalId: "", value: "", discountAmount: "0", date: localDate(), dueDate: localDate(), method: "PIX", installments: "1", accountId: String(defaultAccount?.id || ""), accountType: "CASH", openingAmount: "0", kind: "SUPRIMENTO", fromAccountId: String(accounts[0]?.id || ""), toAccountId: String(accounts[1]?.id || ""), closingAmount: "", idempotencyKey: makeIdempotencyKey(), paymentBreakdown: defaultPaymentBreakdown(localDate()) });
     setFormMode(mode);
   }
   async function submitForm(event: React.FormEvent) {
@@ -200,7 +218,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
     finally { setSaving(false); }
   }
   async function closeSession(session: Row) {
-    const counted = window.prompt("Informe o valor contado no fechamento do caixa:");
+    const counted = window.prompt(`Informe o valor contado no fechamento diário do caixa ${session.account?.name || ""} (aberto em ${displayDateTime(session.openedAt)}):`);
     if (counted === null) return;
     const value = Number(counted.replace(",", "."));
     if (!Number.isFinite(value) || value < 0) { setError("Informe um valor válido para fechar o caixa."); return; }
@@ -215,7 +233,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
       <div className="financial-actions">
         {module === "sales" && <button className="primary" type="button" onClick={() => openForm("sale")}><Plus size={17} /> Nova venda</button>}
         {module === "accounts" && <button className="primary" type="button" onClick={() => openForm("payable")}><Plus size={17} /> Nova despesa</button>}
-        {module === "cash" && <><button className="secondary" type="button" onClick={() => openForm("account")}><Landmark size={16} /> Nova conta</button><button className="secondary" type="button" onClick={() => openForm("open-session")}><Wallet size={16} /> Abrir caixa</button><button className="primary" type="button" onClick={() => openForm("movement")}><Plus size={17} /> Nova movimentação</button></>}
+        {module === "cash" && <><button className="secondary" type="button" onClick={() => openForm("account")}><Landmark size={16} /> Nova conta</button><button className="secondary" type="button" onClick={() => openForm("open-session")} disabled={!availableCashAccounts.length}><Wallet size={16} /> Abertura diária</button><button className="primary" type="button" onClick={() => openForm("movement")}><Plus size={17} /> Nova movimentação</button></>}
         <button className="icon-button" type="button" onClick={() => void reload()} aria-label="Atualizar dados financeiros" title="Atualizar"><RefreshCw size={17} /></button>
       </div>
     </div>
@@ -231,13 +249,26 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
     {module === "finance" && <section className="financial-forecast-panel"><div><strong>Composição por forma de pagamento</strong><small>Distribuição do faturamento pelas formas cadastradas.</small></div>{Object.entries((summary.paymentMethodBreakdown || {}) as Record<string, number>).map(([method, amount]) => <span key={method}><b>{methodLabel[method] || method}</b> {money(Number(amount))} ({totalSales ? Math.round(Number(amount) / totalSales * 100) : 0}%)</span>)}<div className="financial-forecast-list"><strong>Entradas previstas</strong>{((summary.receivablesForecast || []) as Row[]).slice(0, 6).map((item, index) => <span key={`${item.dueDate}-${item.method}-${index}`}>{displayDate(item.dueDate)} · {methodLabel[item.method] || item.method} · {money(Number(item.amount))}</span>)}</div></section>}
 
     {module === "cash" && <section className="financial-shortcuts" aria-label="Saldos de contas">{(summary.accounts || []).length ? (summary.accounts as Row[]).map((account) => <div key={account.id}><Landmark size={18} /><div><strong>{account.name}</strong><small>{account.type === "CASH" ? "Caixa físico" : account.type === "BANK" ? "Conta bancária" : "Outra conta"} · Saldo {money(Number(account.balance || 0))}</small></div></div>) : <div><Landmark size={18} /><div><strong>Cadastre uma conta financeira</strong><small>Separe caixa físico, bancos e outras contas.</small></div></div>}</section>}
-    {module === "cash" && sessions.filter((session) => session.status === "ABERTA").map((session) => <div className="success page-success" role="status" key={session.id}>Caixa aberto · {session.account?.name} · Abertura {money(Number(session.openingAmount || 0))}<button className="secondary" type="button" onClick={() => void closeSession(session)}>Fechar caixa</button></div>)}
+    {module === "cash" && <section className="financial-cash-routine" aria-labelledby="cash-routine-title">
+      <div className="financial-cash-routine-heading"><div><p className="eyebrow">ABERTURA E FECHAMENTO</p><h2 id="cash-routine-title">Rotina diária do caixa</h2><p className="muted">Acompanhe as sessões do dia, confira o valor contado e visualize diferenças no fechamento.</p></div><span className="financial-today-badge"><CalendarDays size={15} /> Hoje · {displayDate(todayKey)}</span></div>
+      <div className="financial-cash-session-summary"><strong>{todaySessions.length} {todaySessions.length === 1 ? "sessão iniciada" : "sessões iniciadas"} hoje</strong><span>{openSessions.length} {openSessions.length === 1 ? "caixa em aberto" : "caixas em aberto"}</span></div>
+      {cashSessionsToShow.length ? <div className="financial-cash-session-list">{cashSessionsToShow.map((session) => {
+        const isOpen = session.status === "ABERTA";
+        const difference = Number(session.difference || 0);
+        return <article className="financial-cash-session" key={session.id}>
+          <div className="financial-cash-session-heading"><div><strong>{session.account?.name || "Caixa físico"}</strong><small>{timestampLocalDate(session.openedAt) === todayKey ? "Hoje" : "Aberto em"} · {displayDateTime(session.openedAt)}{session.closedAt ? ` · Fechado ${displayDateTime(session.closedAt)}` : ""}</small></div><span className={`financial-session-status ${isOpen ? "is-open" : "is-closed"}`}>{isOpen ? "Em aberto" : "Fechado"}</span></div>
+          <div className="financial-cash-session-values"><span><small>Abertura</small><strong>{money(Number(session.openingAmount || 0))}</strong></span>{!isOpen && <><span><small>Esperado</small><strong>{money(Number(session.expectedClosingAmount || 0))}</strong></span><span><small>Contado</small><strong>{money(Number(session.closingAmount || 0))}</strong></span><span><small>Diferença</small><strong className={difference === 0 ? "" : difference > 0 ? "positive" : "negative"}>{money(difference)}</strong></span></>}</div>
+          {isOpen && <button className="secondary financial-close-session" type="button" onClick={() => void closeSession(session)}>Fechar caixa do dia</button>}
+        </article>;
+      })}</div> : <div className="financial-cash-session-empty"><strong>Nenhuma abertura registrada hoje.</strong><span>Inicie o caixa do dia para registrar entradas e saídas da sessão.</span><button className="secondary" type="button" onClick={() => openForm("open-session")} disabled={!availableCashAccounts.length}><Wallet size={15} /> Abrir caixa diário</button></div>}
+    </section>}
 
     <section className="financial-panel">
       {module === "accounts" && <div className="financial-toolbar"><div className="financial-tabs" role="tablist" aria-label="Tipo de conta"><button type="button" className={accountsTab === "receber" ? "active" : ""} onClick={() => setAccountsTab("receber")}>A receber ({receivables.length})</button><button type="button" className={accountsTab === "pagar" ? "active" : ""} onClick={() => setAccountsTab("pagar")}>A pagar ({payables.length})</button></div></div>}
       <div className="financial-toolbar">
         <label className="financial-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar lançamento..." /></label>
         <label className="financial-filter"><CalendarDays size={15} /><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="365">Últimos 12 meses</option></select></label>
+        {(module === "finance" || module === "sales" || module === "accounts") && <label className="financial-filter"><ArrowDownUp size={15} /><select aria-label="Ordenar lançamentos" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}><option value="date-desc">Data · mais recentes</option><option value="date-asc">Data · mais antigas</option><option value="person-asc">Paciente/pessoa · A–Z</option><option value="person-desc">Paciente/pessoa · Z–A</option></select></label>}
         <label className="financial-filter"><Filter size={15} /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="TODOS">Todos os status</option><option value="Pendente">Pendentes</option><option value="Parcial">Parciais</option><option value="Pago">Pagos</option><option value="Cancelado">Cancelados</option></select></label>
       </div>
       <div className="financial-table-wrap">
@@ -245,7 +276,7 @@ export function FinancialPage({ module }: { module: FinancialModule }) {
       </div>
     </section>
 
-    <FinancialFormModal formMode={formMode} form={form} accounts={accounts} suppliers={suppliers} patients={patients} doctors={doctors} saving={saving}
+    <FinancialFormModal formMode={formMode} form={form} accounts={accounts} sessions={sessions} suppliers={suppliers} patients={patients} doctors={doctors} saving={saving}
       onClose={() => setFormMode(null)} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} onSubmit={submitForm} />
     <SettlementModal settlement={settlement} form={form} accounts={accounts} saving={saving}
       onClose={() => setSettlement(null)} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} onSubmit={submitSettlement} />
