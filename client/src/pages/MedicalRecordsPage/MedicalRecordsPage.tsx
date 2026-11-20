@@ -2064,6 +2064,7 @@ const patientExamGroups = [
   { id: "usg_tv", title: "USG TV" },
   { id: "usg_mama", title: "USG Mama" },
   { id: "preventivo", title: "Preventivo" },
+  { id: "tcle", title: "TCLE" },
 ] as const;
 const legacyPatientExamTypes: Record<string, string> = {
   LABORATORIAIS: "laboratorial",

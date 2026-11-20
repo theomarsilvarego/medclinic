@@ -738,6 +738,7 @@ const appointmentExamTypes = [
   "usg_tv",
   "usg_mama",
   "preventivo",
+  "tcle",
 ] as const;
 const legacyAppointmentExamTypes: Record<
   string,

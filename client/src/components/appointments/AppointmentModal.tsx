@@ -22,6 +22,7 @@ const examLabels: Record<string, string> = {
   usg_tv: "USG TV",
   usg_mama: "USG Mama",
   preventivo: "Preventivo",
+  tcle: "TCLE",
   LABORATORIAIS: "Exames laboratoriais",
   USG_TRANSVAGINAL: "USG TV",
   USG_MANA: "USG Mama",
