@@ -50,3 +50,6 @@
 
 ## Organização das listas financeiras
 - [x] Organizar as listas de Vendas, Financeiro e Contas a pagar e receber por data e paciente/pessoa, com opções explícitas de ordenação e pesquisa que considere data e paciente/pessoa.
+
+## Parcelamento do saldo em pagamentos mistos
+- [x] Ao informar valores independentes por forma de pagamento, permitir parcelar os pagamentos seguintes no crédito sobre o valor restante.

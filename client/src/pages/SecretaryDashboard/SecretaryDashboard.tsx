@@ -334,9 +334,9 @@ export function SecretaryDashboard() {
         body: JSON.stringify({
           items: billableItems.map(({ kind, id }) => ({ kind, id })),
           payments,
-          paymentMethod: payments[0]?.method,
+          paymentMethod: payments.length === 1 ? payments[0].method : undefined,
           discountPercent: billingDiscount ? 5 : 0,
-          installments: payments.find((payment) => payment.method === "CREDIT_CARD")?.installments || 1,
+          installments: payments.length === 1 ? payments[0].installments : 1,
         }),
       });
       const billedKeys = new Set(billableItems.map(requestKey));

@@ -5004,7 +5004,7 @@ app.post(
           "O desconto de 5% está disponível somente para Pix ou dinheiro.",
       });
     if (
-      (parsed.data.installments > 1 && paymentMethod !== FinancialPaymentMethod.CREDIT_CARD) ||
+      (!parsed.data.payments?.length && parsed.data.installments > 1 && paymentMethod !== FinancialPaymentMethod.CREDIT_CARD) ||
       parsed.data.payments?.some(({ installments, method }) => installments > 1 && method !== FinancialPaymentMethod.CREDIT_CARD)
     )
       return res.status(400).json({
