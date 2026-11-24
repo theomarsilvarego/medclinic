@@ -129,12 +129,19 @@ export function PatientsPage({
       );
     }
     if (column.key === "state") {
-      const state = getStateNameFromUf(row.state) || getStateFromPhone(row.phone)?.name;
+      const state =
+        getStateNameFromUf(row.state) ||
+        getStateFromPhone(row.state)?.name ||
+        getStateFromPhone(row.phone)?.name;
       if (state) {
         return (
           <span
             className="state-badge"
-            title={row.state ? `UF: ${row.state}` : "Estado identificado pelo DDD"}
+            title={
+              getStateNameFromUf(row.state)
+                ? `UF: ${row.state}`
+                : "Estado identificado pelo DDD"
+            }
           >
             {state}
           </span>
