@@ -119,6 +119,7 @@ export function CrmPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<Status | "">("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [draggedId, setDraggedId] = useState<number | null>(null);
 
@@ -168,10 +169,12 @@ export function CrmPage() {
           .toLocaleLowerCase("pt-BR")
           .includes(term);
       return (
-        matchesSearch && (!categoryFilter || item.category === categoryFilter)
+        matchesSearch &&
+        (!statusFilter || item.status === statusFilter) &&
+        (!categoryFilter || item.category === categoryFilter)
       );
     });
-  }, [treatments, search, categoryFilter]);
+  }, [treatments, search, statusFilter, categoryFilter]);
 
   function openNew() {
     setEditing(null);
@@ -315,10 +318,28 @@ export function CrmPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por paciente ou produto"
+                placeholder="Buscar por nome do paciente ou produto"
+                aria-label="Buscar por nome do paciente ou produto"
               />
             </label>
             <label className="crm-filter">
+              <span>Estado</span>
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as Status | "")
+                }
+              >
+                <option value="">Todos os estados</option>
+                {statuses.map((item) => (
+                  <option value={item.value} key={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="crm-filter">
+              <span>Categoria</span>
               <select
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
