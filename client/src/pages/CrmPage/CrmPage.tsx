@@ -25,7 +25,7 @@ type Category =
 type Treatment = {
   id: number;
   patientId: number;
-  patient: { id: number; fullName: string; phone?: string | null };
+  patient: { id: number; fullName: string; phone?: string | null; state?: string | null };
   productType: ProductType;
   productId: number;
   productName: string;
@@ -140,15 +140,12 @@ const dddStates: Record<string, string> = {
   "98": "Maranhão (MA)",
   "99": "Maranhão (MA)",
 };
-const stateOptions = [...new Set(Object.values(dddStates))].sort((a, b) =>
-  a.localeCompare(b, "pt-BR"),
-);
-function patientState(phone?: string | null) {
-  const digits = String(phone || "").replace(/\D/g, "");
-  const ddd = digits.startsWith("55") && digits.length >= 12
-    ? digits.slice(2, 4)
-    : digits.slice(0, 2);
-  return dddStates[ddd] || "Estado não identificado";
+const stateOptions = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+];
+function patientState(state?: string | null) {
+  return state || "Estado não identificado";
 }
 
 function today() {
@@ -249,7 +246,7 @@ export function CrmPage() {
           .includes(term);
       return (
         matchesSearch &&
-        (!stateFilter || patientState(item.patient.phone) === stateFilter) &&
+        (!stateFilter || item.patient.state === stateFilter) &&
         (!categoryFilter || item.category === categoryFilter)
       );
     });
@@ -464,7 +461,7 @@ export function CrmPage() {
                           <strong>{item.patient.fullName}</strong>
                         </td>
                         <td>{item.patient.phone || "—"}</td>
-                        <td>{patientState(item.patient.phone)}</td>
+                        <td>{patientState(item.patient.state)}</td>
                         <td>
                           {item.productName}
                           <small>

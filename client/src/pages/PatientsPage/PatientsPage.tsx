@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import type { Profile, Row } from "../../lib/app";
 import { getRowId } from "../../lib/app";
-import { getStateFromPhone } from "../../lib/brazilian-ddd";
 import { patientsConfig } from "./config";
 import { patientService } from "./service";
 import { usePatientFilters } from "./hooks";
@@ -114,23 +113,7 @@ export function PatientsPage({
           </span>
         );
       }
-      const state = getStateFromPhone(row.phone);
-      return state ? (
-        <span
-          className="state-badge"
-          style={{ backgroundColor: state.color }}
-          title={`Identificado pelo DDD (${state.ddd})`}
-        >
-          {state.name} ({state.uf})
-        </span>
-      ) : (
-        <span
-          className="state-badge state-badge-unknown"
-          title="O celular não contém um DDD reconhecido entre parênteses."
-        >
-          Não identificado
-        </span>
-      );
+      return <span className="state-badge state-badge-unknown">Não identificado</span>;
     }
     if (column.key === "fullName" && doctorCanOpenRecords)
       return (

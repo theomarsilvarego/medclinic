@@ -5460,7 +5460,7 @@ async function crmProduct(productType: CrmProductType, productId: number) {
   });
 }
 const crmTreatmentInclude = {
-  patient: { select: { id: true, fullName: true, phone: true } },
+  patient: { select: { id: true, fullName: true, phone: true, state: true } },
   doses: {
     orderBy: { doseDate: "asc" as const },
     select: { id: true, doseDate: true },
@@ -5480,7 +5480,7 @@ app.get("/api/admin/crm/catalog", async (_req, res) => {
   const [patients, injectables, procedures] = await Promise.all([
     prisma.patient.findMany({
       orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, phone: true },
+      select: { id: true, fullName: true, phone: true, state: true },
     }),
     prisma.injectable.findMany({
       orderBy: { name: "asc" },
