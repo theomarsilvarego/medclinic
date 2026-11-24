@@ -13,6 +13,11 @@
   line-height: 1.35;
   white-space: normal;
 }
+.state-badge:not(.state-badge-unknown) {
+  border: 1px solid #bfdbfe;
+  background: #dbeafe;
+  color: #1e40af;
+}
 .state-badge-unknown,
 .insurance-badge-unknown {
   background: #e8e4e5;
