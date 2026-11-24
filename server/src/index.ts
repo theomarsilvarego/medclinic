@@ -1995,7 +1995,10 @@ function stateFromPhone(phone: unknown) {
   return dddStateMap[ddd] || null;
 }
 function patientDataWithState(data: z.infer<typeof patientSchema>) {
-  return { ...data, state: stateFromPhone(data.phone) };
+  return {
+    ...data,
+    state: data.state || stateFromPhone(data.phone),
+  };
 }
 
 // Pacientes são acessíveis a qualquer perfil autenticado.
