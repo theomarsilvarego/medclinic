@@ -44,7 +44,48 @@ for (const state of stateDefinitions) {
   }
 }
 
+const stateNamesByUf: Record<string, string> = {
+  AC: "Acre",
+  AL: "Alagoas",
+  AP: "Amapá",
+  AM: "Amazonas",
+  BA: "Bahia",
+  CE: "Ceará",
+  DF: "Distrito Federal",
+  ES: "Espírito Santo",
+  GO: "Goiás",
+  MA: "Maranhão",
+  MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul",
+  MG: "Minas Gerais",
+  PA: "Pará",
+  PB: "Paraíba",
+  PR: "Paraná",
+  PE: "Pernambuco",
+  PI: "Piauí",
+  RJ: "Rio de Janeiro",
+  RN: "Rio Grande do Norte",
+  RS: "Rio Grande do Sul",
+  RO: "Rondônia",
+  RR: "Roraima",
+  SC: "Santa Catarina",
+  SP: "São Paulo",
+  SE: "Sergipe",
+  TO: "Tocantins",
+};
+
+export function getStateNameFromUf(uf: unknown): string | null {
+  return stateNamesByUf[String(uf ?? "").trim().toUpperCase()] ?? null;
+}
+
 export function getStateFromPhone(phone: unknown): BrazilianState | null {
-  const match = String(phone ?? "").match(/\(\s*(\d{2})\s*\)/);
-  return match ? statesByDdd.get(match[1]) ?? null : null;
+  const value = String(phone ?? "");
+  const formattedMatch = value.match(/\(\s*(\d{2})\s*\)/);
+  if (formattedMatch) return statesByDdd.get(formattedMatch[1]) ?? null;
+
+  const digits = value.replace(/\D/g, "");
+  const ddd = digits.startsWith("55") && digits.length >= 12
+    ? digits.slice(2, 4)
+    : digits.slice(0, 2);
+  return statesByDdd.get(ddd) ?? null;
 }

@@ -15,6 +15,7 @@ import { usePatientFilters } from "./hooks";
 import type { PatientRow } from "./types";
 import { PatientModal } from "./PatientModal";
 import "./PatientsPage.css";
+import { getStateFromPhone, getStateNameFromUf } from "../../lib/brazilian-ddd";
 
 type PatientPageProps = {
   profile?: Profile;
@@ -128,13 +129,14 @@ export function PatientsPage({
       );
     }
     if (column.key === "state") {
-      if (row.state) {
+      const state = getStateNameFromUf(row.state) || getStateFromPhone(row.phone)?.name;
+      if (state) {
         return (
           <span
             className="state-badge"
-            title="UF gravada no cadastro do paciente"
+            title={row.state ? `UF: ${row.state}` : "Estado identificado pelo DDD"}
           >
-            {row.state}
+            {state}
           </span>
         );
       }
