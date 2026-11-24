@@ -39,12 +39,27 @@ export function PatientsPage({
   const [error, setError] = useState("");
   const [insuranceOptions, setInsuranceOptions] = useState<any[]>([]);
   const {
-    search, setSearch, insuranceFilter, setInsuranceFilter, stateFilter, setStateFilter,
-    pageSize, setPageSize, page, setPage, pageSizes, totalPages,
-    insuranceNames, stateOptions, filteredRows, visibleRows,
+    search,
+    setSearch,
+    insuranceFilter,
+    setInsuranceFilter,
+    stateFilter,
+    setStateFilter,
+    pageSize,
+    setPageSize,
+    page,
+    setPage,
+    pageSizes,
+    totalPages,
+    insuranceNames,
+    stateOptions,
+    filteredRows,
+    visibleRows,
   } = usePatientFilters(rows);
   const fields = config.fields.map((field) =>
-    field.key === "insuranceCode" ? { ...field, options: insuranceOptions } : field,
+    field.key === "insuranceCode"
+      ? { ...field, options: insuranceOptions }
+      : field,
   );
 
   async function load() {
@@ -58,10 +73,17 @@ export function PatientsPage({
       setInsuranceOptions(
         (insurances || [])
           .filter((row: Row) => row.active)
-          .map((row: Row) => ({ value: row.id, label: `${row.id} - ${row.name}` })),
+          .map((row: Row) => ({
+            value: row.id,
+            label: `${row.id} - ${row.name}`,
+          })),
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Não foi possível carregar os pacientes.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível carregar os pacientes.",
+      );
     } finally {
       setLoading(false);
     }
@@ -108,12 +130,19 @@ export function PatientsPage({
     if (column.key === "state") {
       if (row.state) {
         return (
-          <span className="state-badge" title="UF gravada no cadastro do paciente">
+          <span
+            className="state-badge"
+            title="UF gravada no cadastro do paciente"
+          >
             {row.state}
           </span>
         );
       }
-      return <span className="state-badge state-badge-unknown">Não identificado</span>;
+      return (
+        <span className="state-badge state-badge-unknown">
+          Não identificado
+        </span>
+      );
     }
     if (column.key === "fullName" && doctorCanOpenRecords)
       return (
@@ -188,7 +217,7 @@ export function PatientsPage({
       </div>
       {error && <div className="error page-error">{error}</div>}
       <div className="table-card">
-        {(
+        {
           <div className="patient-list-toolbar">
             <div className="patient-list-controls">
               <label className="patient-search">
@@ -231,7 +260,7 @@ export function PatientsPage({
               {filteredRows.length === 1 ? "" : "s"}
             </span>
           </div>
-        )}
+        }
         <div className="table-head">
           <strong>
             {`${visibleRows.length} de ${filteredRows.length} paciente${filteredRows.length === 1 ? "" : "s"}`}
@@ -277,30 +306,30 @@ export function PatientsPage({
                     ))}
                     <td className="row-actions">
                       {(() => {
-                          const href = whatsappUrl(row.phone);
-                          return href ? (
-                            <a
-                              className="whatsapp-link-button"
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={`Abrir WhatsApp para ${row.fullName}`}
-                              aria-label={`Abrir WhatsApp para ${row.fullName}`}
-                            >
-                              <img src="/icons/whatsapp-iconscout.png" alt="" />
-                            </a>
-                          ) : (
-                            <button
-                              className="whatsapp-link-button whatsapp-disabled"
-                              type="button"
-                              disabled
-                              title="Celular ausente ou inválido"
-                              aria-label="Celular ausente ou inválido"
-                            >
-                              <img src="/icons/whatsapp-iconscout.png" alt="" />
-                            </button>
-                          );
-                        })()}
+                        const href = whatsappUrl(row.phone);
+                        return href ? (
+                          <a
+                            className="whatsapp-link-button"
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Abrir WhatsApp para ${row.fullName}`}
+                            aria-label={`Abrir WhatsApp para ${row.fullName}`}
+                          >
+                            <img src="/icons/whatsapp-iconscout.png" alt="" />
+                          </a>
+                        ) : (
+                          <button
+                            className="whatsapp-link-button whatsapp-disabled"
+                            type="button"
+                            disabled
+                            title="Celular ausente ou inválido"
+                            aria-label="Celular ausente ou inválido"
+                          >
+                            <img src="/icons/whatsapp-iconscout.png" alt="" />
+                          </button>
+                        );
+                      })()}
                       {doctorCanOpenRecords && (
                         <button
                           className="record-link-button"

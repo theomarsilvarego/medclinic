@@ -25,7 +25,12 @@ type Category =
 type Treatment = {
   id: number;
   patientId: number;
-  patient: { id: number; fullName: string; phone?: string | null; state?: string | null };
+  patient: {
+    id: number;
+    fullName: string;
+    phone?: string | null;
+    state?: string | null;
+  };
   productType: ProductType;
   productId: number;
   productName: string;
@@ -71,78 +76,34 @@ const statusLabels = Object.fromEntries(
 const categoryLabels = Object.fromEntries(
   categories.map((item) => [item.value, item.label]),
 ) as Record<Category, string>;
-const dddStates: Record<string, string> = {
-  "11": "São Paulo (SP)",
-  "12": "São Paulo (SP)",
-  "13": "São Paulo (SP)",
-  "14": "São Paulo (SP)",
-  "15": "São Paulo (SP)",
-  "16": "São Paulo (SP)",
-  "17": "São Paulo (SP)",
-  "18": "São Paulo (SP)",
-  "19": "São Paulo (SP)",
-  "21": "Rio de Janeiro (RJ)",
-  "22": "Rio de Janeiro (RJ)",
-  "24": "Rio de Janeiro (RJ)",
-  "27": "Espírito Santo (ES)",
-  "28": "Espírito Santo (ES)",
-  "31": "Minas Gerais (MG)",
-  "32": "Minas Gerais (MG)",
-  "33": "Minas Gerais (MG)",
-  "34": "Minas Gerais (MG)",
-  "35": "Minas Gerais (MG)",
-  "37": "Minas Gerais (MG)",
-  "38": "Minas Gerais (MG)",
-  "41": "Paraná (PR)",
-  "42": "Paraná (PR)",
-  "43": "Paraná (PR)",
-  "44": "Paraná (PR)",
-  "45": "Paraná (PR)",
-  "46": "Paraná (PR)",
-  "47": "Santa Catarina (SC)",
-  "48": "Santa Catarina (SC)",
-  "49": "Santa Catarina (SC)",
-  "51": "Rio Grande do Sul (RS)",
-  "53": "Rio Grande do Sul (RS)",
-  "54": "Rio Grande do Sul (RS)",
-  "55": "Rio Grande do Sul (RS)",
-  "61": "Distrito Federal (DF)",
-  "62": "Goiás (GO)",
-  "64": "Goiás (GO)",
-  "63": "Tocantins (TO)",
-  "65": "Mato Grosso (MT)",
-  "66": "Mato Grosso (MT)",
-  "67": "Mato Grosso do Sul (MS)",
-  "68": "Acre (AC)",
-  "69": "Rondônia (RO)",
-  "71": "Bahia (BA)",
-  "73": "Bahia (BA)",
-  "74": "Bahia (BA)",
-  "75": "Bahia (BA)",
-  "77": "Bahia (BA)",
-  "79": "Sergipe (SE)",
-  "81": "Pernambuco (PE)",
-  "87": "Pernambuco (PE)",
-  "82": "Alagoas (AL)",
-  "83": "Paraíba (PB)",
-  "84": "Rio Grande do Norte (RN)",
-  "85": "Ceará (CE)",
-  "88": "Ceará (CE)",
-  "86": "Piauí (PI)",
-  "89": "Piauí (PI)",
-  "91": "Pará (PA)",
-  "93": "Pará (PA)",
-  "94": "Pará (PA)",
-  "92": "Amazonas (AM)",
-  "97": "Amazonas (AM)",
-  "95": "Roraima (RR)",
-  "96": "Amapá (AP)",
-  "98": "Maranhão (MA)",
-  "99": "Maranhão (MA)",
-};
 const stateOptions = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
-  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+  { uf: "AC", name: "Acre" },
+  { uf: "AL", name: "Alagoas" },
+  { uf: "AP", name: "Amapá" },
+  { uf: "AM", name: "Amazonas" },
+  { uf: "BA", name: "Bahia" },
+  { uf: "CE", name: "Ceará" },
+  { uf: "DF", name: "Distrito Federal" },
+  { uf: "ES", name: "Espírito Santo" },
+  { uf: "GO", name: "Goiás" },
+  { uf: "MA", name: "Maranhão" },
+  { uf: "MT", name: "Mato Grosso" },
+  { uf: "MS", name: "Mato Grosso do Sul" },
+  { uf: "MG", name: "Minas Gerais" },
+  { uf: "PA", name: "Pará" },
+  { uf: "PB", name: "Paraíba" },
+  { uf: "PR", name: "Paraná" },
+  { uf: "PE", name: "Pernambuco" },
+  { uf: "PI", name: "Piauí" },
+  { uf: "RJ", name: "Rio de Janeiro" },
+  { uf: "RN", name: "Rio Grande do Norte" },
+  { uf: "RS", name: "Rio Grande do Sul" },
+  { uf: "RO", name: "Rondônia" },
+  { uf: "RR", name: "Roraima" },
+  { uf: "SC", name: "Santa Catarina" },
+  { uf: "SP", name: "São Paulo" },
+  { uf: "SE", name: "Sergipe" },
+  { uf: "TO", name: "Tocantins" },
 ];
 function patientState(state?: string | null) {
   return state || "Estado não identificado";
@@ -402,15 +363,15 @@ export function CrmPage() {
               <span>Estado (DDD)</span>
               <select
                 value={stateFilter}
-                onChange={(event) =>
-                  setStateFilter(event.target.value)
-                }
+                onChange={(event) => setStateFilter(event.target.value)}
               >
                 <option value="">Todos os estados</option>
-                <option value="Estado não identificado">Estado não identificado</option>
+                <option value="Estado não identificado">
+                  Estado não identificado
+                </option>
                 {stateOptions.map((state) => (
-                  <option value={state} key={state}>
-                    {state}
+                  <option value={state.uf} key={state.uf}>
+                    {state.name} ({state.uf})
                   </option>
                 ))}
               </select>
