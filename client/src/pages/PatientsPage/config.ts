@@ -58,6 +58,16 @@ export const patientsConfig: ResourceConfig = {
         section: "Contato",
       },
       {
+        key: "state",
+        label: "Estado (UF)",
+        type: "select",
+        options: [
+          "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+          "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+        ].map((uf) => ({ value: uf, label: uf })),
+        section: "Contato",
+      },
+      {
         key: "insuranceCode",
         label: "Convênio",
         type: "select",

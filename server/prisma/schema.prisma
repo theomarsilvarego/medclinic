@@ -214,6 +214,7 @@ model Patient {
   cpf            String?         @db.VarChar(14)
   email          String?         @db.VarChar(180)
   phone          String?         @db.VarChar(40)
+  state          String?         @db.Char(2)
   birthDate      DateTime?       @map("birth_date") @db.Date
   insuranceCode  Int?            @map("insurance_code")
   notes          String?         @db.Text

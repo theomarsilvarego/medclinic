@@ -1959,6 +1959,7 @@ const patientSchema = z.object({
   cpf: z.string().trim().optional().nullable(),
   email: z.string().trim().email().optional().nullable().or(z.literal("")),
   phone: z.string().trim().optional().nullable(),
+  state: z.string().trim().toUpperCase().length(2).optional().nullable(),
   birthDate: z.coerce.date().optional().nullable(),
   insuranceCode: z.coerce.number().int().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -1972,6 +1973,30 @@ const patientSchema = z.object({
     )
     .optional(),
 });
+
+// Pacientes são acessíveis a qualquer perfil autenticado.
+const dddStateMap: Record<string, string> = {
+  "11": "SP", "12": "SP", "13": "SP", "14": "SP", "15": "SP", "16": "SP", "17": "SP", "18": "SP", "19": "SP",
+  "21": "RJ", "22": "RJ", "24": "RJ", "27": "ES", "28": "ES",
+  "31": "MG", "32": "MG", "33": "MG", "34": "MG", "35": "MG", "37": "MG", "38": "MG",
+  "41": "PR", "42": "PR", "43": "PR", "44": "PR", "45": "PR", "46": "PR",
+  "47": "SC", "48": "SC", "49": "SC", "51": "RS", "53": "RS", "54": "RS", "55": "RS",
+  "61": "DF", "62": "GO", "64": "GO", "63": "TO", "65": "MT", "66": "MT", "67": "MS",
+  "68": "AC", "69": "RO", "71": "BA", "73": "BA", "74": "BA", "75": "BA", "77": "BA", "79": "SE",
+  "81": "PE", "87": "PE", "82": "AL", "83": "PB", "84": "RN", "85": "CE", "88": "CE",
+  "86": "PI", "89": "PI", "91": "PA", "93": "PA", "94": "PA", "92": "AM", "97": "AM",
+  "95": "RR", "96": "AP", "98": "MA", "99": "MA",
+};
+function stateFromPhone(phone: unknown) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  const ddd = digits.startsWith("55") && digits.length >= 12
+    ? digits.slice(2, 4)
+    : digits.slice(0, 2);
+  return dddStateMap[ddd] || null;
+}
+function patientDataWithState(data: z.infer<typeof patientSchema>) {
+  return { ...data, state: stateFromPhone(data.phone) };
+}
 
 // Pacientes são acessíveis a qualquer perfil autenticado.
 app.get("/api/patients", auth, async (_req, res) => {
@@ -2042,7 +2067,7 @@ app.post(
           message: "O convênio selecionado não está cadastrado no sistema.",
         });
     }
-    const { removePhoto: _removePhoto, ...patientData } = parsed.data;
+    const { removePhoto: _removePhoto, ...patientData } = patientDataWithState(parsed.data);
     const patient = await prisma.patient.create({ data: patientData });
     if (req.file) {
       const extension = req.file.mimetype === "image/png" ? ".png" : ".jpg";
@@ -2091,7 +2116,7 @@ app.put(
       where: { id },
       select: { photoStorageKey: true },
     });
-    const { removePhoto, ...patientData } = parsed.data;
+    const { removePhoto, ...patientData } = patientDataWithState(parsed.data);
     const data: typeof patientData & { photoStorageKey?: string | null } = {
       ...patientData,
     };

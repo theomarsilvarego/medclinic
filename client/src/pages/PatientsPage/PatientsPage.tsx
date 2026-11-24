@@ -107,6 +107,13 @@ export function PatientsPage({
       );
     }
     if (column.key === "state") {
+      if (row.state) {
+        return (
+          <span className="state-badge" title="UF gravada no cadastro do paciente">
+            {row.state}
+          </span>
+        );
+      }
       const state = getStateFromPhone(row.phone);
       return state ? (
         <span

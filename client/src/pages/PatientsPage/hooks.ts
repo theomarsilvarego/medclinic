@@ -21,8 +21,11 @@ export function usePatientFilters(rows: Row[]) {
   const stateOptions = useMemo(() => {
     const states = new Map<string, { uf: string; name: string }>();
     rows.forEach((row) => {
-      const state = getStateFromPhone(row.phone);
-      if (state) states.set(state.uf, { uf: state.uf, name: state.name });
+      const state = row.state || getStateFromPhone(row.phone)?.uf;
+      if (state) {
+        const detected = getStateFromPhone(row.phone);
+        states.set(String(state), { uf: String(state), name: detected?.name || String(state) });
+      }
     });
     return Array.from(states.values()).sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
   }, [rows]);
@@ -34,7 +37,7 @@ export function usePatientFilters(rows: Row[]) {
       );
       const matchesInsurance = !insuranceFilter ||
         String(row.insuranceName || "").toLocaleLowerCase("pt-BR") === insuranceFilter.toLocaleLowerCase("pt-BR");
-      const matchesState = !stateFilter || getStateFromPhone(row.phone)?.uf === stateFilter;
+      const matchesState = !stateFilter || String(row.state || getStateFromPhone(row.phone)?.uf || "") === stateFilter;
       return matchesSearch && matchesInsurance && matchesState;
     });
   }, [rows, search, insuranceFilter, stateFilter]);
